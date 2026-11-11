@@ -6,6 +6,7 @@ use pdf_engine::PdfiumRenderer;
 use qpdf_adapter::QpdfProbe;
 use std::path::PathBuf;
 mod books;
+mod exporting;
 mod synthetic;
 mod text;
 
@@ -91,6 +92,31 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
 
 fn main() -> Result<()> {
     let root = dunce::canonicalize(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
+    if std::env::args().nth(1).as_deref() == Some("--write-export-fixtures") {
+        let dir = root.join(".research/export-fixtures");
+        std::fs::create_dir_all(&dir)?;
+        for feature in [
+            "plain",
+            "info",
+            "metadata",
+            "form",
+            "signature",
+            "tagged",
+            "bookmark",
+            "annotation",
+            "javascript",
+            "attachment",
+            "labels",
+            "unknown",
+        ] {
+            std::fs::write(
+                dir.join(format!("{feature}.pdf")),
+                synthetic::export_safety_pdf(feature),
+            )?;
+        }
+        println!("Generated synthetic export fixtures");
+        return Ok(());
+    }
     if std::env::args().nth(1).as_deref() == Some("--benchmark-books") {
         return books::run(&root);
     }
@@ -154,5 +180,6 @@ fn main() -> Result<()> {
     println!("PASS: pinned QPDF, PDFium rendering, page order, rotation, source unchanged");
     m1_smoke(&root, &renderer)?;
     text::run(&root, &renderer)?;
+    exporting::run(&root, &renderer)?;
     Ok(())
 }

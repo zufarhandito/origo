@@ -1,4 +1,67 @@
-﻿# Verification log
+# Latest verification - M3 safe PDF export, 11 November 2026
+
+This supersedes status claims in historical sections below. Current implementation:
+M1 viewer, M2 organizer, M3 PDF Save As/Extract and presentation-only conversion home.
+
+- scripts/check.ps1 passed formatting, workspace/all-target denied-warning Clippy,
+  **30 unit tests**, and the release workspace build. Debug workspace build also
+  passed. Additional native regression cases were then added; formatting/Clippy and
+  debug/release builds passed again. No product logic changed after release UI checks.
+- Debug and release native smoke passed: existing M0/M1/text cases plus production M3
+  two-source reorder/rotate/delete Save As and selected Extract. It compares source
+  text and sampled rasters, tests all 16 intrinsic/virtual rotation combinations,
+  Unicode/spaces/ampersand/leading-hyphen paths, metadata detection and consent,
+  form/signature-marker/tag/bookmark/annotation/JavaScript/attachment/label/unknown
+  rejection, real encrypted input, malformed input, actual QPDF recovery exit 3,
+  unused-source filtering, source changes before commit and staging cleanup.
+- Unit failure coverage includes no-clobber of an existing hardlink, a competing
+  destination created after staging, source changes, no metadata consent, fake engine
+  failure, cancellation and output validation mismatch. Real child-process fixtures
+  exercise capture overflow, a 100 ms timeout, cancellation and exit code 7. QPDF
+  missing/version mismatch and JSON schema/cycle/count/unsafe-object cases are tested.
+  The synthetic signature marker is not a cryptographically valid signature fixture.
+- Release M3 UI passed: import two sources, move/rotate/delete, Save As seven pages,
+  QPDF count/rotation verification, clean baseline plus Undo/Redo, Extract one page
+  retaining dirty status, native save cancellation, metadata decline/accept, blocked
+  form export retaining a readable viewer, source hashes and staging cleanup.
+  Evidence: .research/m3-ui-7bbee9c601fc4ffaaf510ca304f3d33c.
+  Debug M3 UI also passed: .research/m3-ui-7d6625f4d15e4e8e9670fc10d9fff22d.
+- Release chrome passed Baca/Atur/Konversi, both themes, long filename,
+  860/1000/1200/1600 widths, navigation/zoom non-overlap and focused input/Enter.
+  Evidence: .research/chrome-ui-2e567cbc4cbf4b9f9879823d4cbf8475.
+  Conversion without a document passed after readiness was made explicit:
+  .research/chrome-ui-48846d95a2cf4538ae237726790301a4.
+- Release M2 UI passed drag/cancel, rotation/move/delete/empty/history/native import,
+  exact multi-source mapping and source hashes:
+  .research/m2-ui-bf41773522f842cdb9cfbecc49532035.
+- Release M1 UI passed empty startup, lazy 100 pages, navigation/boundaries/thumbnails,
+  scrolling, rapid 50-400% zoom, fit/resize and unchanged sources:
+  .research/m1-ui-010a6ccb74954136ae5bbcb09cf79c32.
+- Release text UI passed single-click/jitter, double-click, forward/reverse drag/copy,
+  zoom reuse, mode/conversion selection preservation, four rotations, cross-page copy,
+  clear/cache bounds and source hashes. Clipboard restored:
+  .research/text-ui-a031084328064388a4efd606e56f873f.
+- PowerShell parsing and git diff whitespace checks passed. CI includes expanded native
+  smoke automatically, but no remote CI execution is claimed.
+
+Harness fixes: native Save filename is Edit ID 1001, Open is Edit ID 1148; do not
+match the address toolbar or Search Box. TaskDialog's CCPushButton HWND control ID
+is not its logical answer ID; use posted TDM_CLICK_BUTTON with pinned GPUI's negative
+answer indices. Chrome waits for accessible readiness. Rapid zoom can disable its
+button between UIA IsEnabled and Invoke; the test handles that race and still requires
+exact final numeric bounds. Earlier failed attempts are not passing evidence.
+
+All data was synthetic and UI input targeted the test's own HWNDs; no global SendKeys.
+Physical mixed-DPI/trackpad/modifiers, broader accessibility, real complex PDF fidelity,
+ACL-specific errors, hard native cancellation/isolation, crash recovery and portable
+clean-machine/license acceptance remain manual or future gates. No 2000+ page or
+universal preservation claim is made. Sources remain read-only; converters remain
+Akan datang. See ADR-0003 and m3-safe-export-plan.md for exact export limits.
+
+---
+
+# Historical verification records
+# Verification log
 
 Results below were accumulated during the implementation sessions of 9–10 November
 2026. See [PROJECT_HANDOFF.md](../PROJECT_HANDOFF.md), recorded 11 November 2026,

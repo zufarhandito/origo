@@ -190,9 +190,32 @@ impl Viewer {
                             })),
                     ),
             )
+            .when(available && self.mode != ViewerMode::Convert, |el| {
+                el.child(
+                    Button::new("save-as")
+                        .primary()
+                        .label("Simpan sebagai")
+                        .h(px(32.))
+                        .tooltip("Simpan PDF baru - Ctrl+Shift+S")
+                        .disabled(self.opening || self.export.running || self.navigation.count == 0)
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.start_export(pdf_application::export::ExportScope::All, cx)
+                        })),
+                )
+            })
+            .when(self.export.running, |el| {
+                el.child(
+                    Button::new("cancel-export")
+                        .ghost()
+                        .label("Batal ekspor")
+                        .h(px(32.))
+                        .on_click(cx.listener(|this, _, _, cx| this.cancel_export(cx))),
+                )
+            })
             .child(
                 Button::new("open")
-                    .primary()
+                    .when(!available, |b| b.primary())
+                    .when(available, |b| b.ghost())
                     .icon(IconName::FolderOpen)
                     .label("Buka PDF")
                     .h(px(32.))
@@ -516,6 +539,18 @@ impl Viewer {
                     .tooltip("Tambahkan PDF - Ctrl+Shift+O")
                     .disabled(self.opening)
                     .on_click(cx.listener(|this, _, _, cx| this.import_pdf(cx))),
+            )
+            .child(
+                Button::new("extract-pages")
+                    .ghost()
+                    .label("Ekstrak")
+                    .accessibility_label("Ekstrak halaman")
+                    .h(px(32.))
+                    .tooltip("Simpan halaman terpilih sebagai PDF baru")
+                    .disabled(disabled || self.export.running)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.start_export(pdf_application::export::ExportScope::Selected, cx)
+                    })),
             )
             .child(divider(cx))
             .child(

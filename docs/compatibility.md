@@ -1,15 +1,18 @@
 ﻿# Current compatibility
 
-M2 is a Windows x64 virtual page organizer using GPUI Kit 0.9.1. Multiple PDF sources,
+M3 is a Windows x64 PDF organizer/exporter using GPUI Kit 0.9.1. Multiple PDF sources,
 page selection, reorder, rotate, delete, import and bounded Undo/Redo are implemented.
-Edits are session-only: Save As and production exports remain M3. No form/signature
-preservation claims are made. See organizer.md for controls, selection semantics and
+Save As exports the full plan; Extract exports selected pages in workspace order.
+Both require a new .pdf destination and never overwrite existing files or sources.
+Only a successful full export matching the current workspace instance/revision marks
+that revision clean. Extract and older snapshots do not. Unsaved edits are discarded
+on Open/close; there is no recovery or automatic save prompt. See organizer.md for controls and
 aggregate limits. Baca mode is for navigation/text; Atur halaman exposes page operations.
 Mode changes do not mark content dirty. Structural edits explicitly clear text selection and positional caches.
 
 Konversi is an informational roadmap page with Akan datang cards. PDF-to-images,
 Word/TXT/Excel/PowerPoint and conversion into PDF are not operational. No converter
-runtime, OCR model or network upload was added. Save As/Extract are still planned M3.
+runtime, OCR model or network upload was added. Save As/Extract produce PDFs only.
 See m3-safe-export-plan.md and conversion-roadmap.md for scope and prerequisites.
 
 Text selection is available as a requested viewer addition before M2: single-click
@@ -40,7 +43,23 @@ and fingerprints are not cryptographic hashes. Reopen after editing a source ext
 PDFium calls are serialized and have no hard timeout or process sandbox. A hung native
 call can occupy the single worker; hostile-document containment remains future work.
 The UI can navigate while normal rendering proceeds, but stale native calls cannot
-be interrupted in-process. QPDF runs only for trusted synthetic smoke tests.
+be interrupted in-process. Export QPDF child processes support cancellation, bounded
+stdout/stderr and a cumulative 120-second process-time budget (excluding user dialogs).
+PDFium output validation is cooperative before/after the native call, without a hard timeout.
+
+Export preflight requires clean QPDF 12.4.2 checks and recognized JSON v2 structure.
+Encrypted, signed, AcroForm/XFA, tagged, bookmark, annotation/link, attachment,
+active-content, optional-content and unknown complex catalog/page constructs are blocked.
+QPDF recovery warnings also block export. Ordinary Info/XMP document metadata may be
+lost and requires explicit acknowledgement for that snapshot. No implicit flattening,
+decryption, signature stripping or rasterization is performed. Supported pages retain
+PDF content/resources, but universal semantic preservation is not claimed.
+
+Private source copies and staged output are owned by the job in the destination folder.
+QPDF checks and PDFium count/geometry/orientation validation precede a flushed
+non-clobber commit. Source size/mtime is rechecked, including before publication.
+Failure/cancel cleans owned staging; crash-orphan recovery and universal crash durability
+are not implemented. See ADR-0003 and m3-safe-export-plan.md.
 
 DPR layout/raster math is tested; physical mixed-monitor 100/150/200% acceptance is
 pending. Broader complex-PDF/accessibility tests, runtime/license audit and clean-machine

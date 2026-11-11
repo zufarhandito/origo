@@ -73,7 +73,11 @@ function Invoke-Control([string]$Name,[int]$Delay=100){
     if(-not $node.Current.IsEnabled){return $false}
 
     $pattern=$null
-    if($node.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)) { $pattern.Invoke() } else {
+    if($node.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)) {
+        # A rapid final zoom click can reach the bound between IsEnabled and Invoke.
+        # The caller still asserts the final 50/400% value through Wait-State.
+        try { $pattern.Invoke() } catch [Windows.Automation.ElementNotEnabledException] { return $false }
+    } else {
         $r=$node.Current.BoundingRectangle
         $pt=New-Object M1Window+Point
         $pt.X=[int]($r.X+$r.Width/2);$pt.Y=[int]($r.Y+$r.Height/2)

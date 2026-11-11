@@ -13,9 +13,20 @@ $metrics=Join-Path $directory metrics.json
 $old=@(Get-Process pdf-studio -ErrorAction SilentlyContinue|ForEach-Object Id)
 $arguments=if($NoDocument){'--metrics "'+$metrics+'"'}else{'"'+$fixture+'" --metrics "'+$metrics+'"'}
 (New-Object -ComObject Shell.Application).ShellExecute((Join-Path $root "target/$Profile/pdf-studio.exe"),$arguments,$root,'open',1)
-Start-Sleep -Seconds 3
-$app=Get-Process pdf-studio|Where-Object Id -NotIn $old|Select-Object -First 1
-$ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+$deadline=(Get-Date).AddSeconds(25)
+do {
+    Start-Sleep -Milliseconds 200
+    $app=Get-Process pdf-studio -ErrorAction SilentlyContinue|Where-Object Id -NotIn $old|Select-Object -First 1
+    $ready=$null
+    if($app){
+        $app.Refresh()
+        if($app.MainWindowHandle -ne 0){
+            $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+            $ready=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Konversi'))
+        }
+    }
+} while(-not $ready -and (Get-Date) -lt $deadline)
+if(-not $ready){throw "Chrome not ready. Evidence: $directory"}
 function Find($Name){return $ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$Name))}
 function Invoke($Name){$n=Find $Name;if(-not $n){throw "Missing $Name"};
     $pattern=$null

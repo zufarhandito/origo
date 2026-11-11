@@ -635,6 +635,12 @@ impl Render for Viewer {
                 }),
             )
             .on_action(cx.listener(Self::open))
+            .on_action(cx.listener(|this, _: &SaveAs, _, cx| {
+                this.start_export(pdf_application::export::ExportScope::All, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ExtractPages, _, cx| {
+                this.start_export(pdf_application::export::ExportScope::Selected, cx)
+            }))
             .on_action(cx.listener(|this, _: &ImportPdf, _, cx| this.import_pdf(cx)))
             .on_action(cx.listener(|this, _: &UndoEdit, _, cx| this.history(false, cx)))
             .on_action(cx.listener(|this, _: &RedoEdit, _, cx| this.history(true, cx)))
@@ -675,6 +681,30 @@ impl Render for Viewer {
                 ),
             )
             .child(header)
+            .when_some(self.export.notice.clone(), |el, notice| {
+                el.child(
+                    div()
+                        .id("export-notice")
+                        .px_4()
+                        .py_2()
+                        .flex()
+                        .items_center()
+                        .gap_3()
+                        .border_b_1()
+                        .border_color(c.border)
+                        .child(div().flex_1().text_sm().child(notice))
+                        .child(
+                            Button::new("dismiss-export")
+                                .ghost()
+                                .icon(IconName::X)
+                                .accessibility_label("Tutup pemberitahuan ekspor")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.export.notice = None;
+                                    cx.notify();
+                                })),
+                        ),
+                )
+            })
             .children(reading_toolbar)
             .children(organizer_toolbar)
             .child(body)
@@ -688,10 +718,18 @@ impl Render for Viewer {
                             .flex()
                             .items_center()
                             .gap_2()
-                            .when(self.opening || self.inflight.is_some(), |this| {
-                                this.child(Spinner::new().xsmall())
-                            })
-                            .child(if self.mode == ViewerMode::Convert {
+                            .when(
+                                self.opening || self.inflight.is_some() || self.export.running,
+                                |this| this.child(Spinner::new().xsmall()),
+                            )
+                            .child(if self.export.running {
+                                self.export
+                                    .control
+                                    .as_ref()
+                                    .map(|c| c.phase().label())
+                                    .unwrap_or("Mengekspor PDF")
+                                    .to_owned()
+                            } else if self.mode == ViewerMode::Convert {
                                 "Konversi - fitur akan datang".to_owned()
                             } else {
                                 self.status.clone()

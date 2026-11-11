@@ -1,4 +1,4 @@
-﻿name: Windows M1 checks
+name: Windows PDF Studio checks
 on: [push, pull_request, workflow_dispatch]
 jobs:
   native:

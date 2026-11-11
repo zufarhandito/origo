@@ -10,6 +10,9 @@ pdf-application.workspace = true
 pdf-engine.workspace = true
 qpdf-adapter.workspace = true
 tempfile.workspace = true
+pdf-domain.workspace = true
+pdf-platform.workspace = true
+serde_json.workspace = true
 [lints]
 workspace = true
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/desktop", "apps/smoke", "crates/domain", "crates/application", "crates/pdf-engine", "crates/qpdf-adapter"]
+members = ["apps/desktop", "apps/smoke", "crates/domain", "crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "crates/platform"]
 default-members = ["crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "apps/smoke"]
 
 [workspace.package]
@@ -11,6 +11,8 @@ publish = false
 [workspace.dependencies]
 anyhow = "=1.0.100"
 thiserror = "=2.0.17"
+serde_json = "=1.0.154"
+pdf-platform = { path = "crates/platform" }
 image = { version = "=0.25.8", default-features = false }
 smallvec = "=1.15.1"
 tempfile = "=3.23.0"

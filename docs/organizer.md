@@ -2,11 +2,14 @@
 
 The workspace owns multiple sources and one authoritative ordered page plan. Page IDs
 stay stable through move/rotate/delete/undo. Source PDFs are never written by organizer
-operations. Save As and Extract remain M3; edits currently live only in this session.
-Opening another PDF or closing the app discards this virtual plan.
+operations. Simpan sebagai (Ctrl+Shift+S) exports the full current plan to a new PDF;
+Ekstrak exports selected pages in workspace order. Both perform structural preflight
+and output validation. Existing destinations are refused. Opening another PDF or
+closing discards unsaved virtual edits; there is no automatic save/recovery prompt.
 
 The app opens in Baca mode. Its header contains the document name, Baca / Atur halaman,
-Buka PDF and Lainnya (import and theme choices). Hover the name for full name/page size.
+Konversi, Simpan sebagai, Buka PDF and Lainnya (import and theme choices).
+Hover the name for full name/page size.
 The fixed reading toolbar groups sidebar/history, page navigation and zoom. Enter in
 the page field replaces the old Ke button; while focused, its draft is not overwritten
 by scrolling. The Zoom dropdown contains fit width/page and fixed 50-400% presets.
@@ -39,7 +42,10 @@ selections. Its target is an insertion boundary in the pre-removal list. Delete 
 removed IDs from selection. Import selects imported pages, move selects moved pages,
 and rotate preserves selection. Undo/redo restores the operation's before/after selection.
 Selection alone does not change the content revision. Returning to the opening revision
-via Undo clears dirty; a new edit after Undo drops redo. No-op commands add no history.
+via Undo clears dirty until a full Save As establishes a newer clean revision.
+Undo/Redo to that saved revision reports clean. Extract never advances the baseline.
+Saving preserves history and original source references. A new edit after Undo drops
+redo. No-op commands add no history.
 
 History retains at most 128 compact deltas (affected entries/positions, selections,
 revision IDs and imported source metadata), rather than complete workspace snapshots.
@@ -69,4 +75,5 @@ Manual acceptance: select non-adjacent thumbnails with Ctrl; Shift-range both wa
 keyboard select/toggle/clear; drag several selected pages before/after their original
 positions and to the end; Escape/cancel a drag; undo/redo each action; repeat with mixed
 portrait/landscape and two sources. Rotate text pages and select/copy at each orientation.
-Check that text fields retain normal editing keys. No export-preservation claims apply.
+Check that text fields retain normal editing keys. See ADR-0003 for the conservative
+export preservation policy and docs/testing.md for automated export evidence.

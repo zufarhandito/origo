@@ -5,7 +5,7 @@ It maps progress to the blueprint, records verification/limitations, and include
 toolchain precautions and organizer design notes. See docs/organizer.md for current M2 behavior.
 
 Native Windows PDF organizer following [the blueprint](PDF_EDITOR_CODEX_BLUEPRINT.md).
-Current slice: **M2 virtual page organizer**, using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
+Current slice: **M3 safe PDF Save As/Extract**, using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
 
 - Continuous virtualized scrolling and clickable thumbnail sidebar.
 - First/previous/next/last navigation and direct page-number entry.
@@ -19,7 +19,11 @@ Current slice: **M2 virtual page organizer**, using GPUI Kit 0.9.1 and pinned PD
   previews before larger rasters. The input-file limit remains 128 MiB.
 
 Page selection, reorder, virtual rotate/delete, import and bounded Undo/Redo are implemented.
-Edits are session-only; Save As and user-document export remain M3.
+Use **Simpan sebagai** or **Ctrl+Shift+S** to save the current page plan to a new PDF.
+In **Atur halaman**, **Ekstrak** saves selected pages in their workspace order.
+Existing files are never overwritten; source PDFs remain untouched. Save As marks the
+exported current revision clean, while Extract keeps the workspace's saved status.
+Opening another PDF or closing still discards any unsaved virtual edits.
 See [organizer controls and limits](docs/organizer.md).
 See [testing](docs/testing.md), [compatibility](docs/compatibility.md) and
 [architecture](docs/architecture.md) for evidence and remaining limits.
@@ -30,7 +34,11 @@ PowerPoint, images-to-PDF and Office-to-PDF. Every card currently says **Akan da
 there is no converter, upload or format-selection execution behind these cards.
 Entering the page preserves the PDF workspace; Kembali membaca returns to the viewer.
 
-The next functional milestone is [M3 safe PDF Save As/Extract](docs/m3-safe-export-plan.md).
+[M3 safe PDF Save As/Extract](docs/m3-safe-export-plan.md) is implemented for ordinary,
+unencrypted PDFs passing conservative structural preflight. Complex documents such as
+forms, signatures, bookmarks, annotations and tagged PDFs are blocked for export;
+reading remains independent. Info/XMP metadata requires explicit consent because it
+may be lost. See [export policy](docs/adr/0003-export-preservation-policy.md).
 The [conversion roadmap](docs/conversion-roadmap.md) separates raster export, text,
 Office layout reconstruction and OCR. It does not assume that the same engine can
 provide every format or that editable Word output will exactly reproduce the PDF.
@@ -104,6 +112,15 @@ and stays within 50-400%. Trackpad/driver delivery of native pinch events varies
 
 The real native smoke verifies QPDF order/rotation and PDFium rendering, then M1
 100-page metadata, mixed geometry, resource limits and changed-source rejection.
+It also exercises production M3 preflight, Save As/Extract and safe-output failures.
+For the native Save As/Extract dialogs and metadata prompt, generate synthetic fixtures
+and run the headed export check:
+
+```powershell
+cargo run --locked -p pdf-smoke -- --write-export-fixtures
+./scripts/m3-ui-smoke.ps1 -Profile release
+```
+
 Original documents are read-only. For interactive Windows GPU acceptance:
 
 ```powershell

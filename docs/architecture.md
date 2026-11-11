@@ -1,18 +1,20 @@
-﻿# Architecture - M2
+# Architecture - M3
 
 ```text
 desktop (GPUI Kit) -> application -> domain
        |                  ^
        +-> pdf-engine ----+   (PDFium adapter)
 smoke -> pdf-engine + qpdf-adapter
+desktop -> qpdf-adapter + platform -> application
 ```
 
 The domain owns a multi-source virtual Workspace: source identity/fingerprint, stable
 PageId, source index, virtual rotation, authoritative page order, page selection and
 bounded inverse-delta history. Commands validate before mutation; no-op operations
 are omitted. Undo/redo restores state revisions and selection; dirty compares against
-the opening baseline. Sources are retained until their import is undone. An empty plan
-is valid. QPDF remains a trusted synthetic smoke adapter; production export is M3.
+the opening or successfully exported baseline. Sources are retained until their import
+is undone. An empty plan is valid, but export rejects it. QPDF production export is
+separate from the trusted synthetic M0 probe.
 See organizer.md for command semantics, limits and conservative cache invalidation.
 
 Application ports expose inspected metadata and owned RGBA, without GPUI/native
@@ -81,7 +83,7 @@ hit-testing. Text overlays capture the paint-time content mask and restrict down
 to both page and clip bounds, preventing offscreen page regions from swallowing toolbar
 or sidebar clicks. Mouse-up remains global for release outside the page/window viewport.
 
-## Planned export and conversion boundaries
+## Export and planned conversion boundaries
 
 The Konversi home is a third UI-only mode with a presentation catalog in conversion.rs.
 All cards are non-interactive groups marked Akan datang, with stable accessibility IDs.
@@ -91,8 +93,23 @@ successful import still enters Atur halaman. No converter capability is implied 
 presence in this catalog. No converter has been registered or implemented; no plugin discovery/placeholder
 engine crates have been added.
 
-M3 application/export.rs and platform output/process helpers are proposed in
-m3-safe-export-plan.md, not implemented. conversion-roadmap.md reserves separate
+M3 application/export.rs owns immutable plans, preflight/export/output ports, phases,
+cancellation and completion receipts. A workspace instance advances on Open independently
+of text invalidation tokens. Only a full committed receipt matching instance and revision
+can update the clean baseline. Selected exports and stale jobs cannot.
+
+The platform crate owns private snapshots, same-parent staging, flushed non-clobber
+commit and bounded hidden child processes. qpdf-adapter owns version checks, strict
+JSON v2 feature preflight and QPDFJob compilation. Consecutive source runs preserve
+workspace order; relative rotations use final output positions. Owned prepared
+transactions keep the report bound to the copies it inspected; there is no preflight cache.
+The UI captures before the native save picker, runs native work off-thread, asks for
+metadata consent when needed and publishes sanitized notices. Reading/editing can
+continue against the live workspace; one export runs per window. Closing during a job
+requests cancellation and waits for owned cleanup. PDFium validation remains in-process.
+
+See m3-safe-export-plan.md and ADR-0003 for policy and known limits.
+conversion-roadmap.md reserves separate
 structural-PDF, raster, text, reflow/Office and OCR adapter boundaries, sharing snapshots
 and output transactions when implemented. Only complete PDF Save As can advance a clean
 revision; a derived conversion output will not mark the virtual PDF plan saved.

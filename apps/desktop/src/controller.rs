@@ -77,12 +77,16 @@ impl Viewer {
         if self.opening {
             return;
         }
+        if !self.export.running {
+            self.export.notice = None;
+        }
         self.mode = ViewerMode::Read;
         self.page_dragging = false;
         self.gesture_zoom.reset();
         self.text = text_selection::TextState::default();
         self.invalidate_work();
         self.source_sequence += 1;
+        self.workspace_instance += 1;
         self.page_anchor = None;
         let id = SourceId(self.source_sequence);
         let generation = self.generation;
@@ -616,6 +620,11 @@ impl Viewer {
         json.push_str(&format!(
             ",\"conversionHubVisible\":{}}}",
             self.mode == ViewerMode::Convert
+        ));
+        json.pop();
+        json.push_str(&format!(
+            ",\"exporting\":{},\"exportsCompleted\":{},\"exportSuccess\":{},\"exportPages\":{}}}",
+            self.export.running, self.export.completed, self.export.success, self.export.pages
         ));
         cx.background_executor()
             .spawn(async move {

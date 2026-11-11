@@ -1,4 +1,4 @@
-//! M0 trusted synthetic-fixture probe only; not a production user-document exporter.
+//! Pinned QPDF integration: conservative production exporter and trusted M0 probe.
 use anyhow::{Context, Result, bail};
 use std::{
     ffi::OsString,
@@ -7,6 +7,10 @@ use std::{
     process::{Command, Stdio},
     time::{Duration, Instant},
 };
+
+mod export;
+mod preflight;
+pub use export::QpdfExporter;
 
 pub struct QpdfProbe {
     executable: PathBuf,

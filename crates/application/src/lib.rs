@@ -3,6 +3,7 @@ pub use pdf_domain::{
     ExportSupport, PageGeometry, SourceDocument, SourceFingerprint, SourceId, Workspace,
 };
 use std::path::{Path, PathBuf};
+pub mod export;
 pub mod text;
 pub mod viewer;
 

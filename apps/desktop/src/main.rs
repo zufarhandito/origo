@@ -15,6 +15,7 @@ use std::{collections::HashMap, ops::Range, path::PathBuf, sync::Arc};
 mod chrome;
 mod controller;
 mod conversion;
+mod exporting;
 use chrome::ViewerMode;
 mod navigation;
 mod organizer;
@@ -26,6 +27,8 @@ actions!(
     pdf_studio,
     [
         Open,
+        SaveAs,
+        ExtractPages,
         ImportPdf,
         UndoEdit,
         RedoEdit,
@@ -68,6 +71,9 @@ struct RenderStats {
     max_bitmap_bytes: usize,
 }
 struct Viewer {
+    export: exporting::ExportState,
+    exporter: qpdf_adapter::QpdfExporter,
+    workspace_instance: u64,
     mode: ViewerMode,
     page_dragging: bool,
     text: text_selection::TextState,
@@ -147,6 +153,7 @@ fn main() -> anyhow::Result<()> {
             gpui_kit::component::Theme::update(cx, |theme| theme.font_family = "Segoe UI".into());
             cx.bind_keys([
                 KeyBinding::new("ctrl-o", Open, None),
+                KeyBinding::new("ctrl-shift-s", SaveAs, Some("PdfViewer")),
                 KeyBinding::new("ctrl-shift-o", ImportPdf, Some("PdfViewer")),
                 KeyBinding::new("ctrl-z", UndoEdit, Some("PdfViewer")),
                 KeyBinding::new("ctrl-y", RedoEdit, Some("PdfViewer")),
@@ -245,7 +252,24 @@ fn main() -> anyhow::Result<()> {
                                 });
                             });
                         });
+                        let closing = cx.weak_entity();
+                        window.on_window_should_close(cx, move |_, cx| {
+                            closing
+                                .update(cx, |this: &mut Viewer, cx| {
+                                    if this.export.running {
+                                        this.export.close_after = true;
+                                        this.cancel_export(cx);
+                                        false
+                                    } else {
+                                        true
+                                    }
+                                })
+                                .unwrap_or(true)
+                        });
                         let mut viewer = Viewer {
+                            export: exporting::ExportState::default(),
+                            exporter: qpdf_adapter::QpdfExporter::new(&sidecars),
+                            workspace_instance: 0,
                             mode: ViewerMode::Read,
                             page_dragging: false,
                             text: text_selection::TextState::default(),

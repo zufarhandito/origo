@@ -4535,14 +4535,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdf-platform"
+version = "0.1.0"
+dependencies = [
+ "dunce",
+ "pdf-application",
+ "tempfile",
+]
+
+[[package]]
 name = "pdf-smoke"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "dunce",
  "pdf-application",
+ "pdf-domain",
  "pdf-engine",
+ "pdf-platform",
  "qpdf-adapter",
+ "serde_json",
  "tempfile",
 ]
 
@@ -4556,6 +4568,8 @@ dependencies = [
  "pdf-application",
  "pdf-domain",
  "pdf-engine",
+ "pdf-platform",
+ "qpdf-adapter",
  "smallvec",
 ]
 
@@ -4892,6 +4906,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dunce",
+ "pdf-application",
+ "pdf-platform",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,10 +1,18 @@
 ﻿# M3 - Safe PDF export: analysis and implementation contract
 
-Status: design only, 11 November 2026. The conversion hub is presentation-only.
-No production Save As, Extract or converter was implemented by this analysis.
-This extends the approved blueprint and keeps its conservative preservation policy.
+Status: M3 implemented, 11 November 2026. The conversion hub remains presentation-only.
+Production PDF Save As/Extract now follow this contract; format converters remain planned.
+See testing.md for actual verification and ADR-0003 for the preservation policy.
 
-## Current gap
+Implementation notes: preflight reports are bound to owned prepared source copies;
+there is no cache. Source fingerprints remain size/mtime, not hashes. QPDF's 120-second
+budget measures cumulative child-process runtime, excluding user dialogs/copying and
+PDFium work. PDFium validation is cooperative, without a hard native-call deadline.
+Save As retains original source references/history. Opening/closing still discards
+unsaved edits without an automatic save/recovery prompt. Destination overwrite,
+crash-orphan recovery and broader complex-PDF preservation remain outside M3.
+
+## Starting gap (historical, before M3)
 
 The multi-source workspace already has stable PageIds, original indices, virtual
 rotations and unique content revisions. PDFium renders/extracts text in a bounded
@@ -13,7 +21,7 @@ There is no ExportPlan, preflight report, output transaction or saved-revision u
 The image dependency currently disables default features, so PNG/JPEG encoding must
 not be assumed available merely because RGBA images are displayed in GPUI.
 
-The current reader/organizer UI is kept. Save As will be an explicit PDF operation;
+The reader/organizer UI is kept. Save As is an explicit PDF operation;
 format conversion has a separate Konversi home and separate completion semantics.
 
 ## M3 behavior and contracts

@@ -2,7 +2,7 @@
 
 Status: future design, 11 November 2026. The owner explicitly requested a visible
 Konversi page with Akan datang cards. That page is implemented; all conversion engines
-below remain planned. M3 PDF Save As/Extract remains the next functional milestone.
+below remain planned. M3 PDF Save As/Extract is implemented; format conversion is separate.
 
 ## Product categories and order
 
@@ -13,7 +13,7 @@ not a promise to reproduce their engines, quality, accounts or hosted services.
 | Stage | Capability | Candidate path | Gate before enabling |
 |---|---|---|---|
 | C0 (now) | Konversi home with planned cards | GPUI presentation only | Clear Akan datang; no execution/upload |
-| M3 (next) | PDF Save As + selected-page Extract | QPDF page plan + safe output | Preservation policy and failure acceptance |
+| M3 (implemented) | PDF Save As + selected-page Extract | QPDF page plan + safe output | Conservative preflight, validation and no-clobber commit |
 | C1 | PDF pages to PNG/JPEG, PDF to TXT | PDFium owned raster/text + explicit encoders | Bounded batch export, dimensions/Unicode/order |
 | M4 | Split, lossless optimize, release hardening | Existing blueprint | Cancellation/process/packaging gates |
 | C2 | PNG/JPEG to PDF | Dedicated image-to-PDF writer/adapter | EXIF, DPI/page fit, colors, large inputs |

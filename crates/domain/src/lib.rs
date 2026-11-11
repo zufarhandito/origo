@@ -168,6 +168,13 @@ impl Workspace {
     pub fn is_dirty(&self) -> bool {
         self.revision != self.clean_revision
     }
+    pub fn mark_exported(&mut self, revision: u64) -> bool {
+        if self.revision != revision {
+            return false;
+        }
+        self.clean_revision = revision;
+        true
+    }
     pub fn revision(&self) -> u64 {
         self.revision
     }

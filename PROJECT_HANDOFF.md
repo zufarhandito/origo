@@ -1,3 +1,62 @@
+# Current update - M3 Save As and Extract (11 November 2026)
+
+This supersedes all earlier status snapshots below, including their old "current"
+headings. Communicate in Indonesian. Read docs/m3-safe-export-plan.md and ADR-0003.
+
+- M3 is implemented: Simpan sebagai / Ctrl+Shift+S exports the full virtual plan;
+  Ekstrak in Atur halaman exports selected pages in workspace order. New .pdf only;
+  no overwrite of any existing destination or original. run.cmd prefers the new release.
+- Export captures an immutable plan before the native save picker. One job per window;
+  reading/editing/Open can continue against the live workspace. Only full committed
+  output matching workspace instance AND revision marks clean. Extract/stale receipts
+  do not. Undo/Redo to the saved revision reports clean; source references/history stay.
+  Opening another PDF/closing still discards unsaved edits without a save/recovery prompt.
+- Application ports/orchestration: crates/application/src/export.rs. New pdf-platform
+  crate owns private snapshots, same-parent staging, flush/non-clobber commit and
+  bounded hidden processes. qpdf-adapter export.rs/preflight.rs owns production QPDF
+  checks/JSON v2 policy/QPDFJob compilation; QpdfProbe remains a separate trusted probe.
+  Desktop exporting.rs owns asynchronous composition/dialogs/progress/notices/cancel.
+- Only referenced sources are copied/preflighted. A registry entry retained for Undo
+  after deleting all its pages cannot block remaining pages. Recheck size/mtime before/
+  after copy and before commit. These fingerprints are not cryptographic identity.
+- Strict export policy: clean QPDF 12.4.2 check, recognized JSON v2, catalog/page-tree
+  allowlists and unsafe-object checks. Block encryption/forms/XFA/signature markers/
+  tags/bookmarks/annotations/links/attachments/active/optional/unknown complex content,
+  plus malformed/recovered/warning cases. Viewer support is independent. Ordinary
+  Info/XMP metadata needs explicit acknowledgement of possible loss for that snapshot.
+  Never silently flatten, decrypt or rasterize. No universal preservation claim.
+- Output validation: clean QPDF check then PDFium count/dimensions/orientation. Failure/
+  cancel cleans owned staging. Default QPDF budget is cumulative 120 seconds of child
+  runtime, excluding dialogs/copies/PDFium. Stdout inspection/job cap 16 MiB; stderr
+  cap 64 KiB. Kill/reap on cancellation/timeout/overflow. PDFium validation remains
+  cooperative before/after an in-process call, without a hard timeout or process sandbox.
+- Konversi stays an informational Akan datang home. PNG/JPEG/Word/TXT/Excel/PowerPoint,
+  images-to-PDF and Office-to-PDF are not implemented. No new engine installation.
+- Validation: 30 workspace unit tests, denied-warning Clippy, formatting and release
+  workspace build passed. Expanded debug/release native smoke covers two-source page
+  identity, sampled raster, all 16 rotations, metadata consent, unsafe/encrypted/
+  malformed/recovered rejection, unused-source filtering, source changes and cleanup.
+  Headed release M3/chrome/M2/M1/text passed; details/evidence are in docs/testing.md.
+- UI automation: IFileOpenDialog filename Edit ID 1148; IFileSaveDialog filename Edit
+  ID 1001 (address bar's 1001 is a ToolbarWindow32). Native prompt CCPushButton control
+  IDs differ from logical TaskDialog button IDs: pinned GPUI Other answers use -(index+1).
+  Use posted TDM_CLICK_BUTTON for Batal/Lanjutkan; no global SendKeys. Chrome waits for
+  accessible readiness. Rapid zoom UIA handles the race where a bound disables the
+  button between IsEnabled and Invoke; final numeric bounds are still asserted.
+- Preserve the text-overlay paint-time content-mask hit-test fix, deferred page-input
+  projection, supported Button hover variants, deferred GPU drop_image and 8 MiB stack.
+- Toolchain/sidecars are already on D:. Do not reinstall or remove .tools. Never close
+  a user's running session to rebuild; use a verified in-workspace executable rename
+  if needed. Only own synthetic test processes may be closed by automation.
+- Local commit was requested by owner. GitHub push was previously rejected by automatic
+  approval review pending explicit confirmation of destination
+  https://github.com/zufarhandito/origo.git (main). Do not retry/bypass without that
+  confirmation, and do not report local commits as pushed.
+- Remaining acceptance: physical trackpad/modifiers, broad drag/accessibility, mixed
+  DPI, complex real PDFs/crop/color/fonts, ACL-specific failures, crash-orphan recovery,
+  hard native isolation and portable/license/clean-machine gates. M4 is separate work.
+
+---
 # Current update - M3 analysis and conversion home (11 November 2026)
 
 - User requested analysis of M3 plus future conversion like Smallpdf/iLovePDF, and
