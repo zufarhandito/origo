@@ -1,0 +1,14 @@
+{
+  "target": "x86_64-pc-windows-msvc",
+  "qpdf": {
+    "version": "12.4.2",
+    "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc64.zip",
+    "sha256": "db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d"
+  },
+  "pdfium": {
+    "version": "8125",
+    "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/8125/pdfium-win-x64.tgz",
+    "sha256": "9a964261760cff52570aabf038ab346d3a5034dd8b30d0d5fe8861235d356b8b"
+  }
+}
+

@@ -1,0 +1,11 @@
+[package]
+name = "qpdf-adapter"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+[dependencies]
+anyhow.workspace = true
+dunce.workspace = true
+[lints]
+workspace = true
+

@@ -1,0 +1,7 @@
+/target/
+/.tools/
+/.research/
+/sidecars/
+/dist/
+/*.tmp.json
+
