@@ -166,6 +166,13 @@ try {
     $null=Wait-State {param($s) -not $s.organizing -and $s.selectedChars -eq $beforeMode.selectedChars}
     if(-not (Copy-Enabled)){throw 'Mode switch lost text selection'}
     Write-Host 'PASS mode switch preserves text selection'
+    Invoke-Control 'Konversi'
+    if(Copy-Enabled){throw 'Copy control must be hidden on planned conversion page'}
+    Invoke-Control 'Kembali membaca'
+    $null=Wait-State {param($s) -not $s.conversionHubVisible -and $s.selectedChars -eq $beforeMode.selectedChars}
+    if(-not (Copy-Enabled)){throw 'Conversion hub lost the text selection'}
+    Write-Host 'PASS conversion hub preserves text selection and hides inactive reader actions'
+
 
     foreach($page in 2..4){Jump $page;Set-Fit;$null=Wait-State {param($s) $s.activePage -eq $page};Select-Label $page}
     Jump 1

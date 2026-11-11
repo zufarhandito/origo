@@ -14,6 +14,7 @@ pub(super) enum ViewerMode {
     #[default]
     Read,
     Organize,
+    Convert,
 }
 
 fn icon(
@@ -175,6 +176,17 @@ impl Viewer {
                             .disabled(disabled)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.set_mode(ViewerMode::Organize, window, cx)
+                            })),
+                    )
+                    .child(
+                        Button::new("mode-convert")
+                            .label("Konversi")
+                            .h(px(32.))
+                            .ghost()
+                            .selected(self.mode == ViewerMode::Convert)
+                            .disabled(self.opening)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.set_mode(ViewerMode::Convert, window, cx)
                             })),
                     ),
             )

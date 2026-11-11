@@ -23,6 +23,18 @@ Edits are session-only; Save As and user-document export remain M3.
 See [organizer controls and limits](docs/organizer.md).
 See [testing](docs/testing.md), [compatibility](docs/compatibility.md) and
 [architecture](docs/architecture.md) for evidence and remaining limits.
+## Export and conversion direction
+
+The **Konversi** page reserves a home for PDF-to-PNG/JPEG, Word, text, Excel,
+PowerPoint, images-to-PDF and Office-to-PDF. Every card currently says **Akan datang**:
+there is no converter, upload or format-selection execution behind these cards.
+Entering the page preserves the PDF workspace; Kembali membaca returns to the viewer.
+
+The next functional milestone is [M3 safe PDF Save As/Extract](docs/m3-safe-export-plan.md).
+The [conversion roadmap](docs/conversion-roadmap.md) separates raster export, text,
+Office layout reconstruction and OCR. It does not assume that the same engine can
+provide every format or that editable Word output will exactly reproduce the PDF.
+
 ## Windows setup
 
 Install Visual Studio 2022 Build Tools with **Desktop development with C++**, x64 MSVC

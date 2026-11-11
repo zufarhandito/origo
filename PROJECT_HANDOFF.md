@@ -1,3 +1,32 @@
+# Current update - M3 analysis and conversion home (11 November 2026)
+
+- User requested analysis of M3 plus future conversion like Smallpdf/iLovePDF, and
+  explicitly chose a visible Konversi page with Akan datang status.
+- apps/desktop/src/conversion.rs is presentation-only: planned raster/Word/TXT/Excel/
+  PowerPoint outputs, images-to-PDF and Office-to-PDF. Stable card IDs are metadata,
+  not installed engine capabilities. Cards have no action handlers or InvokePattern.
+- ViewerMode::Convert is accessible with or without a document. It hides reading/
+  organizer controls, preserves workspace and text selection, clears page selection,
+  and exposes Kembali membaca/Esc. Reader navigation, zoom and history are guarded
+  while it is displayed. Ctrl+G returns to the reader's page field.
+- M3 and actual conversion are NOT implemented. See docs/m3-safe-export-plan.md for
+  ExportPlan/safe preflight/staging/no-clobber/receipt design; docs/conversion-roadmap.md
+  for raster/text/Office/OCR boundaries, defaults and quality gates. No new engine,
+  codec feature, runtime/model download, cloud integration or product dependency added.
+- Research uses official QPDF 12.4, Smallpdf/iLovePDF tool docs, LibreOffice, Tesseract,
+  Docling and Apryse docs. These are references, not selected/installed Office engines.
+  PDF-to-Word needs reconstruction; input DOCX support is not DOCX output support.
+- A synthetic local QPDFJob JSON feasibility probe passed with A:2,A:1,B:4 and relative
+  output rotations, --check, three pages, unchanged source hashes. It proves CLI job
+  configuration only. Evidence: .research/m3-analysis-289cb38e568e41a597167ce18ae30c7c.
+- The owner previously requested commit/push. Local commits are authorized, but push
+  was rejected by automatic approval review pending explicit confirmation of the
+  GitHub origin destination; do not bypass that restriction or assume it was pushed.
+- Final conversion-home verification is recorded in docs/testing.md. Preserve the
+  earlier text-overlay content-mask fix and 8 MiB main-stack reserve.
+
+---
+
 # Current update - compact reader/organizer UX (11 November 2026)
 
 This supersedes the presentation details in the M2 handoff below. The M2 domain,

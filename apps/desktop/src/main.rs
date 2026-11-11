@@ -14,6 +14,7 @@ use pdf_engine::PdfiumRenderer;
 use std::{collections::HashMap, ops::Range, path::PathBuf, sync::Arc};
 mod chrome;
 mod controller;
+mod conversion;
 use chrome::ViewerMode;
 mod navigation;
 mod organizer;

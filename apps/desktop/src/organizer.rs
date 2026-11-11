@@ -125,7 +125,7 @@ impl Viewer {
             .unwrap_or_default()
     }
     pub(super) fn history(&mut self, redo: bool, cx: &mut Context<Self>) {
-        if self.opening {
+        if self.opening || self.mode == ViewerMode::Convert {
             return;
         }
         if let Some(w) = &mut self.workspace {

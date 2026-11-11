@@ -444,9 +444,12 @@ impl Render for Viewer {
         let organizing = self.mode == ViewerMode::Organize;
         let dragging_pages = organizing && self.page_dragging && cx.has_active_drag();
         let header = self.document_header(cx);
-        let reading_toolbar = self.reading_toolbar(window, cx);
+        let reading_toolbar =
+            (self.mode != ViewerMode::Convert).then(|| self.reading_toolbar(window, cx));
         let organizer_toolbar = organizing.then(|| self.organizer_toolbar(cx));
-        let body = if has_document {
+        let body = if self.mode == ViewerMode::Convert {
+            self.conversion_hub(window, cx)
+        } else if has_document {
             let weak = cx.weak_entity();
             let main_list = list(self.page_list.clone(), move |index, _, cx| {
                 weak.update(cx, |this, cx| this.item(index, RenderKind::Page, cx))
@@ -608,8 +611,16 @@ impl Render for Viewer {
             .font_family("Segoe UI")
             .track_focus(&self.focus)
             .key_context("PdfViewer")
-            .on_action(cx.listener(|this, _: &CopyText, _, cx| this.copy_text(cx)))
+            .on_action(cx.listener(|this, _: &CopyText, _, cx| {
+                if this.mode != ViewerMode::Convert {
+                    this.copy_text(cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &ClearTextSelection, window, cx| {
+                if this.mode == ViewerMode::Convert {
+                    this.set_mode(ViewerMode::Read, window, cx);
+                    return;
+                }
                 cx.stop_active_drag(window);
                 this.page_dragging = false;
                 this.clear_selection(cx);
@@ -644,6 +655,9 @@ impl Render for Viewer {
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &FocusPage, window, cx| {
+                if this.mode == ViewerMode::Convert {
+                    this.set_mode(ViewerMode::Read, window, cx);
+                }
                 this.jump.update(cx, |state, cx| {
                     state.set_value("", window, cx);
                     state.focus(window, cx);
@@ -661,7 +675,7 @@ impl Render for Viewer {
                 ),
             )
             .child(header)
-            .child(reading_toolbar)
+            .children(reading_toolbar)
             .children(organizer_toolbar)
             .child(body)
             .child(
@@ -677,7 +691,11 @@ impl Render for Viewer {
                             .when(self.opening || self.inflight.is_some(), |this| {
                                 this.child(Spinner::new().xsmall())
                             })
-                            .child(self.status.clone())
+                            .child(if self.mode == ViewerMode::Convert {
+                                "Konversi - fitur akan datang".to_owned()
+                            } else {
+                                self.status.clone()
+                            })
                             .when(self.workspace.is_some(), |el| {
                                 el.child(format!(
                                     " - {} sumber",

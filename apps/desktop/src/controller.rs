@@ -167,6 +167,9 @@ impl Viewer {
         cx.notify();
     }
     pub(super) fn navigate(&mut self, direction: Direction, cx: &mut Context<Self>) {
+        if self.mode == ViewerMode::Convert {
+            return;
+        }
         self.stats.navigation_commands += 1;
         if self.navigation.count > 0 {
             match direction {
@@ -199,6 +202,9 @@ impl Viewer {
         }
     }
     pub(super) fn set_zoom(&mut self, zoom: Zoom, cx: &mut Context<Self>) {
+        if self.mode == ViewerMode::Convert {
+            return;
+        }
         self.gesture_zoom.reset();
         if self.opening {
             self.zoom = zoom;
@@ -605,6 +611,11 @@ impl Viewer {
         json.push_str(&format!(
             ",\"navCommands\":{}}}",
             self.stats.navigation_commands
+        ));
+        json.pop();
+        json.push_str(&format!(
+            ",\"conversionHubVisible\":{}}}",
+            self.mode == ViewerMode::Convert
         ));
         cx.background_executor()
             .spawn(async move {

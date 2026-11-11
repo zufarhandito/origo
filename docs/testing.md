@@ -249,3 +249,40 @@ Corrections discovered during validation:
 Physical 150/200% and mixed-monitor DPI checks remain manual; the width/theme matrix
 above is not a claim that those physical configurations were tested. Save As remains
 M3 and edits remain session-only. Documentation and PROJECT_HANDOFF.md were updated.
+
+## M3 analysis + planned conversion home - 2026-11-11
+
+Scope: analyze safe PDF exporting and future formats; implement only the owner's
+explicitly requested Konversi/Akan datang page. M3 Save As/Extract and all conversion
+backends remain unimplemented. No engine/model/codec feature/dependency was installed.
+
+- `scripts/check.ps1` passed: fmt, denied-warning workspace/all-target Clippy,
+  21 unit tests and workspace release build.
+- `scripts/chrome-ui-smoke.ps1 -Profile release -NoDocument` passed: Konversi opens
+  without a PDF, all planned cards are present without InvokePattern, and return works.
+  Evidence `.research/chrome-ui-fe2186433c9f48ec9b06cd3492d7aed6`.
+- `scripts/chrome-ui-smoke.ps1 -Profile release` passed: Baca/Atur/Konversi, light/dark,
+  long filename, 860/1000/1200/1600 widths, placeholder-only cards, preserved workspace
+  and focused reader input. Evidence `.research/chrome-ui-ce0a270006bb422b9282b55f2a58b833`
+  includes 24 theme/width/mode screenshots. Actual DPI remains 96; physical mixed DPI
+  is not claimed. Grid uses two/three/four columns as width permits.
+- Release M2 UI smoke passed including mode semantics, drag/cancel, history, empty,
+  native import, multi-source mapping and unchanged source hashes:
+  `.research/m2-ui-b4876d03447d44e0b93905cc1e37da4e`.
+- Release M1 viewer UI smoke passed (empty startup, 100 pages, navigation/scroll,
+  50-400% zoom, resize): `.research/m1-ui-bc1f43c00fa241f39d2a07147fedc49e`.
+- Release text-selection UI smoke passed, now also checking that Konversi hides Copy
+  and returning preserves the previous selection, followed by four rotations and
+  cross-page copy: `.research/text-ui-e3072931751841588c32518d76a4c1d7`. Clipboard restored.
+
+The analysis also ran bundled QPDF 12.4.2 --job-json-help and structured inspection
+on a generated fixture. A synthetic QPDFJob JSON selected A:2,A:1,B:4 and applied
+relative rotations, produced three pages passing --check, and retained both source
+hashes. Evidence `.research/m3-analysis-289cb38e568e41a597167ce18ae30c7c`. This proves
+job-file invocation only; no production export/preflight/atomic-output gate is claimed.
+Official reference sources and implementation/quality decisions are recorded in
+m3-safe-export-plan.md and conversion-roadmap.md.
+
+A running user release session was preserved by renaming its loaded executable to
+`target/release/pdf-studio.previous-dcd498672e83487b849f8cde642b55f9.exe` before building
+the new default executable. Acceptance viewers were separate synthetic instances.

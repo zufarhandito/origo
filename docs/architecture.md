@@ -80,3 +80,19 @@ A global canvas mouse listener does not automatically inherit overflow clipping 
 hit-testing. Text overlays capture the paint-time content mask and restrict down/move
 to both page and clip bounds, preventing offscreen page regions from swallowing toolbar
 or sidebar clicks. Mouse-up remains global for release outside the page/window viewport.
+
+## Planned export and conversion boundaries
+
+The Konversi home is a third UI-only mode with a presentation catalog in conversion.rs.
+All cards are non-interactive groups marked Akan datang, with stable accessibility IDs.
+The reader page plan, text cache and history remain shared; navigation/zoom/history
+commands are guarded while the hub is displayed. Opening a PDF returns to Baca;
+successful import still enters Atur halaman. No converter capability is implied by
+presence in this catalog. No converter has been registered or implemented; no plugin discovery/placeholder
+engine crates have been added.
+
+M3 application/export.rs and platform output/process helpers are proposed in
+m3-safe-export-plan.md, not implemented. conversion-roadmap.md reserves separate
+structural-PDF, raster, text, reflow/Office and OCR adapter boundaries, sharing snapshots
+and output transactions when implemented. Only complete PDF Save As can advance a clean
+revision; a derived conversion output will not mark the virtual PDF plan saved.

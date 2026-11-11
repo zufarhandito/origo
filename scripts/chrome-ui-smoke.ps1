@@ -1,4 +1,4 @@
-﻿param([ValidateSet('debug','release')][string]$Profile='debug')
+﻿param([ValidateSet('debug','release')][string]$Profile='debug',[switch]$NoDocument)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Add-Type -AssemblyName UIAutomationClient
@@ -11,7 +11,8 @@ $fixture=Join-Path $directory 'Laporan pengujian navigasi dan toolbar dengan nam
 Copy-Item (Join-Path $root tests/fixtures/text-selection.pdf) $fixture
 $metrics=Join-Path $directory metrics.json
 $old=@(Get-Process pdf-studio -ErrorAction SilentlyContinue|ForEach-Object Id)
-(New-Object -ComObject Shell.Application).ShellExecute((Join-Path $root "target/$Profile/pdf-studio.exe"),('"'+$fixture+'" --metrics "'+$metrics+'"'),$root,'open',1)
+$arguments=if($NoDocument){'--metrics "'+$metrics+'"'}else{'"'+$fixture+'" --metrics "'+$metrics+'"'}
+(New-Object -ComObject Shell.Application).ShellExecute((Join-Path $root "target/$Profile/pdf-studio.exe"),$arguments,$root,'open',1)
 Start-Sleep -Seconds 3
 $app=Get-Process pdf-studio|Where-Object Id -NotIn $old|Select-Object -First 1
 $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
@@ -34,7 +35,25 @@ function Capture($Name){
     try{$ok=[ChromeWindow]::PrintWindow($app.MainWindowHandle,$dc,2);if(-not $ok){throw 'Capture failed'}}finally{$g.ReleaseHdc($dc)}
     try{$bmp.Save((Join-Path $directory "$Name.png"))}finally{$g.Dispose();$bmp.Dispose()}
 }
+function Assert-Conversion {
+    foreach($label in @('PDF ke gambar','PDF ke Word','PDF ke teks','PDF ke Excel','PDF ke PowerPoint','Gambar ke PDF','Dokumen Office ke PDF')) {
+        $card=Find ($label+' - Akan datang')
+        if(-not $card){throw "Missing planned card: $label"}
+        $pattern=$null
+        if($card.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)){throw "Planned converter is executable: $label"}
+    }
+    if(Find 'Zoom'){throw 'Reader controls leaked into conversion hub'}
+    $s=Get-Content -Raw $metrics|ConvertFrom-Json
+    if(-not $s.conversionHubVisible -or $s.dirty){throw 'Conversion hub changed content state'}
+}
 try {
+    if($NoDocument){
+        Invoke 'Konversi';Assert-Conversion;Capture 'conversion-no-document'
+        if((Get-Content -Raw $metrics|ConvertFrom-Json).pageCount -ne 0){throw 'Unexpected loaded document'}
+        Invoke 'Kembali membaca'
+        Write-Host "PASS conversion hub without a document. Evidence: $directory"
+        return
+    }
     Capture initial-read
     Invoke 'Atur halaman'
     Capture initial-organize
@@ -44,8 +63,9 @@ try {
         foreach($width in @(860,1000,1200,1600)) {
             [ChromeWindow]::MoveWindow($app.MainWindowHandle,30,20,$width,900,$true)|Out-Null
             Start-Sleep -Milliseconds 500
-            foreach($mode in @('Baca','Atur halaman')) {
+            foreach($mode in @('Baca','Atur halaman','Konversi')) {
                 Invoke $mode
+                if($mode -eq 'Konversi') {Assert-Conversion;Capture "$theme-$width-$mode";continue}
                 $previous=(Find 'Halaman sebelumnya').Current.BoundingRectangle
                 $next=(Find 'Halaman berikutnya').Current.BoundingRectangle
                 $zoom=(Find 'Zoom').Current.BoundingRectangle
@@ -58,6 +78,7 @@ try {
             }
         }
     }
+    Invoke 'Baca'
     # Enter navigation replaces the old Go button; focused text is not overwritten.
     $input=Find 'Nomor halaman tujuan';$input.SetFocus()
     $input.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('3')
@@ -71,7 +92,7 @@ try {
     [ChromeWindow]::PostMessage($app.MainWindowHandle,0x101,[IntPtr]13,[IntPtr]0xC01C0001)|Out-Null
     Start-Sleep -Milliseconds 500
     $s=Get-Content -Raw $metrics|ConvertFrom-Json
-    if($s.activePage -ne 3 -or $s.dirty){throw 'Enter navigation or presentation-only state failed'}
+    if($s.activePage -ne 3 -or $s.dirty -or $s.conversionHubVisible -or $s.pageCount -ne 4){throw 'Enter navigation or presentation-only state failed'}
     [pscustomobject]@{Profile=$Profile;Dpi=[ChromeWindow]::GetDpiForWindow($app.MainWindowHandle);Widths=@(860,1000,1200,1600);Themes=@('Terang','Gelap');PhysicalMixedDpiTested=$false}|ConvertTo-Json|Set-Content (Join-Path $directory 'acceptance.json')
-    Write-Host "PASS chrome: modes, two themes, four widths, non-overlapping toolbar, Enter input. Evidence: $directory"
+    Write-Host "PASS chrome: modes/conversion placeholders, two themes, four widths, non-overlapping toolbar, Enter input. Evidence: $directory"
 } finally {if(-not $app.HasExited){$null=$app.CloseMainWindow();$null=$app.WaitForExit(5000)}}

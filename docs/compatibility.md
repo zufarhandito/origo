@@ -7,6 +7,11 @@ preservation claims are made. See organizer.md for controls, selection semantics
 aggregate limits. Baca mode is for navigation/text; Atur halaman exposes page operations.
 Mode changes do not mark content dirty. Structural edits explicitly clear text selection and positional caches.
 
+Konversi is an informational roadmap page with Akan datang cards. PDF-to-images,
+Word/TXT/Excel/PowerPoint and conversion into PDF are not operational. No converter
+runtime, OCR model or network upload was added. Save As/Extract are still planned M3.
+See m3-safe-export-plan.md and conversion-roadmap.md for scope and prerequisites.
+
 Text selection is available as a requested viewer addition before M2: single-click
 clears without selecting, drag over text to select, double-click selects a sentence,
 Ctrl+C or Salin to copy, Esc or a blank page click to clear. Selection survives zoom
