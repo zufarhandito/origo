@@ -2,10 +2,10 @@
 
 For the next development chat, read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) first.
 It maps progress to the blueprint, records verification/limitations, and includes
-toolchain precautions and concrete notes for the future M2 implementation.
+toolchain precautions and organizer design notes. See docs/organizer.md for current M2 behavior.
 
 Native Windows PDF organizer following [the blueprint](PDF_EDITOR_CODEX_BLUEPRINT.md).
-Current slice: **M1 read-only viewer**, using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
+Current slice: **M2 virtual page organizer**, using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
 
 - Continuous virtualized scrolling and clickable thumbnail sidebar.
 - First/previous/next/last navigation and direct page-number entry.
@@ -18,7 +18,9 @@ Current slice: **M1 read-only viewer**, using GPUI Kit 0.9.1 and pinned PDFium/Q
 - Book viewer follow-up: up to 1024 pages, reused native document sessions and lightweight
   previews before larger rasters. The input-file limit remains 128 MiB.
 
-Organizer commands, undo and user-document export belong to later milestones.
+Page selection, reorder, virtual rotate/delete, import and bounded Undo/Redo are implemented.
+Edits are session-only; Save As and user-document export remain M3.
+See [organizer controls and limits](docs/organizer.md).
 See [testing](docs/testing.md), [compatibility](docs/compatibility.md) and
 [architecture](docs/architecture.md) for evidence and remaining limits.
 ## Windows setup
@@ -73,10 +75,15 @@ To rebuild on this machine:
 ./scripts/run-desktop.ps1 -Pdf ./tests/fixtures/hundred-pages.pdf
 ```
 
+The app opens in **Baca** mode with a compact reading toolbar. Choose **Atur halaman**
+to select, rotate, delete, move or import pages; returning to Baca clears page selection.
+Undo/Redo are available in both modes. Theme choices live under **Lainnya**. The Copy
+icon appears when text is selected. See [organizer controls](docs/organizer.md).
+
 Open with Buka PDF or Ctrl+O. PgUp/PgDn and Left/Right move between pages;
-Ctrl+Home/End select the first/last page. Ctrl+G focuses the page field; Enter or Ke
+Ctrl+Home/End select the first/last page. Ctrl+G focuses the page field; Enter
 jumps to that page. Ctrl+plus/minus adjusts zoom, Ctrl+0 fits the page, Ctrl+1 fits
-width. Clicking the percentage resets to 100%. Scroll vertically across pages and
+width. The percentage opens fit options and zoom presets. Scroll vertically across pages and
 pan horizontally at higher zoom. The sidebar and theme can be toggled.
 Over the PDF viewport, spread/pinch two fingers on a supported precision trackpad
 to zoom in/out; Ctrl+scroll also zooms. Ordinary two-finger scrolling still pans the

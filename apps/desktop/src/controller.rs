@@ -77,10 +77,13 @@ impl Viewer {
         if self.opening {
             return;
         }
+        self.mode = ViewerMode::Read;
+        self.page_dragging = false;
         self.gesture_zoom.reset();
         self.text = text_selection::TextState::default();
         self.invalidate_work();
         self.source_sequence += 1;
+        self.page_anchor = None;
         let id = SourceId(self.source_sequence);
         let generation = self.generation;
         self.opening = true;
@@ -164,6 +167,7 @@ impl Viewer {
         cx.notify();
     }
     pub(super) fn navigate(&mut self, direction: Direction, cx: &mut Context<Self>) {
+        self.stats.navigation_commands += 1;
         if self.navigation.count > 0 {
             match direction {
                 Direction::First => {
@@ -289,11 +293,9 @@ impl Viewer {
         self.workspace
             .as_ref()
             .map(|workspace| {
-                workspace
-                    .source()
-                    .geometries
-                    .iter()
-                    .map(|g| self.zoom.size(*g, self.viewport).0 + 64.)
+                (0..workspace.pages().len())
+                    .filter_map(|i| workspace.geometry(i).ok())
+                    .map(|g| self.zoom.size(g, self.viewport).0 + 64.)
                     .fold(self.viewport.0, f32::max)
             })
             .unwrap_or(self.viewport.0)
@@ -354,8 +356,10 @@ impl Viewer {
             128.
         };
         Some(RenderKey {
-            source: workspace.source().id,
-            fingerprint: workspace.source().fingerprint,
+            source: workspace.pages().get(index)?.source_id,
+            fingerprint: workspace
+                .resolve(workspace.pages().get(index)?.source_id)?
+                .fingerprint,
             index: workspace.pages().get(index)?.source_page_index,
             rotation: geometry.quarter_turns,
             background_rgba: 0xffffffff,
@@ -441,10 +445,16 @@ impl Viewer {
         let Some(workspace) = self.workspace.as_ref() else {
             return;
         };
+        let Some(source) = workspace.resolve(job.key.source) else {
+            return;
+        };
         let request = RenderRequest {
-            path: workspace.source().path.clone(),
+            path: source.path.clone(),
             page_index: job.key.index,
             target_width: job.key.width,
+            rotation_delta: (job.key.rotation + 4
+                - source.geometries[usize::from(job.key.index)].quarter_turns)
+                % 4,
             fingerprint: Some(job.key.fingerprint),
         };
         self.inflight = Some(job.clone());
@@ -514,6 +524,10 @@ impl Viewer {
         if self.workspace.is_none() {
             return;
         }
+        if self.navigation.count == 0 {
+            self.status = "Tidak ada halaman - impor PDF atau Undo untuk memulihkan.".into();
+            return;
+        }
         let page = self.navigation.current + 1;
         let count = self.navigation.count;
         self.status =
@@ -521,7 +535,7 @@ impl Viewer {
                 if let Some(error) = self.failures.get(&key) {
                     error.clone()
                 } else if self.pages.contains(&key) {
-                    format!("Halaman {page} dari {count} · File asli tetap utuh")
+                    format!("Halaman {page} dari {count}")
                 } else {
                     format!("Memuat halaman {page} dari {count}…")
                 }
@@ -530,13 +544,14 @@ impl Viewer {
             };
     }
     pub(super) fn report(&self, cx: &mut Context<Self>) {
+        self.defer_page_input(cx);
         let Some(path) = self.metrics.clone() else {
             return;
         };
         let sequence = self.metrics_sequence.clone();
         let number = sequence.fetch_add(1, Ordering::SeqCst) + 1;
         let lock = self.metrics_lock.clone();
-        let json = format!(
+        let mut json = format!(
             "{{\"pageCount\":{},\"activePage\":{},\"zoomPercent\":{},\"fullRenders\":{},\"thumbnailRenders\":{},\"staleResults\":{},\"queue\":{},\"rendering\":{},\"opening\":{},\"pageCacheBytes\":{},\"thumbnailCacheBytes\":{},\"peakCacheBytes\":{},\"maxBitmapBytes\":{},\"generation\":{},\"gpuReleases\":{},\"gpuReleaseErrors\":{},\"documentOpens\":{},\"nativeRenders\":{},\"textCacheBytes\":{},\"textLoads\":{},\"textLoading\":{},\"selectedChars\":{}}}",
             self.navigation.count,
             self.navigation.current + 1,
@@ -565,6 +580,32 @@ impl Viewer {
                 .map(|s| s.anchor.character.abs_diff(s.focus.character) + 1)
                 .unwrap_or(0)
         );
+        if let Some(w) = &self.workspace {
+            json.pop();
+            let plan = w
+                .pages()
+                .iter()
+                .map(|p| {
+                    format!(
+                        "[{}, {}, {}]",
+                        p.source_id.0, p.source_page_index, p.rotation_delta
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            json.push_str(&format!(",\"sourceCount\":{},\"selectedPages\":{},\"dirty\":{},\"revision\":{},\"pagePlan\":[{}]}}",w.sources().len(),w.selected().len(),w.is_dirty(),w.revision(),plan));
+        }
+        json.pop();
+        json.push_str(&format!(
+            ",\"organizing\":{},\"pageDragging\":{}}}",
+            self.mode == ViewerMode::Organize,
+            self.page_dragging
+        ));
+        json.pop();
+        json.push_str(&format!(
+            ",\"navCommands\":{}}}",
+            self.stats.navigation_commands
+        ));
         cx.background_executor()
             .spawn(async move {
                 if let Ok(_guard) = lock.lock()

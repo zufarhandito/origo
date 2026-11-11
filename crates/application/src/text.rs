@@ -33,6 +33,22 @@ pub struct TextPage {
     pub chars: Vec<TextChar>,
 }
 impl TextPage {
+    /// Compose virtual clockwise rotation with already source-normalized character boxes.
+    pub fn rotate(&mut self, turns: u8) {
+        for ch in &mut self.chars {
+            if let Some(r) = &mut ch.bounds {
+                for _ in 0..turns % 4 {
+                    *r = TextRect {
+                        left: 1. - r.bottom,
+                        top: r.left,
+                        right: 1. - r.top,
+                        bottom: r.right,
+                    };
+                }
+            }
+        }
+    }
+
     pub fn sentence_range(&self, index: usize) -> Range<usize> {
         if index >= self.chars.len() {
             return 0..0;

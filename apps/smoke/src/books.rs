@@ -38,6 +38,7 @@ pub fn run(root: &Path) -> Result<()> {
                     fingerprint: Some(info.fingerprint),
                     page_index: index as u16,
                     target_width: 1200,
+                    rotation_delta: 0,
                 })?;
                 timings.push(start.elapsed().as_micros() as f64 / 1000.);
                 ensure!(
@@ -68,6 +69,7 @@ pub fn run(root: &Path) -> Result<()> {
                         fingerprint: Some(wrong),
                         page_index: 0,
                         target_width: 256,
+                        rotation_delta: 0,
                     }),
                     Err(RenderError::SourceChanged)
                 ),

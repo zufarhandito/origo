@@ -40,11 +40,15 @@ impl Viewer {
         let Some(page) = workspace.pages().get(index) else {
             return;
         };
-        let id = workspace.source().id;
+        let id = self.source_sequence;
+        let rotation = page.rotation_delta;
+        let Some(source) = workspace.resolve(page.source_id) else {
+            return;
+        };
         let request = TextRequest {
-            path: workspace.source().path.clone(),
+            path: source.path.clone(),
             page_index: page.source_page_index,
-            fingerprint: workspace.source().fingerprint,
+            fingerprint: source.fingerprint,
         };
         self.text.busy = true;
         self.text.loads += 1;
@@ -55,12 +59,13 @@ impl Viewer {
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
-                if this.workspace.as_ref().map(|w| w.source().id) != Some(id) {
+                if this.source_sequence != id {
                     return;
                 }
                 this.text.busy = false;
                 match result {
-                    Ok(page) => {
+                    Ok(mut page) => {
+                        page.rotate(rotation);
                         let bytes = page.bytes();
                         this.text.pages.insert(index, Arc::new(page), bytes);
                     }

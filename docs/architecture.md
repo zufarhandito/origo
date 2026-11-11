@@ -1,4 +1,4 @@
-﻿# Architecture - M1
+﻿# Architecture - M2
 
 ```text
 desktop (GPUI Kit) -> application -> domain
@@ -7,10 +7,13 @@ desktop (GPUI Kit) -> application -> domain
 smoke -> pdf-engine + qpdf-adapter
 ```
 
-The domain owns a read-only single-source Workspace: source identity/fingerprint,
-stable PageId, source index and validated page geometry. Opening inspects all page
-metadata without rasterizing. Export support remains NotPreflighted; there are no
-organizer commands or history yet. QPDF remains a trusted synthetic smoke adapter.
+The domain owns a multi-source virtual Workspace: source identity/fingerprint, stable
+PageId, source index, virtual rotation, authoritative page order, page selection and
+bounded inverse-delta history. Commands validate before mutation; no-op operations
+are omitted. Undo/redo restores state revisions and selection; dirty compares against
+the opening baseline. Sources are retained until their import is undone. An empty plan
+is valid. QPDF remains a trusted synthetic smoke adapter; production export is M3.
+See organizer.md for command semantics, limits and conservative cache invalidation.
 
 Application ports expose inspected metadata and owned RGBA, without GPUI/native
 handles. A dedicated adapter thread owns Pdfium and a borrowed document session;
@@ -65,3 +68,15 @@ load text. Selection stores page/character endpoints, and the view paints merged
 rectangles on an explicitly top-left-positioned canvas over each page image.
 Clipboard writes use the toolkit on an explicit copy action, capped to 1 MiB.
 
+
+## Reader/organizer presentation
+
+ViewerMode is UI-only. Baca restricts thumbnails to navigation; Atur halaman exposes
+page commands. Both modes share the same viewer, document plan, history, render worker
+and cache budgets. Header/toolbars and deferred current-page input projection live in
+chrome.rs. The field is not mutated during render and focused drafts survive scrolling.
+
+A global canvas mouse listener does not automatically inherit overflow clipping for
+hit-testing. Text overlays capture the paint-time content mask and restrict down/move
+to both page and clip bounds, preventing offscreen page regions from swallowing toolbar
+or sidebar clicks. Mouse-up remains global for release outside the page/window viewport.

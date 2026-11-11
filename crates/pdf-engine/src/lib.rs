@@ -375,7 +375,15 @@ fn render(
         .map_err(|_| RenderError::InvalidPage)?;
     let geometry = geometry(&page)?;
     let aspect = f64::from(geometry.height_points / geometry.width_points);
-    let requested = f64::from(request.target_width.clamp(32, limits.max_bitmap_dimension));
+    if request.rotation_delta > 3 {
+        return Err(RenderError::InvalidPage);
+    }
+    let requested = f64::from(request.target_width.clamp(32, limits.max_bitmap_dimension))
+        / if request.rotation_delta % 2 == 1 {
+            aspect
+        } else {
+            1.
+        };
     let factor = (f64::from(limits.max_bitmap_dimension) / (requested * aspect))
         .min((limits.max_bitmap_pixels as f64 / (requested * requested * aspect)).sqrt())
         .min(1.);
@@ -394,15 +402,28 @@ fn render(
     {
         return Err(RenderError::ResourceLimit);
     }
-    let rgba = bitmap.as_rgba_bytes();
+    let mut rgba = bitmap.as_rgba_bytes();
     if rgba.len() != width as usize * height as usize * 4 {
         return Err(RenderError::ResourceLimit);
+    }
+    let (mut width, mut height) = (width, height);
+    for _ in 0..request.rotation_delta {
+        let mut rotated = vec![0; rgba.len()];
+        for y in 0..height as usize {
+            for x in 0..width as usize {
+                let from = (y * width as usize + x) * 4;
+                let to = (x * height as usize + height as usize - 1 - y) * 4;
+                rotated[to..to + 4].copy_from_slice(&rgba[from..from + 4]);
+            }
+        }
+        rgba = rotated;
+        std::mem::swap(&mut width, &mut height);
     }
     Ok(RenderedPage {
         width,
         height,
         rgba,
         page_count: document.pages().len() as u16,
-        clockwise_quarter_turns: geometry.quarter_turns,
+        clockwise_quarter_turns: (geometry.quarter_turns + request.rotation_delta) % 4,
     })
 }

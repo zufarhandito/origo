@@ -4554,6 +4554,7 @@ dependencies = [
  "gpui-kit",
  "image",
  "pdf-application",
+ "pdf-domain",
  "pdf-engine",
  "smallvec",
 ]

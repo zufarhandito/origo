@@ -1,19 +1,161 @@
 use crate::*;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, Sizable, StyledExt, Theme, ThemeMode, TitleBar,
+    ActiveTheme, Icon, Sizable, TitleBar,
     button::{Button, ButtonVariants},
     empty::{Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle},
-    input::Input,
     scroll::Scrollbar,
     spinner::Spinner,
     status_bar::StatusBar,
-    toolbar::Toolbar,
 };
 use gpui_kit::{IntoElement, MouseButton, Render, canvas, div, img, list};
 use pdf_application::viewer::RenderKind;
 
 impl Viewer {
+    fn thumbnail_sidebar(
+        &mut self,
+        dragging_pages: bool,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let c = cx.theme().colors;
+        let organizing = self.mode == ViewerMode::Organize;
+        if self.sidebar {
+            let weak = cx.weak_entity();
+            div()
+                .id("page-organizer")
+                .when(organizing, |el| el.key_context("PageOrganizer"))
+                .on_action(cx.listener(|this, _: &ClearPages, window, cx| {
+                    cx.stop_active_drag(window);
+                    this.page_dragging = false;
+                    if let Some(w) = &mut this.workspace {
+                        w.select([]);
+                    }
+                    this.page_anchor = None;
+                    cx.notify();
+                }))
+                .on_action(cx.listener(|this, _: &PageFocusPrevious, _, cx| {
+                    this.navigate(Direction::Previous, cx)
+                }))
+                .on_action(
+                    cx.listener(|this, _: &PageFocusNext, _, cx| {
+                        this.navigate(Direction::Next, cx)
+                    }),
+                )
+                .on_action(cx.listener(|this, _: &RotateRight, _, cx| {
+                    this.edit(
+                        pdf_domain::Command::Rotate {
+                            ids: this.selected_ids(),
+                            turns: 1,
+                        },
+                        cx,
+                    )
+                }))
+                .on_action(cx.listener(|this, _: &RotateLeft, _, cx| {
+                    this.edit(
+                        pdf_domain::Command::Rotate {
+                            ids: this.selected_ids(),
+                            turns: 3,
+                        },
+                        cx,
+                    )
+                }))
+                .track_focus(&self.page_focus)
+                .on_action(cx.listener(|this, _: &DeletePages, _, cx| {
+                    this.edit(
+                        pdf_domain::Command::Delete {
+                            ids: this.selected_ids(),
+                        },
+                        cx,
+                    )
+                }))
+                .on_action(cx.listener(|this, _: &SelectPages, _, cx| {
+                    if let Some(w) = &mut this.workspace {
+                        let ids = w.pages().iter().map(|p| p.id).collect::<Vec<_>>();
+                        w.select(ids);
+                    }
+                    cx.notify();
+                }))
+                .on_action(
+                    cx.listener(|this, _: &MoveEarlier, _, cx| this.move_selection(false, cx)),
+                )
+                .on_action(cx.listener(|this, _: &MoveLater, _, cx| this.move_selection(true, cx)))
+                .on_action(
+                    cx.listener(|this, _: &ExtendPrevious, _, cx| this.page_step(false, true, cx)),
+                )
+                .on_action(
+                    cx.listener(|this, _: &ExtendNext, _, cx| this.page_step(true, true, cx)),
+                )
+                .on_action(
+                    cx.listener(|this, _: &PagePrevious, _, cx| this.page_step(false, false, cx)),
+                )
+                .on_action(cx.listener(|this, _: &PageNext, _, cx| this.page_step(true, false, cx)))
+                .on_action(cx.listener(|this, _: &TogglePage, _, cx| {
+                    this.select_page(usize::from(this.navigation.current), true, false, cx)
+                }))
+                .w(px(196.))
+                .flex_shrink_0()
+                .min_h_0()
+                .flex()
+                .flex_col()
+                .bg(c.background)
+                .border_r_1()
+                .border_color(c.border)
+                .child(
+                    div()
+                        .h_10()
+                        .px_4()
+                        .py_2()
+                        .text_xs()
+                        .text_color(c.muted_foreground)
+                        .child("Halaman"),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .relative()
+                        .child(
+                            list(self.thumbnail_list.clone(), move |index, _, cx| {
+                                weak.update(cx, |this, cx| {
+                                    this.item(index, RenderKind::Thumbnail, cx)
+                                })
+                                .unwrap_or_else(|_| div().into_any_element())
+                            })
+                            .size_full(),
+                        )
+                        .child(Scrollbar::vertical(&self.thumbnail_list)),
+                )
+                .when(dragging_pages, |el| {
+                    el.child(
+                        div()
+                            .id("drop-at-end")
+                            .h_10()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_xs()
+                            .border_t_2()
+                            .border_color(c.primary)
+                            .child("Letakkan di akhir")
+                            .on_drop(cx.listener(|this, drag: &organizer::PageDrag, _, cx| {
+                                if let Some(w) = &this.workspace {
+                                    let target = w.pages().len();
+                                    this.edit(
+                                        pdf_domain::Command::Move {
+                                            ids: drag.0.clone(),
+                                            target,
+                                        },
+                                        cx,
+                                    );
+                                }
+                            })),
+                    )
+                })
+                .into_any_element()
+        } else {
+            div().into_any_element()
+        }
+    }
     fn item(
         &mut self,
         index: usize,
@@ -44,7 +186,18 @@ impl Viewer {
             self.zoom.size(geometry, self.viewport)
         };
         let colors = cx.theme().colors;
-        let active = usize::from(self.navigation.current) == index;
+        let organizing = self.mode == ViewerMode::Organize;
+        let reading = usize::from(self.navigation.current) == index;
+        let active = if thumbnail {
+            organizing && workspace.selected().contains(&page_id)
+        } else {
+            usize::from(self.navigation.current) == index
+        };
+        let drag_ids = if workspace.selected().contains(&page_id) {
+            self.selected_ids()
+        } else {
+            vec![page_id]
+        };
         let failed = self.failures.get(&key).cloned();
         let mut bitmap_key = key.clone();
         let mut bitmap = self.bitmap(&key);
@@ -111,12 +264,16 @@ impl Viewer {
                             window.paint_quad(gpui::fill(highlight, gpui::rgba(0x3b82f650)));
                         }
                     }
+                    // Global window listeners must honor the page's visible clip. A
+                    // scrolled-off page can otherwise intercept toolbar/sidebar clicks.
+                    let input_clip = window.content_mask().bounds;
                     let down = weak.clone();
                     window.on_mouse_event(
                         move |event: &gpui::MouseDownEvent, phase, window, cx| {
                             if phase == gpui::DispatchPhase::Bubble
                                 && event.button == MouseButton::Left
                                 && bounds.contains(&event.position)
+                                && input_clip.contains(&event.position)
                             {
                                 let _ = down.update(cx, |this, cx| {
                                     this.select_text(
@@ -136,6 +293,7 @@ impl Viewer {
                         move |event: &gpui::MouseMoveEvent, phase, window, cx| {
                             if phase == gpui::DispatchPhase::Bubble
                                 && bounds.contains(&event.position)
+                                && input_clip.contains(&event.position)
                             {
                                 let _ = weak.update(cx, |this, cx| {
                                     // Hover/repaint events can carry no button. End the
@@ -210,7 +368,7 @@ impl Viewer {
                 .child(
                     div()
                         .border_2()
-                        .border_color(if active {
+                        .border_color(if active || reading {
                             colors.primary
                         } else {
                             colors.border
@@ -223,10 +381,39 @@ impl Viewer {
                         .text_color(colors.muted_foreground)
                         .child(format!("{}", index + 1)),
                 )
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.go_to(index as u16, cx);
-                    this.focus.focus(window, cx);
+                .when(organizing && !self.opening, |el| {
+                    let weak = cx.weak_entity();
+                    el.on_drag(organizer::PageDrag(drag_ids), move |_, _, _, cx| {
+                        let _ = weak.update(cx, |this, cx| {
+                            this.page_dragging = true;
+                            cx.notify();
+                        });
+                        cx.new(|_| organizer::DragLabel)
+                    })
+                    .drag_over::<organizer::PageDrag>(
+                        move |style, _, _, _| style.border_t_2().border_color(colors.primary),
+                    )
+                })
+                .on_drop(cx.listener(move |this, drag: &organizer::PageDrag, _, cx| {
+                    this.edit(
+                        pdf_domain::Command::Move {
+                            ids: drag.0.clone(),
+                            target: index,
+                        },
+                        cx,
+                    );
                 }))
+                .on_click(
+                    cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
+                        let m = event.modifiers();
+                        if this.mode == ViewerMode::Organize {
+                            this.select_page(index, m.control, m.shift, cx);
+                        } else {
+                            this.go_to(index as u16, cx);
+                        }
+                        this.page_focus.focus(window, cx);
+                    }),
+                )
                 .into_any_element()
         } else {
             div()
@@ -251,197 +438,14 @@ impl Viewer {
 }
 
 impl Render for Viewer {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.theme().colors;
-        let dark = cx.theme().is_dark();
         let has_document = self.workspace.is_some();
-        let can_previous = self.navigation.target(Direction::Previous).is_some();
-        let can_next = self.navigation.target(Direction::Next).is_some();
-        let name = self
-            .workspace
-            .as_ref()
-            .and_then(|w| w.source().path.file_name())
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "Ruang baca PDF".into());
-        let subtitle = self
-            .workspace
-            .as_ref()
-            .and_then(|w| w.geometry(usize::from(self.navigation.current)).ok())
-            .map(|g| {
-                format!(
-                    "{} halaman · {:.0} × {:.0} pt · Dokumen lokal",
-                    self.navigation.count, g.width_points, g.height_points
-                )
-            })
-            .unwrap_or_else(|| "Buka dokumen untuk mulai membaca".into());
-        let open_button = Button::new("open")
-            .primary()
-            .icon(IconName::FolderOpen)
-            .label("Buka PDF")
-            .disabled(self.opening)
-            .tooltip("Buka dokumen · Ctrl+O")
-            .on_click(cx.listener(|this, _, window, cx| this.open(&Open, window, cx)));
-        let theme_button = Button::new("theme")
-            .accessibility_label("Ganti tema")
-            .ghost()
-            .icon(if dark { IconName::Sun } else { IconName::Moon })
-            .tooltip("Ganti tema terang/gelap")
-            .on_click(|_, window, cx| {
-                let mode = if cx.theme().is_dark() {
-                    ThemeMode::Light
-                } else {
-                    ThemeMode::Dark
-                };
-                Theme::change(mode, Some(window), cx);
-            });
-        let header = Toolbar::new("document-toolbar")
-            .px_5()
-            .py_3()
-            .border_b_1()
-            .border_color(c.border)
-            .content(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .child(div().text_sm().font_semibold().text_ellipsis().child(name))
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(c.muted_foreground)
-                            .child(subtitle),
-                    ),
-            )
-            .child(
-                Button::new("copy-text")
-                    .accessibility_label("Salin teks")
-                    .ghost()
-                    .icon(IconName::Copy)
-                    .label("Salin")
-                    .tooltip("Salin teks terpilih · Ctrl+C")
-                    .disabled(self.text.selection.is_none())
-                    .on_click(cx.listener(|this, _, _, cx| this.copy_text(cx))),
-            )
-            .child(theme_button)
-            .child(open_button);
-        let page_controls = Toolbar::new("page-toolbar")
-            .child(
-                Button::new("sidebar")
-                    .accessibility_label("Panel thumbnail")
-                    .ghost()
-                    .icon(IconName::PanelLeft)
-                    .tooltip("Tampilkan/sembunyikan thumbnail")
-                    .disabled(!has_document)
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.sidebar = !this.sidebar;
-                        cx.notify();
-                    })),
-            )
-            .child(
-                Button::new("first-page")
-                    .accessibility_label("Halaman pertama")
-                    .ghost()
-                    .icon(IconName::ChevronsLeft)
-                    .tooltip("Halaman pertama · Ctrl+Home")
-                    .disabled(!can_previous)
-                    .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::First, cx))),
-            )
-            .child(
-                Button::new("previous-page")
-                    .accessibility_label("Halaman sebelumnya")
-                    .ghost()
-                    .icon(IconName::ChevronLeft)
-                    .tooltip("Sebelumnya · PgUp")
-                    .disabled(!can_previous)
-                    .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::Previous, cx))),
-            )
-            .content(
-                Input::new(&self.jump)
-                    .small()
-                    .w(px(60.))
-                    .disabled(!has_document)
-                    .aria_label("Nomor halaman tujuan"),
-            )
-            .child(
-                Button::new("jump-page")
-                    .ghost()
-                    .label("Ke")
-                    .tooltip("Lompat ke halaman · Ctrl+G")
-                    .disabled(!has_document)
-                    .on_click(cx.listener(|this, _, window, cx| this.jump_to(window, cx))),
-            )
-            .content(
-                div()
-                    .text_sm()
-                    .text_color(c.muted_foreground)
-                    .child(format!("/ {}", self.navigation.count)),
-            )
-            .child(
-                Button::new("next-page")
-                    .accessibility_label("Halaman berikutnya")
-                    .ghost()
-                    .icon(IconName::ChevronRight)
-                    .tooltip("Berikutnya · PgDn")
-                    .disabled(!can_next)
-                    .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::Next, cx))),
-            )
-            .child(
-                Button::new("last-page")
-                    .accessibility_label("Halaman terakhir")
-                    .ghost()
-                    .icon(IconName::ChevronsRight)
-                    .tooltip("Halaman terakhir · Ctrl+End")
-                    .disabled(!can_next)
-                    .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::Last, cx))),
-            );
-        let zoom_controls = Toolbar::new("zoom-toolbar")
-            .child(
-                Button::new("zoom-out")
-                    .accessibility_label("Perkecil")
-                    .ghost()
-                    .icon(IconName::Minus)
-                    .tooltip("Perkecil · Ctrl+-")
-                    .disabled(!has_document || self.zoom_percent() <= 50)
-                    .on_click(cx.listener(|this, _, _, cx| this.zoom_step(-25, cx))),
-            )
-            .child(
-                Button::new("zoom-reset")
-                    .ghost()
-                    .label(format!("{}%", self.zoom_percent()))
-                    .tooltip("Ukuran 100%")
-                    .disabled(!has_document)
-                    .on_click(cx.listener(|this, _, _, cx| this.set_zoom(Zoom::Percent(100), cx))),
-            )
-            .child(
-                Button::new("zoom-in")
-                    .accessibility_label("Perbesar")
-                    .ghost()
-                    .icon(IconName::Plus)
-                    .tooltip("Perbesar · Ctrl++")
-                    .disabled(!has_document || self.zoom_percent() >= 400)
-                    .on_click(cx.listener(|this, _, _, cx| this.zoom_step(25, cx))),
-            )
-            .child(
-                Button::new("fit-width")
-                    .ghost()
-                    .icon(IconName::MoveHorizontal)
-                    .label("Lebar")
-                    .tooltip("Fit width · Ctrl+1")
-                    .disabled(!has_document)
-                    .on_click(cx.listener(|this, _, _, cx| this.set_zoom(Zoom::FitWidth, cx))),
-            )
-            .child(
-                Button::new("fit-page")
-                    .ghost()
-                    .icon(IconName::Scan)
-                    .label("Halaman")
-                    .tooltip("Fit page · Ctrl+0")
-                    .disabled(!has_document)
-                    .on_click(cx.listener(|this, _, _, cx| this.set_zoom(Zoom::FitPage, cx))),
-            );
-
+        let organizing = self.mode == ViewerMode::Organize;
+        let dragging_pages = organizing && self.page_dragging && cx.has_active_drag();
+        let header = self.document_header(cx);
+        let reading_toolbar = self.reading_toolbar(window, cx);
+        let organizer_toolbar = organizing.then(|| self.organizer_toolbar(cx));
         let body = if has_document {
             let weak = cx.weak_entity();
             let main_list = list(self.page_list.clone(), move |index, _, cx| {
@@ -528,48 +532,18 @@ impl Render for Viewer {
                         .child(main_list.w(px(content_width)).h_full()),
                 )
                 .child(probe)
+                .when(self.navigation.count == 0, |el| {
+                    el.child(
+                        div()
+                            .absolute()
+                            .top_4()
+                            .left_4()
+                            .child("Tidak ada halaman. Impor PDF atau gunakan Undo."),
+                    )
+                })
                 .child(Scrollbar::vertical(&self.page_list))
                 .child(Scrollbar::horizontal(&self.horizontal));
-            let sidebar = if self.sidebar {
-                let weak = cx.weak_entity();
-                div()
-                    .w(px(196.))
-                    .flex_shrink_0()
-                    .min_h_0()
-                    .flex()
-                    .flex_col()
-                    .bg(c.background)
-                    .border_r_1()
-                    .border_color(c.border)
-                    .child(
-                        div()
-                            .h_10()
-                            .px_4()
-                            .py_2()
-                            .text_xs()
-                            .text_color(c.muted_foreground)
-                            .child("HALAMAN"),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_h_0()
-                            .relative()
-                            .child(
-                                list(self.thumbnail_list.clone(), move |index, _, cx| {
-                                    weak.update(cx, |this, cx| {
-                                        this.item(index, RenderKind::Thumbnail, cx)
-                                    })
-                                    .unwrap_or_else(|_| div().into_any_element())
-                                })
-                                .size_full(),
-                            )
-                            .child(Scrollbar::vertical(&self.thumbnail_list)),
-                    )
-                    .into_any_element()
-            } else {
-                div().into_any_element()
-            };
+            let sidebar = self.thumbnail_sidebar(dragging_pages, cx);
             div()
                 .flex_1()
                 .min_h_0()
@@ -635,8 +609,24 @@ impl Render for Viewer {
             .track_focus(&self.focus)
             .key_context("PdfViewer")
             .on_action(cx.listener(|this, _: &CopyText, _, cx| this.copy_text(cx)))
-            .on_action(cx.listener(|this, _: &ClearTextSelection, _, cx| this.clear_selection(cx)))
+            .on_action(cx.listener(|this, _: &ClearTextSelection, window, cx| {
+                cx.stop_active_drag(window);
+                this.page_dragging = false;
+                this.clear_selection(cx);
+            }))
+            .on_mouse_up(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    if this.page_dragging {
+                        this.page_dragging = false;
+                        cx.notify();
+                    }
+                }),
+            )
             .on_action(cx.listener(Self::open))
+            .on_action(cx.listener(|this, _: &ImportPdf, _, cx| this.import_pdf(cx)))
+            .on_action(cx.listener(|this, _: &UndoEdit, _, cx| this.history(false, cx)))
+            .on_action(cx.listener(|this, _: &RedoEdit, _, cx| this.history(true, cx)))
             .on_action(
                 cx.listener(|this, _: &FirstPage, _, cx| this.navigate(Direction::First, cx)),
             )
@@ -671,23 +661,14 @@ impl Render for Viewer {
                 ),
             )
             .child(header)
-            .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .justify_between()
-                    .px_3()
-                    .py_1()
-                    .border_b_1()
-                    .border_color(c.border)
-                    .child(page_controls)
-                    .child(zoom_controls),
-            )
+            .child(reading_toolbar)
+            .children(organizer_toolbar)
             .child(body)
             .child(
                 StatusBar::new()
                     .px_4()
-                    .py_2()
+                    .h(px(24.))
+                    .py_0()
                     .left(
                         div()
                             .flex()
@@ -696,9 +677,19 @@ impl Render for Viewer {
                             .when(self.opening || self.inflight.is_some(), |this| {
                                 this.child(Spinner::new().xsmall())
                             })
-                            .child(self.status.clone()),
+                            .child(self.status.clone())
+                            .when(self.workspace.is_some(), |el| {
+                                el.child(format!(
+                                    " - {} sumber",
+                                    self.workspace.as_ref().map_or(0, |w| w.sources().len())
+                                ))
+                            }),
                     )
-                    .right(format!("{}% · Ctrl+G: ke halaman", self.zoom_percent())),
+                    .right(if self.workspace.as_ref().is_some_and(|w| w.is_dirty()) {
+                        "Perubahan sesi belum diekspor"
+                    } else {
+                        "File asli tetap utuh"
+                    }),
             )
     }
 }

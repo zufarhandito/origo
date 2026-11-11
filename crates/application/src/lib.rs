@@ -50,6 +50,7 @@ pub struct RenderRequest {
     pub path: PathBuf,
     pub page_index: u16,
     pub target_width: u32,
+    pub rotation_delta: u8,
     pub fingerprint: Option<SourceFingerprint>,
 }
 
@@ -69,6 +70,7 @@ pub trait PageRenderer {
             path: source.into(),
             page_index: page,
             target_width: 1200,
+            rotation_delta: 0,
             fingerprint: None,
         })
     }

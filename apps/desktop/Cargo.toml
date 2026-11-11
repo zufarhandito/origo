@@ -9,6 +9,7 @@ gpui-kit.workspace = true
 image.workspace = true
 smallvec.workspace = true
 pdf-application.workspace = true
+pdf-domain.workspace = true
 pdf-engine.workspace = true
 [lints]
 workspace = true

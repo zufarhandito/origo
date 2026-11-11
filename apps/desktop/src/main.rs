@@ -12,8 +12,11 @@ use pdf_application::{
 };
 use pdf_engine::PdfiumRenderer;
 use std::{collections::HashMap, ops::Range, path::PathBuf, sync::Arc};
+mod chrome;
 mod controller;
+use chrome::ViewerMode;
 mod navigation;
+mod organizer;
 mod text_selection;
 mod views;
 use navigation::{Direction, Navigation};
@@ -22,6 +25,23 @@ actions!(
     pdf_studio,
     [
         Open,
+        ImportPdf,
+        UndoEdit,
+        RedoEdit,
+        DeletePages,
+        RotateRight,
+        RotateLeft,
+        SelectPages,
+        MoveEarlier,
+        MoveLater,
+        ExtendPrevious,
+        ExtendNext,
+        PagePrevious,
+        PageNext,
+        TogglePage,
+        ClearPages,
+        PageFocusPrevious,
+        PageFocusNext,
         FirstPage,
         PreviousPage,
         NextPage,
@@ -40,13 +60,18 @@ actions!(
 #[derive(Default)]
 struct RenderStats {
     full: u64,
+    navigation_commands: u64,
     thumbnails: u64,
     stale: u64,
     peak_cache_bytes: usize,
     max_bitmap_bytes: usize,
 }
 struct Viewer {
+    mode: ViewerMode,
+    page_dragging: bool,
     text: text_selection::TextState,
+    page_anchor: Option<pdf_domain::PageId>,
+    page_focus: FocusHandle,
     focus: FocusHandle,
     renderer: PdfiumRenderer,
     workspace: Option<Workspace>,
@@ -121,6 +146,23 @@ fn main() -> anyhow::Result<()> {
             gpui_kit::component::Theme::update(cx, |theme| theme.font_family = "Segoe UI".into());
             cx.bind_keys([
                 KeyBinding::new("ctrl-o", Open, None),
+                KeyBinding::new("ctrl-shift-o", ImportPdf, Some("PdfViewer")),
+                KeyBinding::new("ctrl-z", UndoEdit, Some("PdfViewer")),
+                KeyBinding::new("ctrl-y", RedoEdit, Some("PdfViewer")),
+                KeyBinding::new("delete", DeletePages, Some("PageOrganizer")),
+                KeyBinding::new("ctrl-a", SelectPages, Some("PageOrganizer")),
+                KeyBinding::new("alt-up", MoveEarlier, Some("PageOrganizer")),
+                KeyBinding::new("alt-down", MoveLater, Some("PageOrganizer")),
+                KeyBinding::new("shift-up", ExtendPrevious, Some("PageOrganizer")),
+                KeyBinding::new("shift-down", ExtendNext, Some("PageOrganizer")),
+                KeyBinding::new("up", PagePrevious, Some("PageOrganizer")),
+                KeyBinding::new("down", PageNext, Some("PageOrganizer")),
+                KeyBinding::new("space", TogglePage, Some("PageOrganizer")),
+                KeyBinding::new("escape", ClearPages, Some("PageOrganizer")),
+                KeyBinding::new("ctrl-up", PageFocusPrevious, Some("PageOrganizer")),
+                KeyBinding::new("ctrl-down", PageFocusNext, Some("PageOrganizer")),
+                KeyBinding::new("ctrl-r", RotateRight, Some("PageOrganizer")),
+                KeyBinding::new("ctrl-shift-r", RotateLeft, Some("PageOrganizer")),
                 KeyBinding::new("pageup", PreviousPage, None),
                 KeyBinding::new("pagedown", NextPage, None),
                 KeyBinding::new("left", PreviousPage, None),
@@ -159,6 +201,7 @@ fn main() -> anyhow::Result<()> {
                         let focus = cx.focus_handle();
                         cx.observe_window_activation(window, |this: &mut Viewer, window, _| {
                             if !window.is_window_active() {
+                                this.page_dragging = false;
                                 this.text.dragging = false;
                                 this.text.pending = None;
                                 this.text.sentence_anchor = None;
@@ -173,6 +216,8 @@ fn main() -> anyhow::Result<()> {
                             |this: &mut Viewer, _, event: &InputEvent, window, cx| {
                                 if matches!(event, InputEvent::PressEnter { .. }) {
                                     this.jump_to(window, cx);
+                                } else if matches!(event, InputEvent::Blur) {
+                                    this.defer_page_input(cx);
                                 }
                             },
                         )
@@ -200,7 +245,11 @@ fn main() -> anyhow::Result<()> {
                             });
                         });
                         let mut viewer = Viewer {
+                            mode: ViewerMode::Read,
+                            page_dragging: false,
                             text: text_selection::TextState::default(),
+                            page_anchor: None,
+                            page_focus: cx.focus_handle(),
                             focus,
                             renderer: PdfiumRenderer::new(&sidecars),
                             workspace: None,

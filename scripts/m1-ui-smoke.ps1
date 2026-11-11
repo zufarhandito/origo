@@ -16,7 +16,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 if(-not ('M1Window' -as [type])) {
-    Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class M1Window { [StructLayout(LayoutKind.Sequential)]public struct Rect {public int L,T,R,B;} [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out Rect r);[DllImport("user32.dll")]public static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,IntPtr l);[DllImport("user32.dll")]public static extern bool MoveWindow(IntPtr h,int x,int y,int w,int height,bool repaint);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint f);}'
+    Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class M1Window {[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l); [StructLayout(LayoutKind.Sequential)]public struct Point{public int X,Y;}[DllImport("user32.dll")]public static extern bool ScreenToClient(IntPtr h,ref Point p); [StructLayout(LayoutKind.Sequential)]public struct Rect {public int L,T,R,B;} [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out Rect r);[DllImport("user32.dll")]public static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,IntPtr l);[DllImport("user32.dll")]public static extern bool MoveWindow(IntPtr h,int x,int y,int w,int height,bool repaint);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint f);}'
 }
 $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-Object Id)
 $desktop=New-Object -ComObject Shell.Application
@@ -45,11 +45,16 @@ if(-not $app -or $app.Path -ne $exe){throw 'New project viewer not found'}
 $app.Id | Set-Content (Join-Path $directory 'pid.txt')
 $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
 function Wait-State([scriptblock]$Predicate){
-    $deadline=(Get-Date).AddSeconds(20)
+    $deadline=(Get-Date).AddSeconds(30)
+    $stable=0;$lastGeneration=-1
     do {
         Start-Sleep -Milliseconds 100
         try{$state=Get-Content -Raw -LiteralPath $metricsPath | ConvertFrom-Json}catch{continue}
-        if(-not $state.opening -and -not $state.rendering -and $state.queue -eq 0 -and (& $Predicate $state)){return $state}
+        if(-not $state.opening -and -not $state.rendering -and $state.queue -eq 0 -and (& $Predicate $state)){
+            if($lastGeneration -eq $state.generation){$stable++}else{$stable=0}
+            $lastGeneration=$state.generation
+            if($stable -ge 3){return $state}
+        }else{$stable=0}
     }while((Get-Date) -lt $deadline)
     throw "Viewer timed out: $($state | ConvertTo-Json -Compress)"
 }
@@ -63,18 +68,49 @@ function Find-Control([string]$Name,[Windows.Automation.ControlType]$Type){
 }
 function Invoke-Control([string]$Name,[int]$Delay=100){
     $node=Find-Control $Name ([Windows.Automation.ControlType]::Button)
+    $deadline=(Get-Date).AddSeconds(1)
+    while(-not $node.Current.IsEnabled -and (Get-Date) -lt $deadline){Start-Sleep -Milliseconds 100;$node=Find-Control $Name ([Windows.Automation.ControlType]::Button)}
     if(-not $node.Current.IsEnabled){return $false}
-    $pattern=$node.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
-    try { $pattern.Invoke() }
-    catch [Windows.Automation.ElementNotEnabledException] { return $false }
+
+    $pattern=$null
+    if($node.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)) { $pattern.Invoke() } else {
+        $r=$node.Current.BoundingRectangle
+        $pt=New-Object M1Window+Point
+        $pt.X=[int]($r.X+$r.Width/2);$pt.Y=[int]($r.Y+$r.Height/2)
+        [M1Window]::ScreenToClient($app.MainWindowHandle,[ref]$pt)|Out-Null
+        $lp=[IntPtr](($pt.Y -shl 16) -bor ($pt.X -band 0xffff))
+        [M1Window]::SendMessage($app.MainWindowHandle,0x201,[IntPtr]1,$lp)|Out-Null
+        [M1Window]::SendMessage($app.MainWindowHandle,0x202,[IntPtr]0,$lp)|Out-Null
+    }
+
     if($Delay -gt 0){Start-Sleep -Milliseconds $Delay}
     return $true
+}
+function Set-Fit([string]$Name){
+    $null=Invoke-Control 'Zoom'
+    Start-Sleep -Milliseconds 150
+    $node=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$Name))
+    if(-not $node){throw "Missing zoom menu item: $Name"}
+
+    $pattern=$null
+    if($node.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)) { $pattern.Invoke() } else {
+        $r=$node.Current.BoundingRectangle
+        $pt=New-Object M1Window+Point
+        $pt.X=[int]($r.X+$r.Width/2);$pt.Y=[int]($r.Y+$r.Height/2)
+        [M1Window]::ScreenToClient($app.MainWindowHandle,[ref]$pt)|Out-Null
+        $lp=[IntPtr](($pt.Y -shl 16) -bor ($pt.X -band 0xffff))
+        [M1Window]::SendMessage($app.MainWindowHandle,0x201,[IntPtr]1,$lp)|Out-Null
+        [M1Window]::SendMessage($app.MainWindowHandle,0x202,[IntPtr]0,$lp)|Out-Null
+    }
+
 }
 function Jump([int]$Page){
     $input=Find-Control 'Nomor halaman tujuan' ([Windows.Automation.ControlType]::Edit)
     $value=$input.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
+    $input.SetFocus()
     $value.SetValue([string]$Page)
-    $null=Invoke-Control 'Ke'
+    [M1Window]::PostMessage($app.MainWindowHandle,0x100,[IntPtr]13,[IntPtr]0x1C0001)|Out-Null
+    [M1Window]::PostMessage($app.MainWindowHandle,0x101,[IntPtr]13,[IntPtr]0xC01C0001)|Out-Null
 }
 function Capture([string]$Name){
     $rect=New-Object M1Window+Rect
@@ -91,7 +127,7 @@ if($initial.fullRenders -gt 12 -or $initial.thumbnailRenders -gt 12){throw 'Eage
 $initial|ConvertTo-Json|Set-Content (Join-Path $directory 'initial.json')
 Write-Host "PASS lazy startup: $($initial.fullRenders) page attempts, $($initial.thumbnailRenders) thumbnail attempts"
 Capture 'initial'
-$null=Invoke-Control 'Halaman'
+Set-Fit 'Sesuaikan halaman'
 $fit=Wait-State {param($s) $s.zoomPercent -lt $initial.zoomPercent -and $s.pageCount -eq $ExpectedPages}
 Capture 'fit-page'
 Jump $ExpectedPages
@@ -125,7 +161,7 @@ $small=Wait-State {param($s) $s.zoomPercent -eq 50}
 Capture 'zoom-50'
 if($small.pageCacheBytes -gt 128MB -or $small.thumbnailCacheBytes -gt 16MB -or $small.maxBitmapBytes -gt 64MB){throw 'Memory budget exceeded'}
 Write-Host "PASS rapid 50-400% zoom: $($small.staleResults) obsolete results ignored"
-$null=Invoke-Control 'Halaman'
+Set-Fit 'Sesuaikan halaman'
 $null=Wait-State {param($s) $s.pageCount -eq $ExpectedPages}
 $generation=(Get-Content -Raw $metricsPath|ConvertFrom-Json).generation
 $resizeRect=New-Object M1Window+Rect
@@ -135,13 +171,13 @@ $resizeWidth=if(($resizeRect.R-$resizeRect.L) -gt 1050){1000}else{1200}
 $resized=Wait-State {param($s) $s.generation -gt $generation -and $s.pageCount -eq $ExpectedPages}
 Capture 'resized'
 Write-Host 'PASS fit after window resize'
-$null=Invoke-Control 'Lebar'
+Set-Fit 'Sesuaikan lebar'
 $null=Wait-State {param($s) $s.pageCount -eq $ExpectedPages}
-$null=Invoke-Control 'Halaman'
+Set-Fit 'Sesuaikan halaman'
 Jump 1
 $final=Wait-State {param($s) $s.activePage -eq 1}
 if($Stress){
-    $null=Invoke-Control 'Lebar'
+    Set-Fit 'Sesuaikan lebar'
     $null=Wait-State {param($s) $s.pageCount -eq $ExpectedPages}
     for($pass=1;$pass -le 2;$pass++){
         $sampleCount=[math]::Min($ExpectedPages,$StressSamples)
@@ -156,7 +192,7 @@ if($Stress){
             ConvertTo-Json | Set-Content (Join-Path $directory "stress-$pass.json")
         Write-Host "PASS cache stress pass $pass ($sampleCount destinations across $ExpectedPages pages, bounded LRU)"
     }
-    $null=Invoke-Control 'Halaman'
+    Set-Fit 'Sesuaikan halaman'
     Jump 1
     $final=Wait-State {param($s) $s.activePage -eq 1}
 }

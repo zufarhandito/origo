@@ -1,3 +1,97 @@
+# Current update - compact reader/organizer UX (11 November 2026)
+
+This supersedes the presentation details in the M2 handoff below. The M2 domain,
+non-destructive commands and export limitations remain in force.
+
+- Default Baca mode: compact 44px document header and one 40px reading toolbar.
+  Atur halaman opens the sidebar, selects the current page when needed, and adds
+  a 40px contextual organizer toolbar. Returning to Baca clears page selection,
+  anchor and drag, preserves text selection, and never changes content revision.
+- apps/desktop/src/chrome.rs owns ViewerMode, header, grouped reading/organizer
+  builders and page-field projection. views.rs owns viewer canvas/sidebar/items.
+  Successful import enters Atur halaman; failed import leaves the plan/mode intact.
+- Toolbar groups: sidebar/history; navigation; zoom dropdown/presets. Copy appears
+  only with text selection. First/last move into navigation menu below 1000 logical
+  pixels. Mode/header uses icon + essential labels; other common actions use icons,
+  accessible labels and tooltips. Theme choices are in Lainnya.
+- The page field displays current position and submits with Enter; the Ke button
+  is removed. Its projection updates are deferred outside rendering and do not
+  replace a focused draft. Input Blur also schedules projection refresh.
+- Organizer contains import, selected count, rotation/delete, Pindahkan and Seleksi
+  menus. Page shortcuts/drag are enabled only in Atur halaman's page panel. End-drop
+  hint is visible only during a page drag; target has a top insertion indicator.
+- Session dirty notice is plain footer text, not a disabled button. Footer includes
+  source count and does not repeat zoom. No Save As/Extract placeholder is added.
+- IMPORTANT regression fix: page text overlays register global window mouse
+  listeners. Capture window.content_mask().bounds at paint time and check it along
+  with page bounds on down/move. A partially scrolled page can extend behind toolbar
+  or sidebar: checking page bounds alone intercepts clicks in those controls. Keep
+  global mouse-up handling unrestricted so a drag ends outside the page.
+- GPUI Kit Button already installs hover styling. A second raw .hover() on Button
+  panics with "hover style already set". Delete uses supported ButtonCustomVariant
+  hover/active colors plus focus-visible style. Do not reintroduce the raw hover.
+- Headed tests now use Enter via HWND-posted keyboard messages: Windows GPUI handles
+  key-down in the message pump pretranslation, so SendMessage(WM_KEYDOWN) bypasses it.
+  Menu controls can lack UIA InvokePattern; use their own HWND-relative bounds for
+  fallback clicks, never global input. Wait for accessible controls/layout readiness.
+- New scripts/chrome-ui-smoke.ps1 covers mode/theme/width layout, long filename and
+  focused page input while scrolling. Existing M1/M2/text smoke follows new controls.
+  Final evidence/results are in docs/testing.md; physical mixed-monitor DPI remains manual.
+- An already-running release was retained by renaming its loaded executable inside
+  target/release to pdf-studio.previous-fe73d6dbc0f84bfdadedefb6e68892a3.exe. This let
+  us build the new default executable without closing the user's session. That old
+  window continues using the old UI; run.cmd launches the new build. Do not infer
+  a currently live PID from this note or delete a mapped executable during a session.
+
+---
+
+# Current handoff - M2 organizer (11 November 2026)
+
+This update supersedes the pre-M2 snapshot preserved below. Communicate with the
+owner in Indonesian. Continue reading the blueprint and docs/organizer.md.
+
+- M2 is implemented: multi-source virtual page plan, stable IDs, page selection,
+  reorder (keyboard/buttons and thumbnail drag/drop), virtual rotation, delete,
+  import/append, bounded Undo/Redo, content revisions, dirty and empty states.
+- Save As/Extract and production export remain M3. Edits are session-only; opening
+  another PDF or closing discards the virtual plan. Sources are never modified.
+- Domain Command validates before mutation and stores affected entries/positions,
+  selections/revisions and optional imported source metadata. History cap: 128.
+  New edit clears redo; Undo to the opening revision clears dirty. No-op edits do
+  not create history. Registry retains sources after delete for undo.
+- Import appends one whole PDF per dialog. Duplicate source path/ID is refused.
+  Aggregate limits: 1024 source pages (including deleted pages of registered sources)
+  and 128 MiB source bytes. Undo import removes its source from the registry.
+- Desktop organizer logic: apps/desktop/src/organizer.rs; page plan/commands/history:
+  crates/domain/src/lib.rs. Controller resolves every render by SourceId.
+  RenderRequest now includes rotation_delta; worker rotates owned RGBA with bounded
+  dimensions. TextPage::rotate composes normalized character boxes with virtual rotation.
+- Every structural edit clears positional text state, raster caches/GPU residency,
+  and advances the token rejecting old text results. This is the chosen conservative
+  correctness policy; preserving unchanged caches across edits is a future optimization.
+- Ctrl/Shift thumbnail selection; Up/Down, Shift+Up/Down, Ctrl+Up/Down, Space, Ctrl+A,
+  Esc in the page panel; Alt+Up/Down move; Ctrl+R/Ctrl+Shift+R rotate; Delete removes.
+  Ctrl+Shift+O imports; Ctrl+Z/Ctrl+Y undo/redo. Text selection behavior is preserved.
+- The source_sequence counter also invalidates text results and therefore skips IDs;
+  no IDs are reused. Source identity is independent of workspace position/revision.
+- M2 UI smoke: scripts/m2-ui-smoke.ps1. Native dialog automation sets the filename
+  Edit control ID 1148 and clicks the native Open button ID 1 via HWND messages.
+  UIA traversal can expose Search Box instead of filename; never use the last Edit
+  or first matching automation ID as a fallback. Only target the test's own handles.
+- Release organizer, viewer and text-selection headed tests passed; evidence:
+  .research/m2-ui-31aaa601d905498f8c39cdda04d6f371,
+  .research/m1-ui-41a98684860c4b2895595eb58e49e7ce,
+  .research/text-ui-3422b39a1186498d8a8443ffd7de6bd7.
+  Source hashes unchanged. See docs/testing.md for final command results.
+- Physical modifier-key/trackpad, broad multi-selection drag/cancel and mixed-monitor
+  acceptance still need the documented manual matrix. No 2000+ page claim is added.
+- Keep toolchain/sidecars on D:, main stack reserve 8 MiB, and deferred drop_image.
+  run.cmd still prefers release; release is not yet portable-product certification.
+
+---
+
+## Historical snapshot before M2 (retained for prior evidence)
+
 # PDF Studio — handoff untuk chat berikutnya
 
 Dicatat: **11 November 2026**, zona waktu Asia/Bangkok.

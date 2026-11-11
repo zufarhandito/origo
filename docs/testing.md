@@ -150,3 +150,102 @@ form/signature export preflight, clean-machine portable runtime/license audit an
 packaging remain pending. The CI workflow is written but has not run remotely;
 headed GPU acceptance is local and is not claimed on GitHub hosted runners.
 
+
+## M2 organizer - 2026-11-11
+
+Implemented multi-source virtual commands, page selection, reorder/drag, rotate/delete,
+import, bounded Undo/Redo, revision/dirty and empty states. See organizer.md for exact
+semantics and limitations. Save As/Extract remain M3; sources are never rewritten.
+
+Final checks actually run locally:
+
+- `scripts/check.ps1`: fmt, workspace/all-target Clippy with denied warnings,
+  **21 unit tests**, and workspace release build passed.
+- `cargo run --locked --offline -p pdf-smoke`: real QPDF/PDFium smoke passed;
+  metadata/render/resource/source-change checks passed. Text checks now also cover
+  **16 intrinsic/virtual rotation combinations** against actual glyph raster ink.
+- `scripts/m2-ui-smoke.ps1 -Profile debug`: native import and organizer UI passed
+  before drag coverage was added; evidence `.research/m2-ui-4da7cfa4f77b4ec9a997c78cff6f1176`.
+- `scripts/m2-ui-smoke.ps1 -Profile release`: drag/drop, rotate, move, delete,
+  Undo/Redo, delete-all/restore, native import, two-source page plan and unchanged
+  source hashes passed. Evidence `.research/m2-ui-31aaa601d905498f8c39cdda04d6f371`.
+- `scripts/m1-ui-smoke.ps1 -Profile release`: empty startup, lazy 100-page viewing,
+  navigation, scrolling, rapid zoom and resize passed. Evidence
+  `.research/m1-ui-41a98684860c4b2895595eb58e49e7ce`.
+- `scripts/text-selection-smoke.ps1 -Profile release`: click/jitter, double-click,
+  forward/reverse, hover while pressed, four source rotations, zoom reuse, cross-page
+  copy, clear, cache bound and unchanged source hash passed. Evidence
+  `.research/text-ui-3422b39a1186498d8a8443ffd7de6bd7`.
+
+Harness corrections during this session: hidden launch had no usable MainWindowHandle;
+visible headed test launch is necessary. UIA import-button invocation can block on the
+modal picker. HWND-posted click avoids this. UIA filename traversal incorrectly found
+Search Box and Open-button lookup could target another control, causing a wrong fixture
+to be selected. Final harness targets native filename Edit ID 1148 and native button ID 1,
+and verifies the resulting exact page mapping; failed attempts are not passing evidence.
+Only synthetic fixture copies and the test's own window/process handles were used.
+
+The release UI runs preceded the final additional seeded mixed-operation test and
+smoke output wording change; production behavior did not change afterward. Final
+quality checks and native smoke were rerun after those changes. Test windows were
+closed; an earlier hidden/stuck test process required targeted cleanup. No installation,
+source rewrite, sidecar upgrade, remote CI run or 2000+ page benchmark was performed.
+Physical modifier keys, multi-selection drag/cancel matrix and physical mixed-DPI
+acceptance remain manual checks documented in organizer.md.
+
+## Compact Baca / Atur halaman UX - 2026-11-11
+
+Implemented the approved grouped toolbar plan. Header is 44 logical pixels, reading
+bar 40, and contextual organizer bar 40 only in Atur halaman. Baca is the default;
+mode changes are presentation-only. Theme/import live under Lainnya; Enter replaces
+Ke; zoom presets/fit choices live under Zoom; copy appears only for text selection.
+Navigation shortcuts and page commands retain their previous domain semantics.
+
+Final local verification:
+
+- `scripts/check.ps1`: fmt, workspace/all-target Clippy with denied warnings,
+  **21 unit tests**, and workspace release build passed.
+- Native smoke passed earlier in this UX session: pinned QPDF/PDFium, order/rotation,
+  resources/source changes and 16 source/virtual rotation glyph alignments. No engine
+  or domain behavior changed in the subsequent presentation fixes.
+- `scripts/chrome-ui-smoke.ps1 -Profile release` passed: Baca/Atur, both themes,
+  long filename, widths 860/1000/1200/1600, navigation/zoom on one non-overlapping row,
+  focused page draft surviving scroll and Enter navigation without dirtying content.
+  Evidence: `.research/chrome-ui-855a944943694c628b61aa806c636800` (16 mode/theme/width
+  screenshots, plus initial views and acceptance.json). Actual test DPI was **96/100%**.
+- `scripts/m2-ui-smoke.ps1 -Profile release` passed: mode/selection semantics,
+  drag and Escape cancellation without an edit, rotate/move/delete, history,
+  empty/restore, native import, two-source mapping and unchanged source hashes.
+  Evidence: `.research/m2-ui-3405e25e53f14a6bb6e8b0022b2f3074`.
+- `scripts/m1-ui-smoke.ps1 -Profile release` passed: empty startup, lazy 100-page
+  opening, Enter navigation, boundary buttons/thumbnail, continuous scrolling,
+  rapid 50-400% zoom, resize and unchanged sources.
+  Evidence: `.research/m1-ui-d9efab4b715a4d198d96436b3f475e56`.
+- `scripts/text-selection-smoke.ps1 -Profile release` passed: single-click/jitter,
+  double-click, forward/reverse drag, zoom reuse, mode switch preserving selection,
+  all four intrinsic rotations, cross-page copy, clear, bounded cache and source hashes.
+  Clipboard was restored. Evidence: `.research/text-ui-383da9ad9f65460d956d07b54e5761a5`.
+- Debug viewer regression also passed after the clipping correction:
+  `.research/m1-ui-92ea059dfe66490687492eff48630c5a`.
+
+Corrections discovered during validation:
+
+- Raw Button.hover duplicates the Kit's hover style and panics; use the supported
+  ButtonCustomVariant instead. Earlier black captures/missing controls were failed
+  render evidence, not successful acceptance screenshots.
+- Centered navigation exposed an existing text-overlay bug: a scrolled-off page's
+  global mouse listener could overlap the toolbar and swallow clicks. Restricting
+  down/move to the paint-time content mask fixes this. First/previous navigation,
+  scrolling and text-selection regressions passed after the fix. Unrestricted global
+  mouse-up is retained. Navigation target math and domain commands were unchanged.
+- Page-number projection is deferred outside render, respects focused drafts and
+  refreshes on Blur. UIA readiness is awaited; key-down tests use HWND PostMessage
+  because GPUI pretranslates queued key messages. Menus without InvokePattern use
+  targeted HWND-relative clicks; no global SendKeys/input was introduced.
+- The old release executable was in use. Its loaded file was renamed to a unique
+  previous-version filename inside target/release, preserving the user's running
+  session while the new default executable was built. It was not force-closed.
+
+Physical 150/200% and mixed-monitor DPI checks remain manual; the width/theme matrix
+above is not a claim that those physical configurations were tested. Save As remains
+M3 and edits remain session-only. Documentation and PROJECT_HANDOFF.md were updated.

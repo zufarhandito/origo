@@ -1,9 +1,11 @@
 ﻿# Current compatibility
 
-M1 is a read-only Windows x64 GPU viewer using GPUI Kit 0.9.1. Theme preference is
-session-only. Continuous scrolling, thumbnails, jump-to-page, manual zoom and fit
-modes are implemented; organizer operations, undo, Save As and production exports
-remain pending. No form/signature preservation claims are made.
+M2 is a Windows x64 virtual page organizer using GPUI Kit 0.9.1. Multiple PDF sources,
+page selection, reorder, rotate, delete, import and bounded Undo/Redo are implemented.
+Edits are session-only: Save As and production exports remain M3. No form/signature
+preservation claims are made. See organizer.md for controls, selection semantics and
+aggregate limits. Baca mode is for navigation/text; Atur halaman exposes page operations.
+Mode changes do not mark content dirty. Structural edits explicitly clear text selection and positional caches.
 
 Text selection is available as a requested viewer addition before M2: single-click
 clears without selecting, drag over text to select, double-click selects a sentence,

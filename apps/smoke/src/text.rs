@@ -58,6 +58,47 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
                 page_index * 90
             );
         }
+        for turns in 0..4 {
+            let mut rotated = renderer.extract_text(&TextRequest {
+                path: path.clone(),
+                page_index,
+                fingerprint: info.fingerprint,
+            })?;
+            rotated.rotate(turns);
+            let raster = renderer.render_page(&pdf_application::RenderRequest {
+                path: path.clone(),
+                page_index,
+                target_width: 900,
+                rotation_delta: turns,
+                fingerprint: Some(info.fingerprint),
+            })?;
+            ensure!(
+                raster.clockwise_quarter_turns == (page_index as u8 + turns) % 4,
+                "Composed rotation"
+            );
+            for ch in rotated.chars.iter().filter(|c| !c.unicode.is_whitespace()) {
+                let r = ch
+                    .bounds
+                    .ok_or_else(|| anyhow::anyhow!("Missing glyph box"))?;
+                let mut ink = 0;
+                for y in ((r.top * raster.height as f32).max(0.) as u32)
+                    ..((r.bottom * raster.height as f32).ceil() as u32).min(raster.height)
+                {
+                    for x in ((r.left * raster.width as f32).max(0.) as u32)
+                        ..((r.right * raster.width as f32).ceil() as u32).min(raster.width)
+                    {
+                        let offset = ((y * raster.width + x) * 4) as usize;
+                        if raster.rgba[offset..offset + 3].iter().all(|v| *v > 220) {
+                            ink += 1;
+                        }
+                    }
+                }
+                ensure!(
+                    ink > 0,
+                    "Virtual rotated glyph alignment: intrinsic {page_index}, delta {turns}"
+                );
+            }
+        }
         let start = copied
             .find(&label)
             .ok_or_else(|| anyhow::anyhow!("Page label"))?;
@@ -115,7 +156,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         format!("[{}]", probes.join(",")),
     )?;
     println!(
-        "PASS text: exact content/newlines, all four source rotations and raster alignment, empty scan, changed-source rejection"
+        "PASS text: exact content/newlines, all four source rotations, 16 source/virtual rotation glyph alignments, empty scan, changed-source rejection"
     );
     Ok(())
 }

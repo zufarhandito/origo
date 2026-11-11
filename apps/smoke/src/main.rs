@@ -35,6 +35,7 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
             path: path.clone(),
             page_index: index,
             target_width: width,
+            rotation_delta: 0,
             fingerprint: Some(info.fingerprint),
         })?;
         ensure!(rendered.rgba.len() <= 64 * 1024 * 1024, "Raster memory cap");
@@ -74,6 +75,7 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
                 path,
                 page_index: 0,
                 target_width: 256,
+                rotation_delta: 0,
                 fingerprint: Some(info.fingerprint)
             }),
             Err(RenderError::SourceChanged)
