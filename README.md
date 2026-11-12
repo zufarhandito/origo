@@ -36,9 +36,11 @@ Entering the page preserves the PDF workspace; Kembali membaca returns to the vi
 
 [M3 safe PDF Save As/Extract](docs/m3-safe-export-plan.md) is implemented for ordinary,
 unencrypted PDFs passing conservative structural preflight. Complex documents such as
-forms, signatures, bookmarks, annotations and tagged PDFs are blocked for export;
-reading remains independent. Info/XMP metadata requires explicit consent because it
-may be lost. See [export policy](docs/adr/0003-export-preservation-policy.md).
+forms, signatures, annotations and tagged PDFs are blocked for export; reading
+remains independent. Ordinary local bookmarks can be exported with explicit
+**Simpan tanpa bookmark** consent: navigation bookmarks are omitted from the output.
+Info/XMP metadata also requires consent because it may be lost. Complex bookmark
+actions remain blocked. See [export policy](docs/adr/0003-export-preservation-policy.md).
 The [conversion roadmap](docs/conversion-roadmap.md) separates raster export, text,
 Office layout reconstruction and OCR. It does not assume that the same engine can
 provide every format or that editable Word output will exactly reproduce the PDF.

@@ -1,3 +1,36 @@
+# Latest verification - bookmark export confirmation, 12 November 2026
+
+This supersedes the blanket bookmark rejection in the earlier M3 records.
+
+- scripts/check.ps1 passed: formatting, workspace/all-target denied-warning Clippy,
+  **32 unit tests**, and release workspace build. Current debug desktop also built.
+- Debug and release native smoke passed. Bookmark cases include direct destinations,
+  local GoTo actions, legacy and name-tree destinations, nested/sibling outlines and
+  combined Info metadata. Without consent, publication is refused and staging cleans
+  up. With consent, output actually has no bookmark structures, retains page content/
+  sampled raster and passes QPDF/PDFium validation. Rotated selected-page Extract
+  requires its own consent and does not advance the clean baseline.
+- JavaScript, remote and chained bookmark actions remain blocked. Unit cases also
+  cover invalid parents/targets, cycles, unknown keys, missing summary items, unrelated
+  annotations and unvalidated orphan actions. Existing source-change/no-clobber and
+  other unsafe-PDF checks remain in the native suite.
+- Headed release scripts/m3-ui-smoke.ps1 passed the existing two-source organizer/
+  Save As/Extract/history/native-cancel/metadata/form checks plus bookmark-only,
+  named-bookmark and combined bookmark+metadata dialogs. It asserts warning text,
+  Batal retaining dirty with no output, Simpan tanpa bookmark producing a clean full
+  export, omitted outlines, expected 90-degree rotation, unchanged source hashes and
+  staging cleanup. Evidence: .research/m3-ui-4acc3841c85344269a4cd64f4be11b84.
+- PowerShell parsing and whitespace checks passed. The interrupted attempt was not
+  counted as completed release/UI evidence; the resumed checks above finished.
+
+Only synthetic fixtures were used. The user's specific PDF was not supplied or
+inspected, and complex bookmark actions/other unsupported document features may
+still block export. Bookmark preservation/remapping is not implemented: policy v2
+allows omission only after explicit snapshot-specific consent. Existing reader/text/
+chrome regression results below are historical and were not rerun for this change.
+No new engine/runtime, installation, remote CI, converter or push was performed.
+
+---
 # Latest verification - M3 safe PDF export, 11 November 2026
 
 This supersedes status claims in historical sections below. Current implementation:

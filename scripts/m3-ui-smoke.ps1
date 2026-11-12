@@ -49,7 +49,7 @@ function Invoke($Name) {
             $dialog=$ui.FindFirst([Windows.Automation.TreeScope]::Children,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ClassNameProperty,'#32770'))
             # Pinned GPUI maps Other prompt answers to -(index+1). TaskDialog's
             # native child control IDs are unrelated to those logical button IDs.
-            $answerId=if($Name -eq 'Batal'){-1}elseif($Name -eq 'Lanjutkan'){-2}else{throw "Unknown prompt answer: $Name"}
+            $answerId=if($Name -eq 'Batal'){-1}elseif($Name -in @('Lanjutkan','Simpan tanpa bookmark')){-2}else{throw "Unknown prompt answer: $Name"}
             [OutputDialog]::PostMessage([IntPtr]$dialog.Current.NativeWindowHandle,0x466,[IntPtr]$answerId,[IntPtr]::Zero)|Out-Null
         } else {
             [OutputDialog]::PostMessage($button,0xF5,[IntPtr]::Zero,[IntPtr]::Zero)|Out-Null
@@ -146,6 +146,32 @@ try {
     Picker 'Simpan sebagai';Fill-Picker $metadataOutput;Invoke 'Lanjutkan'
     $null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and $s.exportSuccess}
     if(-not (Test-Path $metadataOutput)){throw 'Acknowledged output missing'}
+    foreach($feature in @('bookmark','bookmark-named','bookmark-info')) {
+        $bookmark=Join-Path $directory "$feature.pdf";Copy-Item (Join-Path $root ".research/export-fixtures/$feature.pdf") $bookmark
+        $bookmarkHash=(Get-FileHash $bookmark).Hash
+        Open-Pdf $bookmark
+        Invoke 'Atur halaman';Invoke 'Putar kanan'
+        $withoutBookmark=Join-Path $directory "$feature-edited.pdf"
+        $before=(Get-Content -Raw $metrics|ConvertFrom-Json).exportsCompleted
+        Picker 'Simpan sebagai';Fill-Picker $withoutBookmark
+        $null=Find 'Simpan PDF tanpa bookmark?'
+        $detail='Bookmark/daftar isi navigasi tidak disertakan pada PDF hasil ekspor. '
+        if($feature -eq 'bookmark-info'){$detail+='Metadata seperti judul, penulis, atau informasi XML juga dapat hilang. '}
+        $detail+='Halaman diekspor sesuai susunan; file sumber tetap utuh.'
+        $null=Find $detail
+        Invoke 'Batal'
+        $null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and -not $s.exportSuccess -and $s.dirty}
+        if(Test-Path $withoutBookmark){throw 'Bookmark loss was not approved'}
+        $before=(Get-Content -Raw $metrics|ConvertFrom-Json).exportsCompleted
+        Picker 'Simpan sebagai';Fill-Picker $withoutBookmark;Invoke 'Simpan tanpa bookmark'
+        $null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and $s.exportSuccess -and -not $s.dirty}
+        & $qpdf --check $withoutBookmark|Out-Null;if($LASTEXITCODE -ne 0){throw 'Bookmark output invalid'}
+        $output=& $qpdf --json=2 --json-key=outlines --json-key=pages --json-key=qpdf $withoutBookmark|ConvertFrom-Json
+        if($output.outlines.Count -ne 0 -or $output.pages.Count -ne 1){throw 'Bookmark removal output mismatch'}
+        $key='obj:'+$output.pages[0].object
+        if($output.qpdf[1].PSObject.Properties[$key].Value.value.'/Rotate' -ne 90){throw 'Bookmark export lost rotation'}
+        if((Get-FileHash $bookmark).Hash -ne $bookmarkHash){throw 'Bookmark source changed'}
+    }
     $form=Join-Path $directory 'form.pdf';Copy-Item (Join-Path $root '.research/export-fixtures/form.pdf') $form
     Open-Pdf $form
     $blocked=Join-Path $directory 'blocked.pdf';$state=Save-Pdf 'Simpan sebagai' $blocked
@@ -153,7 +179,7 @@ try {
     if((Get-FileHash $a).Hash -ne $hashA -or (Get-FileHash $b).Hash -ne $hashB){throw 'Originals changed'}
     if(Get-ChildItem $directory -Directory -Filter '.pdf-studio-export-*'){throw 'Owned staging leaked'}
     $state|ConvertTo-Json -Depth 6|Set-Content (Join-Path $directory 'final.json')
-    Write-Host "PASS M3 UI: two-source organizer Save As, output rotations, clean baseline/Undo/Redo, Extract keeps dirty, native cancel, metadata decline/accept, form reject, source hashes, cleanup. Evidence: $directory"
+    Write-Host "PASS M3 UI: two-source organizer Save As, output rotations, clean baseline/Undo/Redo, Extract keeps dirty, native cancel, metadata/bookmark/combined decline and accept, named bookmarks, form reject, source hashes, cleanup. Evidence: $directory"
 } finally {
     if(-not $app.HasExited){$null=$app.CloseMainWindow();$null=$app.WaitForExit(5000)}
 }

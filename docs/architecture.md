@@ -104,8 +104,11 @@ JSON v2 feature preflight and QPDFJob compilation. Consecutive source runs prese
 workspace order; relative rotations use final output positions. Owned prepared
 transactions keep the report bound to the copies it inspected; there is no preflight cache.
 The UI captures before the native save picker, runs native work off-thread, asks for
-metadata consent when needed and publishes sanitized notices. Reading/editing can
-continue against the live workspace; one export runs per window. Closing during a job
+bookmark/metadata consent when needed and publishes sanitized notices. Reading/editing can
+continue against the live workspace; one export runs per window. Policy v2 separates
+bookmark omission from metadata loss, validates ordinary local outline/name trees,
+and requests specific consent before dropping navigation bookmarks. Complex actions
+remain blocked. Closing during a job
 requests cancellation and waits for owned cleanup. PDFium validation remains in-process.
 
 See m3-safe-export-plan.md and ADR-0003 for policy and known limits.

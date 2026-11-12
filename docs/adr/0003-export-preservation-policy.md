@@ -14,13 +14,25 @@ input, clean QPDF checks (warnings/recovery are errors), recognized JSON v2 sche
 resolved catalog/page tree and agreement with the inspected page count/order.
 Catalog/page dictionaries use conservative allowlists, with a depth-bounded page
 tree and recursive inspection of returned object values for known unsafe features.
-Block forms/XFA, signature markers, tags, outlines/bookmarks, page labels, annotations
+Block forms/XFA, signature markers, tags, page labels, annotations
 and links, attachments, active/optional content and unknown complex constructs.
 Viewing remains available independently of export compatibility. Do not decrypt,
 flatten, strip signatures or pretend that unsupported features are preserved.
 
 Ordinary trailer Info and catalog XMP metadata are detected, their references are
 resolved and the user must explicitly acknowledge possible document-metadata loss.
+Policy v2 also permits ordinary outlines only with explicit **Simpan tanpa bookmark**
+consent. The output omits outlines/named destinations; there is no preservation/remapping
+promise. Resolve and validate root/items, Parent/Prev/Next/First/Last links, local
+page destinations, local GoTo actions and recognized legacy/name-tree destinations.
+Match item identities against the QPDF outline summary. Bound graph depth and counts;
+reject malformed/cyclic references, unknown fields and remote/JavaScript/chained actions.
+Only fully validated outline/action objects bypass the general action blocker.
+Catalog Names is allowed only for Dests; attachments and other namespaces still block.
+PageMode is limited to UseOutlines/UseNone presentation hints.
+
+The report has separate bookmark-loss and metadata-loss flags. If both are detected,
+one prompt describes both. Save As and Extract each need a fresh decision.
 Consent applies to the owned prepared plan/report, not a remembered global choice.
 Declining drops that job's staging. Metadata preservation is not promised. The
 catalog also permits Lang/Version without a promise of retaining those document hints.

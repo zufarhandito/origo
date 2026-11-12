@@ -139,7 +139,7 @@ fn vector_pdf(count: usize, mixed: bool, selection: bool, prefix: &str) -> Vec<u
     document.into_bytes()
 }
 
-/// Structural markers exercise rejection; the signature marker is not a valid cryptographic signature.
+/// Structural export-policy fixtures; the signature marker is not cryptographically valid.
 pub fn export_safety_pdf(feature: &str) -> Vec<u8> {
     let (catalog, page, extra, trailer): (&str, &str, Vec<Vec<u8>>, &str) = match feature {
         "info" => (
@@ -183,6 +183,54 @@ pub fn export_safety_pdf(feature: &str) -> Vec<u8> {
                 b"<< /Title (Part) /Parent 6 0 R /Dest [4 0 R /Fit] >>".to_vec(),
             ],
             "",
+        ),
+        "bookmark-action" | "bookmark-javascript" | "bookmark-remote" | "bookmark-chained" => (
+            "/Outlines 6 0 R /PageMode /UseOutlines",
+            "",
+            vec![
+                b"<< /Type /Outlines /First 7 0 R /Last 7 0 R /Count 1 >>".to_vec(),
+                b"<< /Title (Part) /Parent 6 0 R /A 8 0 R >>".to_vec(),
+                match feature {
+                    "bookmark-javascript" => b"<< /S /JavaScript /JS (void 0) >>".to_vec(),
+                    "bookmark-remote" => b"<< /S /GoToR /F (other.pdf) /D [0 /Fit] >>".to_vec(),
+                    "bookmark-chained" => b"<< /S /GoTo /D [4 0 R /Fit] /Next << /S /JavaScript /JS (void 0) >> >>".to_vec(),
+                    _ => b"<< /Type /Action /S /GoTo /D [4 0 R /XYZ null 100 0] >>".to_vec(),
+                },
+            ],
+            "",
+        ),
+        "bookmark-named" => (
+            "/Outlines 6 0 R /Names << /Dests 8 0 R >> /PageMode /UseOutlines", "",
+            vec![
+                b"<< /Type /Outlines /First 7 0 R /Last 7 0 R /Count 1 >>".to_vec(),
+                b"<< /Title (Part) /Parent 6 0 R /A << /S /GoTo /D (chapter) >> >>".to_vec(),
+                b"<< /Kids [9 0 R] >>".to_vec(),
+                b"<< /Limits [(chapter) (chapter)] /Names [(chapter) << /D [4 0 R /Fit] >>] >>".to_vec(),
+            ], "",
+        ),
+        "bookmark-legacy" => (
+            "/Outlines 6 0 R /Dests << /chapter [4 0 R /Fit] >>", "",
+            vec![
+                b"<< /Type /Outlines /First 7 0 R /Last 7 0 R /Count 1 >>".to_vec(),
+                b"<< /Title (Part) /Parent 6 0 R /Dest /chapter >>".to_vec(),
+            ], "",
+        ),
+        "bookmark-nested" => (
+            "/Outlines 6 0 R", "",
+            vec![
+                b"<< /Type /Outlines /First 7 0 R /Last 8 0 R /Count 3 >>".to_vec(),
+                b"<< /Title (Part) /Parent 6 0 R /First 9 0 R /Last 9 0 R /Count 1 /Next 8 0 R /Dest [4 0 R /Fit] >>".to_vec(),
+                b"<< /Title (Sibling) /Parent 6 0 R /Prev 7 0 R /Dest [4 0 R /Fit] >>".to_vec(),
+                b"<< /Title (Nested) /Parent 7 0 R /Dest [4 0 R /FitH 100] >>".to_vec(),
+            ], "",
+        ),
+        "bookmark-info" => (
+            "/Outlines 6 0 R", "",
+            vec![
+                b"<< /Type /Outlines /First 7 0 R /Last 7 0 R /Count 1 >>".to_vec(),
+                b"<< /Title (Part) /Parent 6 0 R /Dest [4 0 R /Fit] >>".to_vec(),
+                b"<< /Title (Synthetic metadata) >>".to_vec(),
+            ], "/Info 8 0 R",
         ),
         "annotation" => (
             "",

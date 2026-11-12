@@ -159,9 +159,9 @@ impl Viewer {
             };
             let preflight = exporter.clone();
             let c = control.clone();
-            let task = cx.background_executor().spawn(async move {
-                prepare_export(plan, &path, &LocalOutput, &preflight, &c)
-            });
+            let task = cx
+                .background_executor()
+                .spawn(async move { prepare_export(plan, &path, &LocalOutput, &preflight, &c) });
             let prepared = match task.await {
                 Ok(p) => p,
                 Err(e) => {
@@ -169,14 +169,14 @@ impl Viewer {
                     return;
                 }
             };
-            let acknowledged = if prepared.report.metadata_loss {
+            let acknowledged = if prepared.report.requires_acknowledgement() {
                 control.set_phase(pdf_application::export::ExportPhase::Confirmation);
                 let prompt = handle.update(cx, |_, window, cx| {
                     window.prompt(
                         gpui::PromptLevel::Warning,
-                        "Metadata dokumen dapat tidak terbawa",
-                        Some("Ekspor ini menyusun PDF baru. Metadata seperti judul, penulis, atau informasi XML dapat hilang. Lanjutkan ekspor snapshot ini?"),
-                        &["Batal", "Lanjutkan"],
+                        prepared.report.confirmation_title(),
+                        Some(prepared.report.confirmation_detail()),
+                        &["Batal", prepared.report.confirmation_action()],
                         cx,
                     )
                 });
@@ -187,7 +187,7 @@ impl Viewer {
             } else {
                 false
             };
-            if prepared.report.metadata_loss && !acknowledged {
+            if prepared.report.requires_acknowledgement() && !acknowledged {
                 drop(prepared);
                 let _ = this.update(cx, |this, cx| {
                     this.export_finished(Err(ExportError::Cancelled), cx)

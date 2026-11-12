@@ -48,10 +48,17 @@ stdout/stderr and a cumulative 120-second process-time budget (excluding user di
 PDFium output validation is cooperative before/after the native call, without a hard timeout.
 
 Export preflight requires clean QPDF 12.4.2 checks and recognized JSON v2 structure.
-Encrypted, signed, AcroForm/XFA, tagged, bookmark, annotation/link, attachment,
+Encrypted, signed, AcroForm/XFA, tagged, annotation/link, attachment,
 active-content, optional-content and unknown complex catalog/page constructs are blocked.
 QPDF recovery warnings also block export. Ordinary Info/XMP document metadata may be
-lost and requires explicit acknowledgement for that snapshot. No implicit flattening,
+lost and requires explicit acknowledgement for that snapshot.
+Ordinary navigation bookmarks (including nested outlines, local GoTo and named
+destinations) are allowed only after explicit **Simpan tanpa bookmark** confirmation;
+the output omits them. Detection validates the outline graph and local destinations.
+Remote/JavaScript/chained/unknown bookmark actions remain blocked. If metadata is
+also present, one confirmation describes both losses. Cancelling leaves no output
+and preserves dirty status. This applies to Save As and Extract separately.
+No implicit flattening,
 decryption, signature stripping or rasterization is performed. Supported pages retain
 PDF content/resources, but universal semantic preservation is not claimed.
 

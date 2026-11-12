@@ -32,7 +32,7 @@ pub enum ExportError {
     Unsupported(&'static str),
     #[error("Struktur inspeksi PDF tidak dikenali; ekspor diblokir.")]
     Inspection,
-    #[error("Metadata dokumen dapat hilang; diperlukan persetujuan untuk ekspor ini.")]
+    #[error("Bookmark atau metadata dapat hilang; diperlukan persetujuan untuk ekspor ini.")]
     Acknowledgement,
     #[error("Ekspor melebihi batas sumber daya.")]
     ResourceLimit,
@@ -130,7 +130,7 @@ impl ExportPhase {
             Self::Choosing => "Pilih tujuan ekspor",
             Self::Snapshot => "Menyiapkan salinan sumber",
             Self::Preflight => "Memeriksa keamanan ekspor",
-            Self::Confirmation => "Menunggu persetujuan metadata",
+            Self::Confirmation => "Menunggu persetujuan ekspor",
             Self::Writing => "Menyusun PDF",
             Self::Validation => "Memvalidasi hasil PDF",
             Self::Commit => "Menyimpan PDF baru",
@@ -201,7 +201,41 @@ impl ExportControl {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreflightReport {
     pub metadata_loss: bool,
+    pub bookmarks_loss: bool,
     pub policy_version: u32,
+}
+pub const EXPORT_POLICY_VERSION: u32 = 2;
+impl PreflightReport {
+    pub fn requires_acknowledgement(&self) -> bool {
+        self.metadata_loss || self.bookmarks_loss
+    }
+    pub fn confirmation_title(&self) -> &'static str {
+        if self.bookmarks_loss {
+            "Simpan PDF tanpa bookmark?"
+        } else {
+            "Metadata dokumen dapat tidak terbawa"
+        }
+    }
+    pub fn confirmation_detail(&self) -> &'static str {
+        match (self.bookmarks_loss, self.metadata_loss) {
+            (true, true) => {
+                "Bookmark/daftar isi navigasi tidak disertakan pada PDF hasil ekspor. Metadata seperti judul, penulis, atau informasi XML juga dapat hilang. Halaman diekspor sesuai susunan; file sumber tetap utuh."
+            }
+            (true, false) => {
+                "Bookmark/daftar isi navigasi tidak disertakan pada PDF hasil ekspor. Halaman diekspor sesuai susunan; file sumber tetap utuh."
+            }
+            _ => {
+                "Ekspor ini menyusun PDF baru. Metadata seperti judul, penulis, atau informasi XML dapat hilang. Lanjutkan ekspor snapshot ini?"
+            }
+        }
+    }
+    pub fn confirmation_action(&self) -> &'static str {
+        if self.bookmarks_loss {
+            "Simpan tanpa bookmark"
+        } else {
+            "Lanjutkan"
+        }
+    }
 }
 pub trait ExportPreflight {
     fn preflight(
@@ -283,10 +317,10 @@ pub fn finish_export<T: OutputTransaction>(
     control: &ExportControl,
 ) -> Result<ExportReceipt, ExportError> {
     control.checkpoint()?;
-    if prepared.report.policy_version != 1 {
+    if prepared.report.policy_version != EXPORT_POLICY_VERSION {
         return Err(ExportError::Inspection);
     }
-    if prepared.report.metadata_loss && !acknowledged {
+    if prepared.report.requires_acknowledgement() && !acknowledged {
         return Err(ExportError::Acknowledgement);
     }
     let PreparedExport {
@@ -463,6 +497,7 @@ mod tests {
     }
     struct Engine {
         metadata: bool,
+        bookmarks: bool,
         fail: bool,
         cancel_on_write: bool,
     }
@@ -474,7 +509,8 @@ mod tests {
         ) -> Result<PreflightReport, ExportError> {
             Ok(PreflightReport {
                 metadata_loss: self.metadata,
-                policy_version: 1,
+                bookmarks_loss: self.bookmarks,
+                policy_version: EXPORT_POLICY_VERSION,
             })
         }
     }
@@ -525,17 +561,22 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let w = workspace()?;
         let plan = ExportPlan::capture(&w, 1, ExportScope::All)?;
-        for (metadata, ack, fail, cancel, valid, success) in [
-            (true, false, false, false, true, false),
-            (true, true, false, false, true, true),
-            (false, false, true, false, true, false),
-            (false, false, false, true, true, false),
-            (false, false, false, false, false, false),
-            (false, false, false, false, true, true),
+        for (metadata, bookmarks, ack, fail, cancel, valid, success) in [
+            (true, false, false, false, false, true, false),
+            (true, false, true, false, false, true, true),
+            (false, true, false, false, false, true, false),
+            (false, true, true, false, false, true, true),
+            (true, true, false, false, false, true, false),
+            (true, true, true, false, false, true, true),
+            (false, false, false, true, false, true, false),
+            (false, false, false, false, true, true, false),
+            (false, false, false, false, false, false, false),
+            (false, false, false, false, false, true, true),
         ] {
             let count = Arc::new(AtomicUsize::new(0));
             let engine = Engine {
                 metadata,
+                bookmarks,
                 fail,
                 cancel_on_write: cancel,
             };
@@ -560,6 +601,7 @@ mod tests {
                 &Output(Arc::new(AtomicUsize::new(0))),
                 &Engine {
                     metadata: false,
+                    bookmarks: false,
                     fail: false,
                     cancel_on_write: false
                 },

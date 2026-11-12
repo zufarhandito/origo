@@ -66,8 +66,11 @@ source must not block export of remaining ordinary sources.
   the absence of every unsafe feature. Missing/unknown required JSON schema fails closed.
 - Block signed, encrypted, AcroForm/XFA, tagged/StructTreeRoot, malformed/recovered,
   portfolio/attachment, JavaScript/action, optional-content or unknown-complex
-  documents. Initially also block outlines/bookmarks, annotations and nontrivial
-  page-label constructs until dedicated preservation fixtures pass. Viewer support
+  documents. Also block annotations and nontrivial page-label constructs.
+  Policy v2 permits ordinary local outlines only with explicit acknowledgement that
+  bookmarks/named destinations are omitted. Validate resolved outline links, local
+  targets and recognized name trees; remote/JavaScript/chained actions still block.
+  Viewer support
   remains independent: a blocked export can still be read.
 - Ordinary Info/XMP metadata is detected and handled by an explicit warning: the
   initial --empty strategy does not promise to retain document metadata. Require
@@ -117,7 +120,7 @@ staged PDF -> validate -> commit new output -> publish receipt -> cleanup.
   output page count/geometry/orientation against the plan. Integration tests compare
   representative content rasters. Production metadata/spot checks are not proof of
   byte identity or universal semantic preservation. Only commit after validation.
-- Metadata warning acknowledgement is tied to this plan and preflight policy. A
+- Bookmark/metadata warning acknowledgement is tied to this plan and preflight policy. A
   different snapshot or changed report requires a new decision. Cancellation and
   every failure leave existing user files untouched; a destination race is an error.
 

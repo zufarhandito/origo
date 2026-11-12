@@ -148,6 +148,14 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         "signature",
         "tagged",
         "bookmark",
+        "bookmark-action",
+        "bookmark-named",
+        "bookmark-legacy",
+        "bookmark-nested",
+        "bookmark-info",
+        "bookmark-javascript",
+        "bookmark-remote",
+        "bookmark-chained",
         "annotation",
         "javascript",
         "attachment",
@@ -160,18 +168,29 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
             .source()
             .clone();
         let report = exporter.preflight(&[source], &ExportControl::default());
-        if matches!(feature, "plain" | "info" | "metadata") {
+        let bookmarks = matches!(
+            feature,
+            "bookmark"
+                | "bookmark-action"
+                | "bookmark-named"
+                | "bookmark-legacy"
+                | "bookmark-nested"
+                | "bookmark-info"
+        );
+        let metadata = matches!(feature, "info" | "metadata" | "bookmark-info");
+        if matches!(feature, "plain" | "info" | "metadata") || bookmarks {
+            let report = report?;
             ensure!(
-                report?.metadata_loss == (feature != "plain"),
-                "Metadata detection: {feature}"
+                report.metadata_loss == metadata && report.bookmarks_loss == bookmarks,
+                "Feature detection: {feature}"
             );
         } else {
             ensure!(report.is_err(), "Must reject {feature}");
         }
-        if feature == "info" {
+        if metadata || bookmarks {
             let w = open_document(renderer, &path, SourceId(801))?;
             let plan = ExportPlan::capture(&w, 1, ExportScope::All)?;
-            let dest = dir.path().join("metadata-unapproved.pdf");
+            let dest = dir.path().join(format!("{feature}-approved.pdf"));
             let c = ExportControl::default();
             let prepared = prepare_export(plan.clone(), &dest, &LocalOutput, &exporter, &c)?;
             ensure!(
@@ -179,12 +198,49 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
                     finish_export(prepared, false, &exporter, renderer, &c),
                     Err(ExportError::Acknowledgement)
                 ),
-                "Metadata consent"
+                "Explicit feature-loss consent: {feature}"
             );
             ensure!(!dest.exists(), "No unapproved file");
-            let prepared = prepare_export(plan, &dest, &LocalOutput, &exporter, &c)?;
+            let prepared = prepare_export(plan.clone(), &dest, &LocalOutput, &exporter, &c)?;
             finish_export(prepared, true, &exporter, renderer, &c)?;
-            ensure!(dest.exists(), "Acknowledged metadata export");
+            verify(&plan, &dest, renderer)?;
+            let output_source = open_document(renderer, &dest, SourceId(802))?
+                .source()
+                .clone();
+            let output_report = exporter.preflight(&[output_source], &ExportControl::default())?;
+            ensure!(
+                !output_report.requires_acknowledgement(),
+                "Output must actually omit bookmark/metadata structures: {feature}"
+            );
+            // Selected extraction has its own consent, including after rotation.
+            if feature == "bookmark-nested" {
+                let mut subset = w;
+                let ids = subset.pages().iter().map(|p| p.id).collect::<Vec<_>>();
+                subset.execute(Command::Rotate {
+                    ids: ids.clone(),
+                    turns: 1,
+                })?;
+                subset.select(ids);
+                let selected = ExportPlan::capture(&subset, 1, ExportScope::Selected)?;
+                let c = ExportControl::default();
+                let prepared = prepare_export(
+                    selected.clone(),
+                    &dir.path().join("bookmark-extract.pdf"),
+                    &LocalOutput,
+                    &exporter,
+                    &c,
+                )?;
+                ensure!(
+                    prepared.report.bookmarks_loss,
+                    "Extract still requires bookmark consent"
+                );
+                let receipt = finish_export(prepared, true, &exporter, renderer, &c)?;
+                ensure!(
+                    !receipt.apply(1, &mut subset) && subset.is_dirty(),
+                    "Extract baseline"
+                );
+                verify(&selected, &receipt.destination, renderer)?;
+            }
         }
     }
     let plain = dir.path().join("plain.pdf");
@@ -317,7 +373,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         "M3 staging cleanup"
     );
     println!(
-        "PASS M3: multi-source Save As/Extract, source identity/raster, 16 rotations, metadata consent, unsafe/encrypted/malformed/recovered rejection, unused-source filtering, stale source and staging cleanup"
+        "PASS M3: multi-source Save As/Extract, source identity/raster, 16 rotations, metadata/bookmark consent, local/named/nested bookmark removal, unsafe/encrypted/malformed/recovered rejection, unused-source filtering, stale source and staging cleanup"
     );
     Ok(())
 }

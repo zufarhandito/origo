@@ -2,6 +2,7 @@
 use pdf_application::export::{ExportError, PreflightReport};
 use serde_json::{Map, Value};
 use std::collections::HashSet;
+mod bookmarks;
 fn object<'a>(
     objects: &'a Map<String, Value>,
     reference: &Value,
@@ -187,15 +188,10 @@ pub(super) fn inspect_json(
     {
         return Err(ExportError::Inspection);
     }
-    if !json
+    let outlines = json
         .get("outlines")
         .and_then(Value::as_array)
-        .is_some_and(|a| a.is_empty())
-    {
-        return Err(ExportError::Unsupported(
-            "bookmark/outlines belum didukung.",
-        ));
-    }
+        .ok_or(ExportError::Inspection)?;
     let objects = json
         .pointer("/qpdf/1")
         .and_then(Value::as_object)
@@ -217,14 +213,21 @@ pub(super) fn inspect_json(
     if catalog.get("/Type").and_then(Value::as_str) != Some("/Catalog") {
         return Err(ExportError::Inspection);
     }
-    const CATALOG_KEYS: &[&str] = &["/Type", "/Pages", "/Metadata", "/Lang", "/Version"];
+    const CATALOG_KEYS: &[&str] = &[
+        "/Type",
+        "/Pages",
+        "/Metadata",
+        "/Lang",
+        "/Version",
+        "/Outlines",
+        "/PageMode",
+        "/Names",
+        "/Dests",
+    ];
     if catalog.keys().any(|k| !CATALOG_KEYS.contains(&k.as_str())) {
         return Err(ExportError::Unsupported(
-            "catalog memiliki bookmark, form, tag, label halaman atau fitur kompleks yang belum didukung.",
+            "catalog memiliki form, tag, label halaman atau fitur kompleks yang belum didukung.",
         ));
-    }
-    for value in objects.values() {
-        forbidden(value)?;
     }
     let mut tree_pages = Vec::new();
     walk_tree(
@@ -242,10 +245,17 @@ pub(super) fn inspect_json(
         || pages.len() != tree_pages.len()
         || pages
             .iter()
-            .zip(tree_pages)
+            .zip(&tree_pages)
             .any(|(page, id)| page.get("object").and_then(Value::as_str) != Some(id.as_str()))
     {
         return Err(ExportError::Inspection);
+    }
+    let (bookmarks_loss, checked_bookmarks) =
+        bookmarks::inspect(catalog, objects, &tree_pages, outlines)?;
+    for (id, value) in objects {
+        if !checked_bookmarks.contains(id) {
+            forbidden(value)?;
+        }
     }
     if let Some(info) = trailer.get("/Info")
         && !object(objects, info)?.is_object()
@@ -265,7 +275,8 @@ pub(super) fn inspect_json(
     }
     Ok(PreflightReport {
         metadata_loss: trailer.contains_key("/Info") || catalog.contains_key("/Metadata"),
-        policy_version: 1,
+        bookmarks_loss,
+        policy_version: pdf_application::export::EXPORT_POLICY_VERSION,
     })
 }
 
@@ -296,5 +307,97 @@ mod tests {
         let mut v = json();
         v["qpdf"][1]["trailer"]["value"]["/Info"] = serde_json::json!("4 0 R");
         assert!(inspect_json(&v, 1).is_err());
+    }
+    fn with_bookmark() -> Value {
+        let mut v = json();
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/Outlines"] = serde_json::json!("4 0 R");
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/PageMode"] = serde_json::json!("/UseOutlines");
+        v["qpdf"][1]["obj:4 0 R"] = serde_json::json!({"value":{"/Type":"/Outlines","/First":"5 0 R","/Last":"5 0 R","/Count":1}});
+        v["qpdf"][1]["obj:5 0 R"] = serde_json::json!({"value":{"/Title":"u:Part","/Parent":"4 0 R","/Dest":["3 0 R","/Fit"]}});
+        v["outlines"] = serde_json::json!([{"object":"5 0 R","kids":[]}]);
+        v
+    }
+    #[test]
+    fn ordinary_bookmarks_and_local_actions_require_specific_consent() -> Result<(), ExportError> {
+        let report = inspect_json(&with_bookmark(), 1)?;
+        assert!(report.bookmarks_loss && report.requires_acknowledgement());
+        assert!(!report.metadata_loss);
+        let mut v = with_bookmark();
+        v["qpdf"][1]["obj:5 0 R"]["value"]
+            .as_object_mut()
+            .ok_or(ExportError::Inspection)?
+            .remove("/Dest");
+        v["qpdf"][1]["obj:5 0 R"]["value"]["/A"] = serde_json::json!("6 0 R");
+        v["qpdf"][1]["obj:6 0 R"] =
+            serde_json::json!({"value":{"/S":"/GoTo","/D":["3 0 R","/XYZ",null,100,0]}});
+        assert!(inspect_json(&v, 1)?.bookmarks_loss);
+        v["qpdf"][1]["obj:6 0 R"]["value"]["/D"] = serde_json::json!("u:chapter");
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/Names"] = serde_json::json!({"/Dests":"7 0 R"});
+        v["qpdf"][1]["obj:7 0 R"] = serde_json::json!({"value":{"/Kids":["8 0 R"]}});
+        v["qpdf"][1]["obj:8 0 R"] = serde_json::json!({"value":{"/Limits":["u:chapter","u:chapter"],"/Names":["u:chapter",{"/D":["3 0 R","/Fit"]}]}});
+        assert!(inspect_json(&v, 1)?.bookmarks_loss);
+        v["qpdf"][1]["obj:1 0 R"]["value"]
+            .as_object_mut()
+            .ok_or(ExportError::Inspection)?
+            .remove("/Names");
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/Dests"] =
+            serde_json::json!({"/chapter":["3 0 R","/Fit"]});
+        assert!(inspect_json(&v, 1)?.bookmarks_loss);
+        // A nested item and a following sibling exercise Parent/Prev/Next/Last.
+        let mut v = with_bookmark();
+        v["qpdf"][1]["obj:5 0 R"]["value"]["/First"] = serde_json::json!("6 0 R");
+        v["qpdf"][1]["obj:5 0 R"]["value"]["/Last"] = serde_json::json!("6 0 R");
+        v["qpdf"][1]["obj:5 0 R"]["value"]["/Next"] = serde_json::json!("7 0 R");
+        v["qpdf"][1]["obj:4 0 R"]["value"]["/Last"] = serde_json::json!("7 0 R");
+        v["qpdf"][1]["obj:6 0 R"] = serde_json::json!({"value":{"/Title":"u:Nested","/Parent":"5 0 R","/Dest":["3 0 R","/Fit"]}});
+        v["qpdf"][1]["obj:7 0 R"] = serde_json::json!({"value":{"/Title":"u:Sibling","/Parent":"4 0 R","/Prev":"5 0 R","/Dest":["3 0 R","/Fit"]}});
+        v["outlines"] = serde_json::json!([{"object":"5 0 R","kids":[{"object":"6 0 R","kids":[]}]},{"object":"7 0 R","kids":[]}]);
+        assert!(inspect_json(&v, 1)?.bookmarks_loss);
+        Ok(())
+    }
+    #[test]
+    fn complex_or_malformed_bookmarks_still_fail_closed() -> Result<(), ExportError> {
+        for action in [
+            serde_json::json!({"/S":"/JavaScript","/JS":"u:void 0"}),
+            serde_json::json!({"/S":"/GoToR","/D":[0,"/Fit"],"/F":"u:file.pdf"}),
+            serde_json::json!({"/S":"/URI","/URI":"u:https://example.com"}),
+            serde_json::json!({"/S":"/GoTo","/D":["3 0 R","/Fit"],"/Next":{"/S":"/JavaScript","/JS":"u:void 0"}}),
+            serde_json::json!({"/S":"/GoTo","/D":["99 0 R","/Fit"]}),
+        ] {
+            let mut v = with_bookmark();
+            let node = v["qpdf"][1]["obj:5 0 R"]["value"]
+                .as_object_mut()
+                .ok_or(ExportError::Inspection)?;
+            node.remove("/Dest");
+            node.insert("/A".into(), action);
+            assert!(inspect_json(&v, 1).is_err());
+        }
+        for (key, value) in [
+            ("/Next", serde_json::json!("5 0 R")),
+            ("/Parent", serde_json::json!("99 0 R")),
+            ("/Dest", serde_json::json!("u:missing")),
+            ("/FutureFeature", serde_json::json!(true)),
+        ] {
+            let mut v = with_bookmark();
+            v["qpdf"][1]["obj:5 0 R"]["value"][key] = value;
+            assert!(inspect_json(&v, 1).is_err());
+        }
+        let mut v = with_bookmark();
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/Names"] = serde_json::json!({"/EmbeddedFiles":{}});
+        assert!(inspect_json(&v, 1).is_err());
+        let mut v = with_bookmark();
+        v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!(["9 0 R"]);
+        assert!(inspect_json(&v, 1).is_err());
+        let mut v = with_bookmark();
+        v["qpdf"][1]["obj:9 0 R"] =
+            serde_json::json!({"value":{"/S":"/GoTo","/D":["3 0 R","/Fit"]}});
+        assert!(
+            inspect_json(&v, 1).is_err(),
+            "Unvalidated actions must still be blocked"
+        );
+        let mut v = with_bookmark();
+        v["outlines"] = serde_json::json!([]);
+        assert!(inspect_json(&v, 1).is_err());
+        Ok(())
     }
 }

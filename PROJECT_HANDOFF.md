@@ -1,3 +1,34 @@
+# Current update - bookmark export confirmation (12 November 2026)
+
+This supersedes the blanket bookmark-export block in older snapshots below.
+
+- Fixed the reported "bookmark/outlines belum didukung" path for ordinary navigation
+  bookmarks. Export policy v2 has separate bookmarks_loss and metadata_loss flags.
+  Save As and Extract ask **Simpan PDF tanpa bookmark?** with **Batal** and **Simpan
+  tanpa bookmark**. Output omits navigation bookmarks/named destinations only after
+  explicit consent for this prepared snapshot. Metadata loss is described in the
+  same prompt when applicable. Bookmark preservation/remapping is not implemented.
+- New crates/qpdf-adapter/src/preflight/bookmarks.rs validates outline links and item
+  identities against the QPDF summary, direct local destinations, local GoTo actions,
+  nested outlines and recognized legacy/name-tree destinations. Only fully validated
+  outline/action objects bypass the general action blocker. External/JavaScript/chained
+  actions, annotations/forms/signatures and unknown complex features still block.
+- Catalog Outlines, navigation-only Names/Dests and UseOutlines/UseNone PageMode are
+  recognized. No global GoTo exemption was added. Missing/cyclic/invalid references
+  and unknown fields fail closed. No native engine or dependency was added.
+- Expanded native and headed M3 smoke fixtures cover bookmark-only, named bookmarks,
+  combined bookmark+metadata, consent/cancel, output omission, rotation/source hashes
+  and Extract. Final check.ps1 passed: fmt, denied-warning Clippy, 32 unit tests and
+  release build; debug build and native smoke passed too. Headed release M3 passed:
+  .research/m3-ui-4acc3841c85344269a4cd64f4be11b84. See docs/testing.md.
+- An interrupted build had renamed the user's loaded release executable safely inside
+  target/release. The resumed build recreated the normal executable. Never interpret
+  this note as permission to close the user's app. run.cmd launches the new build;
+  any existing window continues running its old executable and keeps its own edits.
+- Push remains unconfirmed for https://github.com/zufarhandito/origo.git main, as noted
+  below. Local commit authorization persists; do not bypass the earlier review rejection.
+
+---
 # Current update - M3 Save As and Extract (11 November 2026)
 
 This supersedes all earlier status snapshots below, including their old "current"

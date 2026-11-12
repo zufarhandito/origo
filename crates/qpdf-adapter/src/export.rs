@@ -52,6 +52,7 @@ impl ExportPreflight for QpdfExporter {
     ) -> Result<PreflightReport, ExportError> {
         self.version(control)?;
         let mut metadata_loss = false;
+        let mut bookmarks_loss = false;
         for source in sources {
             control.checkpoint()?;
             if fingerprint(&source.path)? != source.fingerprint {
@@ -89,15 +90,17 @@ impl ExportPreflight for QpdfExporter {
             }
             let parsed: Value =
                 serde_json::from_slice(&out.stdout).map_err(|_| ExportError::Inspection)?;
-            metadata_loss |=
-                crate::preflight::inspect_json(&parsed, source.geometries.len())?.metadata_loss;
+            let report = crate::preflight::inspect_json(&parsed, source.geometries.len())?;
+            metadata_loss |= report.metadata_loss;
+            bookmarks_loss |= report.bookmarks_loss;
             if fingerprint(&source.path)? != source.fingerprint {
                 return Err(ExportError::SourceChanged);
             }
         }
         Ok(PreflightReport {
             metadata_loss,
-            policy_version: 1,
+            bookmarks_loss,
+            policy_version: pdf_application::export::EXPORT_POLICY_VERSION,
         })
     }
 }
