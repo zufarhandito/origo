@@ -121,6 +121,7 @@ impl Viewer {
                     Err(error) => {
                         this.error = Some(error.to_string());
                         this.status = error.to_string();
+                        this.show_error_popup("PDF belum dapat dibuka", error.to_string(), cx);
                     }
                 }
                 this.report(cx);
@@ -508,7 +509,15 @@ impl Viewer {
                                 .max(this.pages.bytes() + this.thumbnails.bytes());
                         }
                         Err(error) => {
+                            let first_failure = this.failures.is_empty();
                             this.failures.insert(job.key, error.to_string());
+                            if first_failure {
+                                this.show_error_popup(
+                                    "Halaman belum dapat ditampilkan",
+                                    error.to_string(),
+                                    cx,
+                                );
+                            }
                             if matches!(error, RenderError::SourceChanged) {
                                 this.text = text_selection::TextState::default();
                                 this.invalidate_work();

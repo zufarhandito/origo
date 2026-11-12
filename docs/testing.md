@@ -1,3 +1,37 @@
+# Latest verification - GPUI Kit error popups, 12 November 2026
+
+- scripts/check.ps1 passed fmt, workspace/all-target denied-warning Clippy,
+  **33 unit tests** and release workspace build. After adding the modal text-input
+  guard, desktop Clippy plus debug/release builds passed again.
+- Release native smoke passed the complete existing M1/text/M3 suite. Catalog
+  diagnostics now name actual known blockers; a unit case checks tags, MarkInfo,
+  page labels, viewer preferences, layout, color intents and unknown attribute names.
+  No unsupported features were newly allowed or removed.
+- Expanded release M3 UI passed GPUI Kit error popups for export forms, tagged
+  catalog, page labels, unknown catalog, failed import and failed Open, including
+  exact reasons, Tutup and recovery. Existing organizer/Save As/Extract/history,
+  metadata/bookmark consent, source-hash and owned-staging checks also passed.
+  Final evidence: .research/m3-ui-84551693d1c14fcc91d903420c224a9d.
+  error-popup.png was visually inspected: centered modal, icon/title, reason,
+  dimmed document and Tutup. Earlier pre-guard run passed as well:
+  .research/m3-ui-ae36ecd010e444b386ea4f8ba22cce3b.
+- Final release text selection regression passed single-click/jitter, double-click,
+  forward/reverse drag/copy, zoom reuse, mode/conversion selection preservation,
+  four rotations, cross-page copy, clear/cache bounds and source hashes. Clipboard
+  restored. Evidence: .research/text-ui-eae2e837b2c547ff8611b739a495889c.
+- One intermediate headed attempt failed because Windows created an unowned Save
+  picker while the test app was inactive. The harness now also finds top-level
+  #32770 pickers using the test's own PID; it never targets another app's dialog.
+  The failed attempt is not counted as acceptance. Only its own synthetic process
+  was cleaned up. Production handling was not weakened to work around automation.
+
+The user's PDF/path was requested but has not been supplied. Its exact catalog
+attribute and appropriate export support remain unconfirmed. This change implements
+popup feedback and precise diagnostics; it does not claim to fix export of that
+specific document. All acceptance used synthetic files. No installation, converter,
+remote CI or GitHub push occurred. Existing user windows/edits were preserved.
+
+---
 # Latest verification - bookmark export confirmation, 12 November 2026
 
 This supersedes the blanket bookmark rejection in the earlier M3 records.

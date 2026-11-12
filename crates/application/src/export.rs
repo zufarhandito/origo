@@ -30,6 +30,10 @@ pub enum ExportError {
     Structure,
     #[error("Ekspor diblokir: {0}")]
     Unsupported(&'static str),
+    #[error(
+        "Ekspor diblokir: atribut catalog {0} belum didukung. Dokumen perlu diperiksa sebelum dapat diekspor."
+    )]
+    CatalogAttribute(String),
     #[error("Struktur inspeksi PDF tidak dikenali; ekspor diblokir.")]
     Inspection,
     #[error("Bookmark atau metadata dapat hilang; diperlukan persetujuan untuk ekspor ini.")]

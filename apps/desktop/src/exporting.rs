@@ -57,7 +57,14 @@ impl Viewer {
             Err(e) => {
                 self.export.success = false;
                 self.export.pages = 0;
-                self.export.notice = Some(e.to_string());
+                if matches!(e, ExportError::Cancelled) {
+                    self.export.notice = Some(e.to_string());
+                } else {
+                    self.export.notice = None;
+                    if !self.export.close_after {
+                        self.show_error_popup("PDF belum dapat diekspor", e.to_string(), cx);
+                    }
+                }
             }
         }
         self.report(cx);
@@ -70,7 +77,7 @@ impl Viewer {
         }
     }
     pub(super) fn start_export(&mut self, scope: ExportScope, cx: &mut Context<Self>) {
-        if self.export.running || self.opening {
+        if self.export.running || self.opening || self.error_popup {
             return;
         }
         let Some(w) = &self.workspace else {
@@ -79,8 +86,7 @@ impl Viewer {
         let plan = match ExportPlan::capture(w, self.workspace_instance, scope) {
             Ok(p) => p,
             Err(e) => {
-                self.export.notice = Some(e.to_string());
-                cx.notify();
+                self.show_error_popup("PDF belum dapat diekspor", e.to_string(), cx);
                 return;
             }
         };

@@ -213,6 +213,54 @@ pub(super) fn inspect_json(
     if catalog.get("/Type").and_then(Value::as_str) != Some("/Catalog") {
         return Err(ExportError::Inspection);
     }
+    // Report the actual unsupported feature instead of suggesting that every
+    // unknown catalog key implies forms, tags and page labels simultaneously.
+    for (key, reason) in [
+        (
+            "/AcroForm",
+            "PDF memiliki form AcroForm/XFA (/AcroForm); ekspor form belum didukung.",
+        ),
+        (
+            "/StructTreeRoot",
+            "PDF memiliki tag/struktur aksesibilitas (/StructTreeRoot); penyimpanan struktur ini belum didukung.",
+        ),
+        (
+            "/MarkInfo",
+            "PDF memiliki informasi penandaan aksesibilitas (/MarkInfo); dukungan ekspornya perlu diperiksa.",
+        ),
+        (
+            "/PageLabels",
+            "PDF memiliki label penomoran halaman (/PageLabels); penyusunan ulang label belum didukung.",
+        ),
+        (
+            "/Perms",
+            "PDF memiliki izin atau sertifikasi dokumen (/Perms); ekspor dokumen ini belum didukung.",
+        ),
+        (
+            "/OpenAction",
+            "PDF memiliki aksi saat dokumen dibuka (/OpenAction); ekspor aksi ini belum didukung.",
+        ),
+        (
+            "/AA",
+            "PDF memiliki aksi dokumen (/AA); ekspor aksi ini belum didukung.",
+        ),
+        (
+            "/OutputIntents",
+            "PDF memiliki profil warna dokumen (/OutputIntents); pelestarian profil ini belum didukung.",
+        ),
+        (
+            "/ViewerPreferences",
+            "PDF memiliki pengaturan tampilan/cetak (/ViewerPreferences); dukungan ekspornya perlu diperiksa.",
+        ),
+        (
+            "/PageLayout",
+            "PDF memiliki pengaturan tata letak pembaca (/PageLayout); dukungan ekspornya perlu diperiksa.",
+        ),
+    ] {
+        if catalog.contains_key(key) {
+            return Err(ExportError::Unsupported(reason));
+        }
+    }
     const CATALOG_KEYS: &[&str] = &[
         "/Type",
         "/Pages",
@@ -224,10 +272,15 @@ pub(super) fn inspect_json(
         "/Names",
         "/Dests",
     ];
-    if catalog.keys().any(|k| !CATALOG_KEYS.contains(&k.as_str())) {
-        return Err(ExportError::Unsupported(
-            "catalog memiliki form, tag, label halaman atau fitur kompleks yang belum didukung.",
-        ));
+    if let Some(key) = catalog.keys().find(|k| !CATALOG_KEYS.contains(&k.as_str())) {
+        // Only a short PDF attribute name reaches the UI, never QPDF diagnostics
+        // or the object's value. Nothing is added to production metrics/logs.
+        let attribute: String = key
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-'))
+            .take(48)
+            .collect();
+        return Err(ExportError::CatalogAttribute(attribute));
     }
     let mut tree_pages = Vec::new();
     walk_tree(
@@ -307,6 +360,30 @@ mod tests {
         let mut v = json();
         v["qpdf"][1]["trailer"]["value"]["/Info"] = serde_json::json!("4 0 R");
         assert!(inspect_json(&v, 1).is_err());
+    }
+    #[test]
+    fn catalog_rejections_identify_the_actual_attribute() {
+        for (attribute, detail) in [
+            ("/StructTreeRoot", "aksesibilitas (/StructTreeRoot)"),
+            ("/MarkInfo", "(/MarkInfo)"),
+            ("/PageLabels", "(/PageLabels)"),
+            ("/ViewerPreferences", "(/ViewerPreferences)"),
+            ("/PageLayout", "(/PageLayout)"),
+            ("/OutputIntents", "(/OutputIntents)"),
+        ] {
+            let mut v = json();
+            v["qpdf"][1]["obj:1 0 R"]["value"][attribute] = serde_json::json!({});
+            let error = inspect_json(&v, 1)
+                .err()
+                .map(|e| e.to_string())
+                .unwrap_or_default();
+            assert!(error.contains(detail), "Wrong catalog diagnostic: {error}");
+        }
+        let mut v = json();
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/FutureFeature"] = serde_json::json!(true);
+        assert!(
+            matches!(inspect_json(&v, 1), Err(ExportError::CatalogAttribute(key)) if key == "/FutureFeature")
+        );
     }
     fn with_bookmark() -> Value {
         let mut v = json();

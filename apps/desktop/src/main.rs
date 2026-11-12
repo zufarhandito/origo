@@ -16,6 +16,7 @@ mod chrome;
 mod controller;
 mod conversion;
 mod exporting;
+mod feedback;
 use chrome::ViewerMode;
 mod navigation;
 mod organizer;
@@ -71,6 +72,7 @@ struct RenderStats {
     max_bitmap_bytes: usize,
 }
 struct Viewer {
+    error_popup: bool,
     export: exporting::ExportState,
     exporter: qpdf_adapter::QpdfExporter,
     workspace_instance: u64,
@@ -267,6 +269,7 @@ fn main() -> anyhow::Result<()> {
                                 .unwrap_or(true)
                         });
                         let mut viewer = Viewer {
+                            error_popup: false,
                             export: exporting::ExportState::default(),
                             exporter: qpdf_adapter::QpdfExporter::new(&sidecars),
                             workspace_instance: 0,

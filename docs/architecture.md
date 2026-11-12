@@ -111,6 +111,12 @@ and requests specific consent before dropping navigation bookmarks. Complex acti
 remain blocked. Closing during a job
 requests cancellation and waits for owned cleanup. PDFium validation remains in-process.
 
+feedback.rs centralizes modal operational errors using GPUI Kit AlertDialog and a
+deferred window update. A per-viewer guard prevents dialog stacking and background
+text selection; on_close restores interaction. Export cancellations remain non-modal.
+Catalog preflight reports feature-specific reasons or a bounded sanitized unknown
+attribute name, without exposing object contents or raw QPDF diagnostics.
+
 See m3-safe-export-plan.md and ADR-0003 for policy and known limits.
 conversion-roadmap.md reserves separate
 structural-PDF, raster, text, reflow/Office and OCR adapter boundaries, sharing snapshots

@@ -1,3 +1,38 @@
+# Current update - GPUI Kit error popups and catalog diagnostics (12 November 2026)
+
+- User reported the generic catalog blocker and requested error popups. Shared
+  apps/desktop/src/feedback.rs now opens a centered GPUI Kit AlertDialog with warning
+  icon, readable accessible title/reason and Tutup. Export failures, open/import/
+  organizer errors and first render failure per generation use it. Cancellation stays
+  non-modal. Concurrent background failures do not stack popups; closing resets the
+  guard. Closing the app during export cleanup does not open an extra error dialog.
+- Export failures no longer use the inline export-notice strip. Successful exports
+  and cancellation may still use that strip. Global page-text mouse listeners honor
+  the modal guard so popup clicks cannot steal focus or select the PDF behind it.
+  Keep the earlier paint-time clipping checks as well.
+- Catalog errors identify actual known attributes (StructTreeRoot, MarkInfo,
+  PageLabels, Perms, OpenAction, AA, OutputIntents, ViewerPreferences, PageLayout).
+  Unknown keys return CatalogAttribute with a short sanitized name, not raw QPDF
+  diagnostics/object values. Production logs/metrics remain unchanged.
+- IMPORTANT: no unsupported catalog features were silently allowed or stripped.
+  The user's PDF/path was requested asynchronously but has not been supplied.
+  Its actual export blocker is still unconfirmed; do not claim that document's
+  export is fixed. Only synthetic project fixtures were inspected/tested so far.
+- Expanded scripts/m3-ui-smoke.ps1 checks catalog/form error popup reasons,
+  Tutup/dismiss/recovery, corrupt import preserving the document and corrupt Open,
+  plus existing Save As/Extract/history/bookmark consent. It captures error-popup.png.
+  Final verification passed: 33 unit tests, fmt/Clippy, release/debug builds, native
+  smoke, release M3 popups and release text-selection regression. Evidence:
+  .research/m3-ui-84551693d1c14fcc91d903420c224a9d (error-popup.png inspected),
+  .research/text-ui-eae2e837b2c547ff8611b739a495889c. See docs/testing.md.
+  Native picker automation also handles top-level #32770 windows scoped strictly
+  to its test PID when Windows creates an unowned dialog for an inactive app.
+- Existing user sessions must stay open. The loaded release executable was renamed
+  inside target/release before rebuilding, preserving the old process and its edits.
+  run.cmd launches the new build; old windows continue using their prior executable.
+- GitHub push still awaits the explicit destination confirmation described below.
+
+---
 # Current update - bookmark export confirmation (12 November 2026)
 
 This supersedes the blanket bookmark-export block in older snapshots below.

@@ -40,6 +40,12 @@ return typed errors. There is no password prompt. Source size/mtime changes dete
 during a new native read invalidate the workspace; cached pages are not live-watched,
 and fingerprints are not cryptographic hashes. Reopen after editing a source externally.
 
+Operational failures appear in a GPUI Kit modal error dialog with a specific reason
+and Tutup, including export, Open and import. Cancellation is normal feedback rather
+than an error popup. Background failures do not stack dialogs. Catalog export blockers
+name the detected attribute instead of listing unrelated possibilities; unsupported
+structures remain blocked pending validated preservation support.
+
 PDFium calls are serialized and have no hard timeout or process sandbox. A hung native
 call can occupy the single worker; hostile-document containment remains future work.
 The UI can navigate while normal rendering proceeds, but stale native calls cannot

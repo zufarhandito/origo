@@ -275,7 +275,10 @@ impl Viewer {
                                 && bounds.contains(&event.position)
                                 && input_clip.contains(&event.position)
                             {
-                                let _ = down.update(cx, |this, cx| {
+                                let handled = down.update(cx, |this, cx| {
+                                    if this.error_popup {
+                                        return false;
+                                    }
                                     this.select_text(
                                         index,
                                         bounds,
@@ -283,9 +286,12 @@ impl Viewer {
                                         event.click_count,
                                         window,
                                         cx,
-                                    )
+                                    );
+                                    true
                                 });
-                                cx.stop_propagation();
+                                if handled.unwrap_or(false) {
+                                    cx.stop_propagation();
+                                }
                             }
                         },
                     );
@@ -300,6 +306,7 @@ impl Viewer {
                                     // press on mouse-up, not on synthetic hover updates.
                                     if event.pressed_button == Some(MouseButton::Left)
                                         && this.text.dragging
+                                        && !this.error_popup
                                     {
                                         this.select_text(
                                             index,

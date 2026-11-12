@@ -3,6 +3,8 @@ $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Drawing
+Add-Type 'using System;using System.Runtime.InteropServices;public static class M3Capture{[StructLayout(LayoutKind.Sequential)]public struct Rect{public int L,T,R,B;}[DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out Rect r);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint flags);}'
 $directory=Join-Path $root ('.research/m3-ui-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $directory | Out-Null
 $a=Join-Path $directory 'A.pdf'; $b=Join-Path $directory 'B.pdf'
@@ -85,6 +87,14 @@ function Fill-Picker([string]$Path,[switch]$Cancel){
         Start-Sleep -Milliseconds 150
         $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
         $dialog=$ui.FindFirst([Windows.Automation.TreeScope]::Children,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ClassNameProperty,'#32770'))
+        if(-not $dialog){
+            # Windows may create an unowned picker when the test app is inactive.
+            # Match only this test process, never another application's dialog.
+            $condition=[Windows.Automation.AndCondition]::new(
+                [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$app.Id),
+                [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ClassNameProperty,'#32770'))
+            $dialog=[Windows.Automation.AutomationElement]::RootElement.FindFirst([Windows.Automation.TreeScope]::Children,$condition)
+        }
     }while(-not $dialog -and (Get-Date) -lt $deadline)
     if(-not $dialog){throw 'Native output/input picker missing'}
     $script:filename=[IntPtr]::Zero;$script:accept=[IntPtr]::Zero;$script:cancel=[IntPtr]::Zero
@@ -110,6 +120,12 @@ function Save-Pdf($Name,$Path){
     return Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before}
 }
 function Open-Pdf($Path){Picker 'Buka PDF';Fill-Picker $Path;Start-Sleep -Milliseconds 400;$null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 1}}
+function Capture-Error {
+    $rect=New-Object M3Capture+Rect;[M3Capture]::GetWindowRect($app.MainWindowHandle,[ref]$rect)|Out-Null
+    $bitmap=New-Object Drawing.Bitmap(($rect.R-$rect.L),($rect.B-$rect.T));$graphics=[Drawing.Graphics]::FromImage($bitmap);$dc=$graphics.GetHdc()
+    try{$ok=[M3Capture]::PrintWindow($app.MainWindowHandle,$dc,2)}finally{$graphics.ReleaseHdc($dc)}
+    try{if(-not $ok){throw 'Popup capture failed'};$bitmap.Save((Join-Path $directory 'error-popup.png'))}finally{$graphics.Dispose();$bitmap.Dispose()}
+}
 try {
     $null=Wait-State {param($s) $s.pageCount -eq 4}
     Invoke 'Atur halaman'
@@ -176,10 +192,33 @@ try {
     Open-Pdf $form
     $blocked=Join-Path $directory 'blocked.pdf';$state=Save-Pdf 'Simpan sebagai' $blocked
     if($state.exportSuccess -or (Test-Path $blocked) -or $state.pageCount -ne 1){throw 'Unsupported PDF was exported or viewer invalidated'}
+    $null=Find 'PDF belum dapat diekspor'
+    $null=Find 'Ekspor diblokir: AcroForm/XFA belum didukung.'
+    Capture-Error
+    Invoke 'Tutup'
+    foreach($case in @(
+        @{Feature='tagged';Reason='Ekspor diblokir: PDF memiliki tag/struktur aksesibilitas (/StructTreeRoot); penyimpanan struktur ini belum didukung.'},
+        @{Feature='labels';Reason='Ekspor diblokir: PDF memiliki label penomoran halaman (/PageLabels); penyusunan ulang label belum didukung.'},
+        @{Feature='unknown';Reason='Ekspor diblokir: atribut catalog /FutureFeature belum didukung. Dokumen perlu diperiksa sebelum dapat diekspor.'}
+    )) {
+        $path=Join-Path $directory ($case.Feature+'.pdf');Copy-Item (Join-Path $root ('.research/export-fixtures/'+$case.Feature+'.pdf')) $path
+        Open-Pdf $path
+        $dest=Join-Path $directory ($case.Feature+'-blocked.pdf');$state=Save-Pdf 'Simpan sebagai' $dest
+        if($state.exportSuccess -or (Test-Path $dest)){throw 'Catalog blocker was bypassed'}
+        $null=Find 'PDF belum dapat diekspor';$null=Find $case.Reason;Invoke 'Tutup'
+    }
+    $corrupt=Join-Path $directory 'corrupt.pdf';[IO.File]::WriteAllText($corrupt,'Not a PDF')
+    Invoke 'Atur halaman';Picker 'Impor PDF';Fill-Picker $corrupt
+    $null=Find 'PDF belum dapat diimpor';Invoke 'Tutup'
+    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 1}
+    Picker 'Buka PDF';Fill-Picker $corrupt
+    $null=Find 'PDF belum dapat dibuka';Invoke 'Tutup'
+    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 0}
+    Open-Pdf $info
     if((Get-FileHash $a).Hash -ne $hashA -or (Get-FileHash $b).Hash -ne $hashB){throw 'Originals changed'}
     if(Get-ChildItem $directory -Directory -Filter '.pdf-studio-export-*'){throw 'Owned staging leaked'}
     $state|ConvertTo-Json -Depth 6|Set-Content (Join-Path $directory 'final.json')
-    Write-Host "PASS M3 UI: two-source organizer Save As, output rotations, clean baseline/Undo/Redo, Extract keeps dirty, native cancel, metadata/bookmark/combined decline and accept, named bookmarks, form reject, source hashes, cleanup. Evidence: $directory"
+    Write-Host "PASS M3 UI: organizer Save As/Extract/history, metadata/bookmark consent, GPUI Kit export/catalog/import/open error popups and dismiss/recovery, source hashes, cleanup. Evidence: $directory"
 } finally {
     if(-not $app.HasExited){$null=$app.CloseMainWindow();$null=$app.WaitForExit(5000)}
 }

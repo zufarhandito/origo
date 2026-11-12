@@ -72,6 +72,15 @@ impl Viewer {
             Ok(false) => {}
             Err(e) => {
                 self.status = e.to_string();
+                self.show_error_popup(
+                    if importing {
+                        "PDF belum dapat diimpor"
+                    } else {
+                        "Halaman belum dapat diubah"
+                    },
+                    e.to_string(),
+                    cx,
+                );
                 cx.notify();
             }
         }
@@ -217,6 +226,7 @@ impl Viewer {
                     Ok(source) => this.edit(Command::Import(source), cx),
                     Err(e) => {
                         this.status = e.to_string();
+                        this.show_error_popup("PDF belum dapat diimpor", e.to_string(), cx);
                     }
                 }
                 this.schedule_current(cx);
