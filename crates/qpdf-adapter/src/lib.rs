@@ -10,6 +10,7 @@ use std::{
 
 mod export;
 mod preflight;
+mod structure;
 pub use export::QpdfExporter;
 
 pub struct QpdfProbe {

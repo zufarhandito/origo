@@ -1,3 +1,29 @@
+# Latest verification - partial tagged Extract, 15 November 2026
+
+- Formatting, workspace/all-target denied-warning Clippy and **37 unit tests** passed.
+  New tests cover the passive Ink closed schema and selective accessibility JSON
+  patching, preserving annotation data and stream dictionaries. Existing unsafe/
+  schema/identity/snapshot/no-clobber tests remain green.
+- Full debug native smoke passed. New three-page synthetic fixture has tagged content,
+  metadata/viewer settings and passive Ink on page 3. Partial pages 1 and 3 require
+  consent; without consent no output exists. With consent, page count/text and full
+  512px RGBA rasters match. Whole-source byte-copy and existing M1/text/M3 checks passed.
+- Explicit debug AND release checks of the user's supplied three-page document passed
+  for both page 1 and annotated page 3: QPDF/PDFium validation, exact full-raster equality,
+  text, consent refusal and unchanged source bytes. Original source SHA-256 remains
+  unchanged. No actual document text, screenshots or PDF copies enter tracked fixtures.
+  Temporary verification outputs were owned/removed.
+- Release workspace build passed. Expanded M3 UI passed Batal/Simpan tanpa tag, tag
+  removal from catalog/page objects, preserved Ink subtype/InkList on extracted page 3,
+  unchanged source hash and the existing organizer/Save As/Extract/history/metadata/
+  bookmark/popup/select-copy/import/Open/cleanup checks. Evidence:
+  .research/m3-ui-fd8b8252153d4570bed5b349905dea15.
+- No new dependency/runtime/installation, user-file overwrite, remote CI or push.
+  Existing user sessions were preserved. Tag preservation/remapping, other annotation
+  types/actions/appearances, active forms/signatures and broader fidelity are not
+  newly claimed; see ADR-0003 and compatibility for this deliberately scoped policy.
+
+---
 # Latest verification - whole-source Extract, 15 November 2026
 
 - Read-only inspection of the user's supplied one-page invoice found an empty

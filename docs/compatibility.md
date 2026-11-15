@@ -78,6 +78,15 @@ loss consent. Active fields, XFA, signatures, encryption and active content rema
 blocked. This is not support for restructuring tagged/form PDFs: partial selection,
 rotation/reorder and Save As still use the conservative structural-export policy.
 
+Policy v4 permits tagged single-source Extract with explicit **Simpan tanpa tag**
+consent. Accessibility tags/reading-order structure are omitted; the warning also
+lists bookmark/metadata loss when detected. The selected pages remain PDF content,
+and validated passive Ink annotations are preserved rather than flattened. Other
+annotation types, annotation actions/extra appearances, active forms/XFA, signatures
+and encryption remain blocked. Whole-source unmodified extraction still copies all
+original bytes without loss or a tag-removal warning. Full Save As and multi-source
+tagged restructuring remain outside this exception.
+
 Private source copies and staged output are owned by the job in the destination folder.
 QPDF checks and PDFium count/geometry/orientation validation precede a flushed
 non-clobber commit. Source size/mtime is rechecked, including before publication.

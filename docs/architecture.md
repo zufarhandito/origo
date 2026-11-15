@@ -125,6 +125,18 @@ the same validation/transaction/receipt pipeline. Plan fields and the prepared p
 are private to keep the chosen mode immutable. Copy-only preflight preserves tagged
 structure, viewer preferences and verified empty AcroForm instead of rebuilding them.
 
+Policy v4 adds a separate tags_loss flag to the prepared report. Single-source
+Extract may use a tagged-input preflight only with the same closed checks for
+encryption/forms/signatures/active content. Passive Ink objects and annotation arrays
+are validated before bypassing generic annotation rejection; page dictionaries are
+still scanned recursively with only the validated Annots property omitted.
+
+After consent, structure.rs builds a bounded JSON v2 update for the staged output's
+current object IDs. It removes accessibility references, including stream-dictionary
+StructParents, without replacing stream data or Ink geometry. A fresh inspection
+checks cleanup before the existing validation/commit pipeline. Whole-source copy
+returns earlier and preserves tags; ordinary full/multi-source exports are unchanged.
+
 See m3-safe-export-plan.md and ADR-0003 for policy and known limits.
 conversion-roadmap.md reserves separate
 structural-PDF, raster, text, reflow/Office and OCR adapter boundaries, sharing snapshots

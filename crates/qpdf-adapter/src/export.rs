@@ -51,14 +51,19 @@ impl ExportPreflight for QpdfExporter {
         sources: &[SourceDocument],
         control: &ExportControl,
     ) -> Result<PreflightReport, ExportError> {
-        self.preflight_mode(sources, control, plan.is_whole_source_extract())
+        self.preflight_mode(
+            sources,
+            control,
+            plan.is_whole_source_extract(),
+            plan.is_single_source_extract(),
+        )
     }
     fn preflight(
         &self,
         sources: &[SourceDocument],
         control: &ExportControl,
     ) -> Result<PreflightReport, ExportError> {
-        self.preflight_mode(sources, control, false)
+        self.preflight_mode(sources, control, false, false)
     }
 }
 impl QpdfExporter {
@@ -67,10 +72,12 @@ impl QpdfExporter {
         sources: &[SourceDocument],
         control: &ExportControl,
         source_copy: bool,
+        tagged_extract: bool,
     ) -> Result<PreflightReport, ExportError> {
         self.version(control)?;
         let mut metadata_loss = false;
         let mut bookmarks_loss = false;
+        let mut tags_loss = false;
         for source in sources {
             control.checkpoint()?;
             if fingerprint(&source.path)? != source.fingerprint {
@@ -110,11 +117,14 @@ impl QpdfExporter {
                 serde_json::from_slice(&out.stdout).map_err(|_| ExportError::Inspection)?;
             let report = if source_copy {
                 crate::preflight::inspect_source_copy(&parsed, source.geometries.len())?
+            } else if tagged_extract {
+                crate::preflight::inspect_extract(&parsed, source.geometries.len())?
             } else {
                 crate::preflight::inspect_json(&parsed, source.geometries.len())?
             };
             metadata_loss |= report.metadata_loss;
             bookmarks_loss |= report.bookmarks_loss;
+            tags_loss |= report.tags_loss;
             if fingerprint(&source.path)? != source.fingerprint {
                 return Err(ExportError::SourceChanged);
             }
@@ -122,6 +132,7 @@ impl QpdfExporter {
         Ok(PreflightReport {
             metadata_loss,
             bookmarks_loss,
+            tags_loss,
             policy_version: pdf_application::export::EXPORT_POLICY_VERSION,
         })
     }
@@ -176,9 +187,11 @@ fn job(plan: &ExportPlan, sources: &[SourceDocument], output: &Path) -> Result<V
         .filter(|i| !rotations[*i].is_empty())
         .map(|i| format!("+{}:{}", i * 90, ranges(&rotations[i])))
         .collect();
-    Ok(
-        json!({"empty":"","outputFile":output.to_str().ok_or(ExportError::InvalidPlan)?,"pages":pages,"rotate":rotate}),
-    )
+    let mut job = json!({"empty":"","outputFile":output.to_str().ok_or(ExportError::InvalidPlan)?,"pages":pages,"rotate":rotate});
+    if plan.is_single_source_extract() {
+        job["removeStructure"] = json!("");
+    }
+    Ok(job)
 }
 impl PdfExporter for QpdfExporter {
     fn write(
@@ -229,6 +242,9 @@ impl PdfExporter for QpdfExporter {
         if self.invoke(&[argument], 65536, control)?.code != Some(0) {
             return Err(ExportError::Engine);
         }
+        if plan.is_single_source_extract() {
+            self.remove_structure_references(output, work, control)?;
+        }
         Ok(())
     }
     fn check(&self, path: &Path, control: &ExportControl) -> Result<(), ExportError> {
@@ -244,6 +260,61 @@ impl PdfExporter for QpdfExporter {
             return Err(ExportError::Structure);
         }
         Ok(())
+    }
+}
+impl QpdfExporter {
+    fn output_json(&self, path: &Path, control: &ExportControl) -> Result<Value, ExportError> {
+        let result = self.invoke(
+            &[
+                "--json=2".into(),
+                "--json-stream-data=none".into(),
+                "--json-key=qpdf".into(),
+                path.as_os_str().to_owned(),
+            ],
+            JSON_LIMIT,
+            control,
+        )?;
+        if result.code != Some(0) {
+            return Err(ExportError::Validation);
+        }
+        serde_json::from_slice(&result.stdout).map_err(|_| ExportError::Inspection)
+    }
+    fn remove_structure_references(
+        &self,
+        output: &Path,
+        work: &Path,
+        control: &ExportControl,
+    ) -> Result<(), ExportError> {
+        let json = self.output_json(output, control)?;
+        if let Some(patch) = crate::structure::patch(&json)? {
+            let bytes = serde_json::to_vec(&patch).map_err(|_| ExportError::Inspection)?;
+            if bytes.len() > JSON_LIMIT {
+                return Err(ExportError::ResourceLimit);
+            }
+            let patch_path = work.join("structure-patch.json");
+            std::fs::write(&patch_path, bytes).map_err(|_| ExportError::Io)?;
+            let clean = work.join("untagged.pdf");
+            let mut option = OsString::from("--update-from-json=");
+            option.push(&patch_path);
+            let result = self.invoke(
+                &[
+                    output.as_os_str().to_owned(),
+                    option,
+                    clean.as_os_str().to_owned(),
+                ],
+                65536,
+                control,
+            )?;
+            if result.code != Some(0) {
+                return Err(ExportError::Validation);
+            }
+            control.checkpoint()?;
+            if crate::structure::patch(&self.output_json(&clean, control)?)?.is_some() {
+                return Err(ExportError::Validation);
+            }
+            std::fs::copy(&clean, output).map_err(|_| ExportError::Io)?;
+        }
+        control.checkpoint()
     }
 }
 

@@ -14,6 +14,73 @@ use pdf_platform::{LocalOutput, fingerprint};
 use qpdf_adapter::QpdfExporter;
 use std::{path::Path, process::Command as ProcessCommand};
 
+pub fn verify_tagged_extract(
+    root: &Path,
+    path: &Path,
+    page_index: usize,
+    renderer: &PdfiumRenderer,
+) -> Result<()> {
+    let mut workspace = open_document(renderer, path, SourceId(1100))?;
+    let original = std::fs::read(path)?;
+    let page = workspace
+        .pages()
+        .get(page_index)
+        .ok_or_else(|| anyhow::anyhow!("Invalid selected page"))?
+        .id;
+    workspace.select([page]);
+    let plan = ExportPlan::capture(&workspace, 1, ExportScope::Selected)?;
+    ensure!(!plan.is_whole_source_extract(), "Use a partial selection");
+    std::fs::create_dir_all(root.join(".research"))?;
+    let dir = tempfile::tempdir_in(root.join(".research"))?;
+    let output = dir.path().join("extract.pdf");
+    let exporter = QpdfExporter::new(&root.join("sidecars"));
+    let control = ExportControl::default();
+    let prepared = prepare_export(plan.clone(), &output, &LocalOutput, &exporter, &control)?;
+    ensure!(
+        prepared.report.tags_loss,
+        "Specific accessibility-loss warning"
+    );
+    ensure!(
+        matches!(
+            finish_export(prepared, false, &exporter, renderer, &control),
+            Err(ExportError::Acknowledgement)
+        ),
+        "Tag loss requires consent"
+    );
+    ensure!(!output.exists(), "No output before consent");
+    let prepared = prepare_export(plan.clone(), &output, &LocalOutput, &exporter, &control)?;
+    let receipt = finish_export(prepared, true, &exporter, renderer, &control)?;
+    verify(&plan, &output, renderer)?;
+    let info = renderer.inspect(&output)?;
+    let expected = renderer.render_page(&RenderRequest {
+        path: path.into(),
+        page_index: page_index as u16,
+        target_width: 512,
+        rotation_delta: 0,
+        fingerprint: Some(plan.sources()[0].fingerprint),
+    })?;
+    let actual = renderer.render_page(&RenderRequest {
+        path: output.clone(),
+        page_index: 0,
+        target_width: 512,
+        rotation_delta: 0,
+        fingerprint: Some(info.fingerprint),
+    })?;
+    ensure!(
+        expected.rgba == actual.rgba,
+        "Full raster, including passive ink, must match"
+    );
+    ensure!(
+        !receipt.apply(1, &mut workspace),
+        "Extract baseline unchanged"
+    );
+    ensure!(std::fs::read(path)? == original, "Original unchanged");
+    println!(
+        "PASS tagged partial Extract: explicit consent, page/text/full-raster preservation, unchanged source, cleanup"
+    );
+    Ok(())
+}
+
 /// Explicit local verification; user PDFs and outputs never enter tracked fixtures.
 pub fn verify_whole_source_extract(
     root: &Path,
@@ -126,6 +193,10 @@ fn verify(plan: &ExportPlan, path: &Path, renderer: &PdfiumRenderer) -> Result<(
 }
 pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     let dir = tempfile::tempdir_in(root.join("tests/fixtures"))?;
+    let tagged_ink = dir.path().join("tagged-ink.pdf");
+    std::fs::write(&tagged_ink, super::synthetic::tagged_ink_pdf())?;
+    verify_tagged_extract(root, &tagged_ink, 0, renderer)?;
+    verify_tagged_extract(root, &tagged_ink, 2, renderer)?;
     let a = dir.path().join("-source A & test.pdf");
     let b = dir.path().join("Sumber B \u{65e5}\u{672c}.pdf");
     let bytes_a = super::synthetic::selection_pdf();
@@ -151,17 +222,21 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         !changed_plan.is_whole_source_extract(),
         "Rotation must not use source copy"
     );
+    let control = ExportControl::default();
+    let rotated_output = dir.path().join("rotated-tagged.pdf");
+    let prepared = prepare_export(
+        changed_plan.clone(),
+        &rotated_output,
+        &LocalOutput,
+        &exporter,
+        &control,
+    )?;
     ensure!(
-        prepare_export(
-            changed_plan,
-            &dir.path().join("rotated-tagged.pdf"),
-            &LocalOutput,
-            &exporter,
-            &ExportControl::default()
-        )
-        .is_err(),
-        "Unsupported tagged transforms remain blocked"
+        prepared.report.tags_loss,
+        "Rotated tagged extraction needs consent"
     );
+    finish_export(prepared, true, &exporter, renderer, &control)?;
+    verify(&changed_plan, &rotated_output, renderer)?;
     let mut workspace = open_document(renderer, &a, SourceId(501))?;
     let source_b = open_document(renderer, &b, SourceId(502))?.source().clone();
     workspace.execute(Command::Import(source_b))?;

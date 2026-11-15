@@ -10,6 +10,11 @@ can accept verified empty AcroForm plus tagged structure/viewer preferences. All
 normal checks/atomic-output protections remain. Other plans retain the policy below;
 this does not enable structural edits of tagged PDFs or exports of active forms/XFA.
 
+Policy v4 additionally enables single-source selected Extract after explicit tag-loss
+consent. It removes accessibility references with QPDF and a bounded current-output
+JSON patch, preserving page content and validated passive Ink annotations. This is
+not general tag preservation, full Save As/multi-source support or form flattening.
+
 Implementation notes: preflight reports are bound to owned prepared source copies;
 there is no cache. Source fingerprints remain size/mtime, not hashes. QPDF's 120-second
 budget measures cumulative child-process runtime, excluding user dialogs/copying and

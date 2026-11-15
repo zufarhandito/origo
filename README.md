@@ -44,6 +44,9 @@ actions remain blocked. See [export policy](docs/adr/0003-export-preservation-po
 Whole-source Extract has a narrow preservation path: selecting every page of one PDF
 without reorder/rotation copies its snapshot byte-for-byte, including supported
 empty-form/tagged documents. Active forms/XFA and structural edits remain restricted.
+Partial single-source tagged Extract now offers **Simpan tanpa tag**: accessibility
+structure is omitted only after confirmation, while page appearance and supported
+passive Ink annotations are retained. Original PDFs remain unchanged.
 The [conversion roadmap](docs/conversion-roadmap.md) separates raster export, text,
 Office layout reconstruction and OCR. It does not assume that the same engine can
 provide every format or that editable Word output will exactly reproduce the PDF.

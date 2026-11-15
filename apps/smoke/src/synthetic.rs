@@ -37,6 +37,42 @@ fn stream(attributes: &str, bytes: &[u8]) -> Vec<u8> {
     object.extend_from_slice(b"\nendstream");
     object
 }
+pub fn tagged_ink_pdf() -> Vec<u8> {
+    let mut objects = vec![
+        b"<< /Type /Catalog /Pages 2 0 R /StructTreeRoot 10 0 R /MarkInfo << /Marked true >> /ViewerPreferences << /DisplayDocTitle true >> /Metadata 16 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R] /Count 3 >>".to_vec(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
+    ];
+    for index in 0..3 {
+        let annotations = if index == 2 { "/Annots [15 0 R]" } else { "" };
+        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R /StructParents {index} /Tabs /S {annotations} >>", 5 + index * 2).into_bytes());
+        objects.push(stream(
+            "",
+            format!(
+                "/P << /MCID 0 >> BDC BT /F1 18 Tf 25 330 Td (PAGE {}) Tj ET EMC",
+                index + 1
+            )
+            .as_bytes(),
+        ));
+    }
+    objects.push(b"<< /Type /StructTreeRoot /K [11 0 R 12 0 R 13 0 R] /ParentTree 14 0 R /ParentTreeNextKey 3 /RoleMap << /CustomP /P >> >>".to_vec());
+    for index in 0..3 {
+        objects.push(
+            format!(
+                "<< /Type /StructElem /S /CustomP /P 10 0 R /Pg {} 0 R /K 0 >>",
+                4 + index * 2
+            )
+            .into_bytes(),
+        );
+    }
+    objects.push(b"<< /Nums [0 [11 0 R] 1 [12 0 R] 2 [13 0 R]] >>".to_vec());
+    objects.push(b"<< /Type /Annot /Subtype /Ink /P 8 0 R /Rect [20 20 130 100] /InkList [[30 30 60 80 100 40 120 90]] /C [0 0 0] /CA 1 /F 4 /Border [0 0 0] /Contents (Synthetic ink) /T (Test) >>".to_vec());
+    objects.push(stream(
+        "/Type /Metadata /Subtype /XML",
+        b"<metadata>synthetic</metadata>",
+    ));
+    assemble(&objects)
+}
 fn assemble(objects: &[Vec<u8>]) -> Vec<u8> {
     assemble_trailer(objects, "")
 }

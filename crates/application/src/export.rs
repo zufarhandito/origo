@@ -36,7 +36,9 @@ pub enum ExportError {
     CatalogAttribute(String),
     #[error("Struktur inspeksi PDF tidak dikenali; ekspor diblokir.")]
     Inspection,
-    #[error("Bookmark atau metadata dapat hilang; diperlukan persetujuan untuk ekspor ini.")]
+    #[error(
+        "Tag aksesibilitas, bookmark atau metadata dapat hilang; diperlukan persetujuan untuk ekspor ini."
+    )]
     Acknowledgement,
     #[error("Ekspor melebihi batas sumber daya.")]
     ResourceLimit,
@@ -126,6 +128,9 @@ impl ExportPlan {
                     && usize::from(page.entry.source_page_index) == index
                     && page.entry.rotation_delta == 0
             })
+    }
+    pub fn is_single_source_extract(&self) -> bool {
+        self.scope == ExportScope::Selected && self.sources.len() == 1
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -218,14 +223,18 @@ impl ExportControl {
 pub struct PreflightReport {
     pub metadata_loss: bool,
     pub bookmarks_loss: bool,
+    pub tags_loss: bool,
     pub policy_version: u32,
 }
-pub const EXPORT_POLICY_VERSION: u32 = 3;
+pub const EXPORT_POLICY_VERSION: u32 = 4;
 impl PreflightReport {
     pub fn requires_acknowledgement(&self) -> bool {
-        self.metadata_loss || self.bookmarks_loss
+        self.metadata_loss || self.bookmarks_loss || self.tags_loss
     }
     pub fn confirmation_title(&self) -> &'static str {
+        if self.tags_loss {
+            return "Simpan PDF tanpa tag aksesibilitas?";
+        }
         if self.bookmarks_loss {
             "Simpan PDF tanpa bookmark?"
         } else {
@@ -233,6 +242,22 @@ impl PreflightReport {
         }
     }
     pub fn confirmation_detail(&self) -> &'static str {
+        if self.tags_loss {
+            return match (self.bookmarks_loss, self.metadata_loss) {
+                (false, false) => {
+                    "Tag aksesibilitas dan informasi urutan baca tidak disertakan pada hasil ekstrak. Pembaca layar dapat kehilangan struktur navigasi. Tampilan halaman dan anotasi tinta tetap dipertahankan. File sumber tetap utuh."
+                }
+                (false, true) => {
+                    "Tag aksesibilitas dan informasi urutan baca tidak disertakan pada hasil ekstrak. Pembaca layar dapat kehilangan struktur navigasi. Metadata dan pengaturan tampilan juga dapat hilang. Tampilan halaman dan anotasi tinta tetap dipertahankan. File sumber tetap utuh."
+                }
+                (true, false) => {
+                    "Tag aksesibilitas, informasi urutan baca, dan bookmark tidak disertakan pada hasil ekstrak. Pembaca layar dapat kehilangan struktur navigasi. Tampilan halaman dan anotasi tinta tetap dipertahankan. File sumber tetap utuh."
+                }
+                (true, true) => {
+                    "Tag aksesibilitas, informasi urutan baca, dan bookmark tidak disertakan pada hasil ekstrak. Pembaca layar dapat kehilangan struktur navigasi. Metadata dan pengaturan tampilan juga dapat hilang. Tampilan halaman dan anotasi tinta tetap dipertahankan. File sumber tetap utuh."
+                }
+            };
+        }
         match (self.bookmarks_loss, self.metadata_loss) {
             (true, true) => {
                 "Bookmark/daftar isi navigasi tidak disertakan pada PDF hasil ekspor. Metadata seperti judul, penulis, atau informasi XML juga dapat hilang. Halaman diekspor sesuai susunan; file sumber tetap utuh."
@@ -246,6 +271,9 @@ impl PreflightReport {
         }
     }
     pub fn confirmation_action(&self) -> &'static str {
+        if self.tags_loss {
+            return "Simpan tanpa tag";
+        }
         if self.bookmarks_loss {
             "Simpan tanpa bookmark"
         } else {
@@ -559,6 +587,7 @@ mod tests {
             Ok(PreflightReport {
                 metadata_loss: self.metadata,
                 bookmarks_loss: self.bookmarks,
+                tags_loss: false,
                 policy_version: EXPORT_POLICY_VERSION,
             })
         }

@@ -92,6 +92,21 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
 
 fn main() -> Result<()> {
     let root = dunce::canonicalize(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
+    if std::env::args().nth(1).as_deref() == Some("--verify-tagged-extract") {
+        let path = std::env::args_os().nth(2).context("PDF path required")?;
+        let page = std::env::args()
+            .nth(3)
+            .unwrap_or_else(|| "1".into())
+            .parse::<usize>()?
+            .checked_sub(1)
+            .context("Page starts at 1")?;
+        return exporting::verify_tagged_extract(
+            &root,
+            &PathBuf::from(path),
+            page,
+            &PdfiumRenderer::new(&root.join("sidecars")),
+        );
+    }
     if std::env::args().nth(1).as_deref() == Some("--verify-whole-source-extract") {
         let path = std::env::args_os().nth(2).context("PDF path required")?;
         let renderer = PdfiumRenderer::new(&root.join("sidecars"));
@@ -100,6 +115,7 @@ fn main() -> Result<()> {
     if std::env::args().nth(1).as_deref() == Some("--write-export-fixtures") {
         let dir = root.join(".research/export-fixtures");
         std::fs::create_dir_all(&dir)?;
+        std::fs::write(dir.join("tagged-ink.pdf"), synthetic::tagged_ink_pdf())?;
         for feature in [
             "plain",
             "info",

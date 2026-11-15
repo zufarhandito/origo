@@ -1,3 +1,38 @@
+# Current update - partial tagged Extract with consent (15 November 2026)
+
+- User supplied a different three-page PDF with tags, metadata, viewer preferences
+  and a passive Ink annotation on page 3, no active forms/encryption. The earlier
+  whole-source-copy path could not apply to extracting just page 1.
+- Policy v4 adds tags_loss and an explicit Simpan PDF tanpa tag aksesibilitas? prompt,
+  with Batal / Simpan tanpa tag. It explains loss of accessibility reading/navigation
+  structure plus detected bookmark/metadata/settings loss. Declining publishes nothing.
+- Single-source Selected Extract can use this path. Whole-source original-order copy
+  still preserves all bytes, with no warning. Full Save As/multi-source tagged exports
+  remain restricted. No forms/XFA/signatures/encryption/actions are newly allowed.
+- preflight/ink.rs validates passive Ink only (finite geometry/strokes, known metadata/
+  styles, proper page owner, no actions/extra appearances). Validated annotation/array
+  objects bypass generic annotation rejection; pages are still checked with only the
+  validated Annots key excluded. Ink is retained as annotations, never flattened.
+- structure.rs removes catalog/page/stream accessibility references from staged output
+  with QPDF JSON v2 updates. Stream bytes are preserved; object IDs belong to that
+  exact inspected output. Reinspect for residual structure before normal validation/
+  source checks/no-clobber commit. Budget/cancel/output caps remain in force.
+- Verification: 37 workspace tests, fmt/workspace denied-warning Clippy, full debug
+  native smoke and release workspace build passed. Explicit debug/release checks on
+  actual supplied pages 1 AND 3 passed text and full 512px raster equality, no-consent
+  refusal and unchanged source bytes. No user contents/screenshots were logged or
+  added to tracked fixtures; outputs were owned temporary files.
+- Release M3 UI passed cancellation/acceptance, missing tag references in output and
+  retained Ink object/InkList, plus existing organizer/history/metadata/bookmark/
+  error-selection/copy/recovery/source-hash/cleanup checks. Evidence:
+  .research/m3-ui-fd8b8252153d4570bed5b349905dea15.
+- CLI local check: pdf-smoke --verify-tagged-extract <path> <1-based page>. Synthetic
+  fixture tagged-ink.pdf has three pages and an Ink annotation on the last page.
+- Existing user windows were kept open during verified in-workspace executable rename.
+  run.cmd launches the new release; existing windows keep their old code and edits.
+  Push destination approval remains pending; do not bypass earlier review rejection.
+
+---
 # Current update - whole-source invoice Extract (15 November 2026)
 
 - User supplied a one-page invoice failing Extract page 1. Read-only inspection found

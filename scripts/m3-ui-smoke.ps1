@@ -52,7 +52,7 @@ function Invoke($Name) {
             $dialog=$ui.FindFirst([Windows.Automation.TreeScope]::Children,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ClassNameProperty,'#32770'))
             # Pinned GPUI maps Other prompt answers to -(index+1). TaskDialog's
             # native child control IDs are unrelated to those logical button IDs.
-            $answerId=if($Name -eq 'Batal'){-1}elseif($Name -in @('Lanjutkan','Simpan tanpa bookmark')){-2}else{throw "Unknown prompt answer: $Name"}
+            $answerId=if($Name -eq 'Batal'){-1}elseif($Name -in @('Lanjutkan','Simpan tanpa bookmark','Simpan tanpa tag')){-2}else{throw "Unknown prompt answer: $Name"}
             [OutputDialog]::PostMessage([IntPtr]$dialog.Current.NativeWindowHandle,0x466,[IntPtr]$answerId,[IntPtr]::Zero)|Out-Null
         } else {
             [OutputDialog]::PostMessage($button,0xF5,[IntPtr]::Zero,[IntPtr]::Zero)|Out-Null
@@ -129,12 +129,12 @@ function Save-Pdf($Name,$Path){
     Picker $Name;Fill-Picker $Path
     return Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before}
 }
-function Open-Pdf($Path){
+function Open-Pdf($Path,[int]$ExpectedPages=1){
     $previous=Get-Content -Raw $metrics|ConvertFrom-Json
     $beforeGeneration=$previous.generation
     $beforeSource=if($previous.pageCount -gt 0){$previous.pagePlan[0][0]}else{-1}
     Picker 'Buka PDF';Fill-Picker $Path
-    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 1 -and $s.generation -gt $beforeGeneration -and $s.pagePlan[0][0] -ne $beforeSource}
+    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq $ExpectedPages -and $s.generation -gt $beforeGeneration -and $s.pagePlan[0][0] -ne $beforeSource}
 }
 function Capture-Error {
     $rect=New-Object M3Capture+Rect;[M3Capture]::GetWindowRect($app.MainWindowHandle,[ref]$rect)|Out-Null
@@ -212,6 +212,32 @@ try {
     $copyOutput=Join-Path $directory 'whole-source-extract.pdf';$state=Save-Pdf 'Ekstrak halaman' $copyOutput
     if(-not $state.exportSuccess -or $state.exportPages -ne 1){throw 'Whole-source extract failed'}
     if((Get-FileHash $copyOutput).Hash -ne $copyHash -or (Get-FileHash $copySource).Hash -ne $copyHash){throw 'Whole-source extraction changed PDF structure or source'}
+    $taggedSource=Join-Path $directory 'tagged-ink.pdf';Copy-Item (Join-Path $root '.research/export-fixtures/tagged-ink.pdf') $taggedSource
+    $taggedHash=(Get-FileHash $taggedSource).Hash
+    Open-Pdf $taggedSource 3;Invoke 'Atur halaman'
+    $taggedOutput=Join-Path $directory 'tagged-page-1.pdf';$before=(Get-Content -Raw $metrics|ConvertFrom-Json).exportsCompleted
+    Picker 'Ekstrak halaman';Fill-Picker $taggedOutput
+    $null=Find 'Simpan PDF tanpa tag aksesibilitas?'
+    Invoke 'Batal';$null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and -not $s.exportSuccess -and $s.pageCount -eq 3}
+    if(Test-Path $taggedOutput){throw 'Unapproved tag removal produced output'}
+    $before=(Get-Content -Raw $metrics|ConvertFrom-Json).exportsCompleted
+    Picker 'Ekstrak halaman';Fill-Picker $taggedOutput;Invoke 'Simpan tanpa tag'
+    $null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and $s.exportSuccess -and $s.exportPages -eq 1}
+    $output=& $qpdf --json=2 --json-key=pages --json-key=qpdf $taggedOutput|ConvertFrom-Json
+    $objects=$output.qpdf[1];$rootRef=$objects.trailer.value.'/Root';$catalog=$objects.PSObject.Properties['obj:'+$rootRef].Value.value
+    $page=$objects.PSObject.Properties['obj:'+$output.pages[0].object].Value.value
+    if($catalog.'/StructTreeRoot' -or $catalog.'/MarkInfo' -or $null -ne $page.'/StructParents' -or $page.'/Tabs' -eq '/S'){throw 'Stale structure survived extraction'}
+    Invoke 'Halaman 3';$before=(Get-Content -Raw $metrics|ConvertFrom-Json).exportsCompleted
+    $inkOutput=Join-Path $directory 'tagged-page-3.pdf'
+    Picker 'Ekstrak halaman';Fill-Picker $inkOutput;Invoke 'Simpan tanpa tag'
+    $null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and $s.exportSuccess}
+    $output=& $qpdf --json=2 --json-key=pages --json-key=qpdf $inkOutput|ConvertFrom-Json
+    $objects=$output.qpdf[1];$page=$objects.PSObject.Properties['obj:'+$output.pages[0].object].Value.value
+    $annotations=$page.'/Annots';if($annotations -is [string]){$annotations=$objects.PSObject.Properties['obj:'+$annotations].Value.value}
+    if($annotations.Count -ne 1){throw 'Ink annotation was lost'}
+    $ink=$objects.PSObject.Properties['obj:'+$annotations[0]].Value.value
+    if($ink.'/Subtype' -ne '/Ink' -or $ink.'/InkList'.Count -ne 1){throw 'Ink was flattened or changed'}
+    if((Get-FileHash $taggedSource).Hash -ne $taggedHash){throw 'Tagged source changed'}
     $form=Join-Path $directory 'form.pdf';Copy-Item (Join-Path $root '.research/export-fixtures/form.pdf') $form
     Open-Pdf $form
     $blocked=Join-Path $directory 'blocked.pdf';$state=Save-Pdf 'Simpan sebagai' $blocked

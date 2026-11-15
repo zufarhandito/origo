@@ -3,6 +3,7 @@ use pdf_application::export::{ExportError, PreflightReport};
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 mod bookmarks;
+mod ink;
 fn object<'a>(
     objects: &'a Map<String, Value>,
     reference: &Value,
@@ -171,19 +172,27 @@ pub(super) fn inspect_json(
     json: &Value,
     page_count: usize,
 ) -> Result<PreflightReport, ExportError> {
-    inspect(json, page_count, false)
+    inspect(json, page_count, false, false)
 }
 pub(super) fn inspect_source_copy(
     json: &Value,
     page_count: usize,
 ) -> Result<PreflightReport, ExportError> {
-    inspect(json, page_count, true)
+    inspect(json, page_count, true, false)
+}
+pub(super) fn inspect_extract(
+    json: &Value,
+    page_count: usize,
+) -> Result<PreflightReport, ExportError> {
+    inspect(json, page_count, false, true)
 }
 fn inspect(
     json: &Value,
     page_count: usize,
     source_copy: bool,
+    tagged_extract: bool,
 ) -> Result<PreflightReport, ExportError> {
+    let allow_structure = source_copy || tagged_extract;
     if json.get("version").and_then(Value::as_u64) != Some(2)
         || json.pointer("/qpdf/0/jsonversion").and_then(Value::as_u64) != Some(2)
     {
@@ -199,7 +208,7 @@ fn inspect(
         .and_then(Value::as_bool)
     {
         Some(false) => {}
-        Some(true) if source_copy => {}
+        Some(true) if allow_structure => {}
         Some(true) => return Err(ExportError::Unsupported("AcroForm/XFA belum didukung.")),
         None => return Err(ExportError::Inspection),
     }
@@ -237,7 +246,7 @@ fn inspect(
     if catalog.get("/Type").and_then(Value::as_str) != Some("/Catalog") {
         return Err(ExportError::Inspection);
     }
-    if source_copy && let Some(form) = catalog.get("/AcroForm") {
+    if allow_structure && let Some(form) = catalog.get("/AcroForm") {
         let form = if form.is_object() {
             form
         } else {
@@ -256,7 +265,7 @@ fn inspect(
             ));
         }
     }
-    if source_copy
+    if allow_structure
         && json
             .pointer("/acroform/hasacroform")
             .and_then(Value::as_bool)
@@ -310,7 +319,7 @@ fn inspect(
         ),
     ] {
         if catalog.contains_key(key) {
-            if source_copy
+            if allow_structure
                 && matches!(
                     key,
                     "/AcroForm" | "/StructTreeRoot" | "/MarkInfo" | "/ViewerPreferences"
@@ -334,7 +343,7 @@ fn inspect(
     ];
     if let Some(key) = catalog.keys().find(|k| {
         !CATALOG_KEYS.contains(&k.as_str())
-            && !(source_copy
+            && !(allow_structure
                 && matches!(
                     k.as_str(),
                     "/AcroForm" | "/StructTreeRoot" | "/MarkInfo" | "/ViewerPreferences"
@@ -356,7 +365,7 @@ fn inspect(
         &mut HashSet::new(),
         &mut tree_pages,
         0,
-        source_copy,
+        allow_structure,
     )?;
     let pages = json
         .get("pages")
@@ -373,9 +382,25 @@ fn inspect(
     }
     let (bookmarks_loss, checked_bookmarks) =
         bookmarks::inspect(catalog, objects, &tree_pages, outlines)?;
+    let checked_ink = if allow_structure {
+        ink::inspect(objects, &tree_pages)?
+    } else {
+        HashSet::new()
+    };
     for (id, value) in objects {
-        if !checked_bookmarks.contains(id) {
-            forbidden(value, source_copy)?;
+        if checked_bookmarks.contains(id) || checked_ink.contains(id) {
+            continue;
+        }
+        if allow_structure && tree_pages.iter().any(|p| id == &format!("obj:{p}")) {
+            let mut page = value
+                .get("value")
+                .and_then(Value::as_object)
+                .ok_or(ExportError::Inspection)?
+                .clone();
+            page.remove("/Annots");
+            forbidden(&Value::Object(page), allow_structure)?;
+        } else {
+            forbidden(value, allow_structure)?;
         }
     }
     if let Some(info) = trailer.get("/Info")
@@ -396,8 +421,13 @@ fn inspect(
     }
     Ok(PreflightReport {
         metadata_loss: !source_copy
-            && (trailer.contains_key("/Info") || catalog.contains_key("/Metadata")),
+            && (trailer.contains_key("/Info")
+                || catalog.contains_key("/Metadata")
+                || (tagged_extract && catalog.contains_key("/ViewerPreferences"))),
         bookmarks_loss: !source_copy && bookmarks_loss,
+        tags_loss: !source_copy
+            && tagged_extract
+            && (catalog.contains_key("/StructTreeRoot") || catalog.contains_key("/MarkInfo")),
         policy_version: pdf_application::export::EXPORT_POLICY_VERSION,
     })
 }

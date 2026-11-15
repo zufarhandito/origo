@@ -2,6 +2,29 @@
 
 Status: implemented in M3, 11 November 2026. This supersedes the M0-only deferral.
 
+Policy v4 (15 November 2026): single-source selected-page Extract can omit tagged
+accessibility structure after a dedicated explicit acknowledgement. The prompt
+describes loss of tags/reading-order navigation and any detected bookmark/metadata
+loss. Source PDF is unchanged; no output is published if the decision is declined.
+This is intentional tag removal, not tag preservation/remapping or rasterization.
+
+The QPDF job uses removeStructure. A subsequent JSON v2 patch on that exact staged
+output removes StructParent/StructParents, structure-order Tabs and remaining catalog
+StructTreeRoot/MarkInfo. Stream data is omitted from the update so existing streams
+are preserved. Reinspect the rewritten output to reject residual references, then
+perform ordinary QPDF/PDFium validation and non-clobber commit.
+
+Passive Ink annotations are accepted only with a closed schema: finite geometry,
+InkList strokes, known style/metadata fields and correct page ownership. No annotation
+actions, extra appearances or unknown fields are allowed. Preserve Ink as annotation
+objects on selected pages; annotations on unselected pages follow page selection.
+Other annotations, active fields/XFA, encryption and signatures remain blocked.
+Whole-source copy preserves all bytes and requires no loss consent. Tagged full
+Save As/multi-source transformations retain the older restrictions.
+
+References: [QPDF 12.4 structure removal](https://qpdf.readthedocs.io/en/12.4/cli.html),
+[JSON updates and stream preservation](https://qpdf.readthedocs.io/en/12.4/json.html).
+
 Policy v3 (15 November 2026): a complete, unmodified, single-source selected-page
 Extract may copy the owned snapshot byte-for-byte. The immutable plan must contain
 every original page exactly in source order with zero virtual rotation. This path
