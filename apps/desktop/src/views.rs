@@ -688,6 +688,11 @@ impl Render for Viewer {
                 ),
             )
             .child(header)
+            .when(self.export.running && self.export.split_total > 0, |el| {
+                el.child(div().id("split-progress").px_4().py_2().text_sm().child(format!(
+                    "Split PDF: {} dari {} file selesai divalidasi. Folder diterbitkan setelah seluruh batch berhasil.",
+                    self.export.split_done.load(std::sync::atomic::Ordering::SeqCst), self.export.split_total)))
+            })
             .when(
                 matches!(
                     self.transition.phase,

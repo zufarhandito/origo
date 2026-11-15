@@ -15,7 +15,7 @@ not a promise to reproduce their engines, quality, accounts or hosted services.
 | C0 (now) | Konversi home with planned cards | GPUI presentation only | Clear Akan datang; no execution/upload |
 | M3 (implemented) | PDF Save As + selected-page Extract | QPDF page plan + safe output | Conservative preflight, validation and no-clobber commit |
 | C1 | PDF pages to PNG/JPEG, PDF to TXT | PDFium owned raster/text + explicit encoders | Bounded batch export, dimensions/Unicode/order |
-| M4 | Split, lossless optimize, release hardening | Existing blueprint | Cancellation/process/packaging gates |
+| M4 | Split implemented; lossless optimize and release hardening remain | Existing blueprint; see split.md | Cancellation/process/packaging gates |
 | C2 | PNG/JPEG to PDF | Dedicated image-to-PDF writer/adapter | EXIF, DPI/page fit, colors, large inputs |
 | C3 | DOCX/XLSX/PPTX to PDF | Benchmark a local Office engine such as headless LibreOffice | Fonts, pagination, profiles/process cleanup, redistribution |
 | C4 | OCR + editable PDF to DOCX | Layout reconstruction pipeline and DOCX writer, or evaluated SDK | Indonesian/English text and layout quality corpus |

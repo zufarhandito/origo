@@ -5,6 +5,7 @@ This directory is not a completed redistribution audit or a license grant for th
 The verified download script preserves upstream distribution files:
 
 - GPUI Kit 0.9.1: `GPUI-Kit-Apache-2.0.txt`; Lucide icon notice: `Lucide-ISC.txt`.
+- atomicwrites 0.4.4 (Windows no-replace directory publication): `Atomicwrites-MIT.txt`.
 
 - QPDF 12.4.2: `sidecars/qpdf/share/doc/` (including distribution notices) and all bundled DLLs.
 - PDFium Chromium 8125: `sidecars/pdfium/LICENSE` and `sidecars/pdfium/licenses/`.

@@ -1,4 +1,10 @@
-﻿# Current compatibility
+# Current compatibility
+
+Split PDF is available under Lainnya. It divides the captured plan per N pages or
+increasing, non-overlapping manual ranges into a new Windows output folder. All
+parts pass the existing Extract policy and validation before publication. Failure
+or cancellation publishes no batch; existing directories/files are refused and
+Split never marks edits saved. See split.md for controls, consent and limits.
 
 M3 is a Windows x64 PDF organizer/exporter using GPUI Kit 0.9.1. Multiple PDF sources,
 page selection, reorder, rotate, delete, import and bounded Undo/Redo are implemented.

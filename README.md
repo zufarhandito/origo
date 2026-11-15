@@ -6,6 +6,9 @@ toolchain precautions and organizer design notes. See docs/organizer.md for curr
 
 Native Windows PDF organizer following [the blueprint](PDF_EDITOR_CODEX_BLUEPRINT.md).
 Current slice: **M3 safe PDF Save As/Extract**, using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
+The first M4 feature is **Split PDF**, under **Lainnya → Split PDF**: split every N
+pages or by manual ranges into a new output folder. All parts are validated before
+the folder is published; Split does not mark edits saved. See [Split](docs/split.md).
 
 - Continuous virtualized scrolling and clickable thumbnail sidebar.
 - First/previous/next/last navigation and direct page-number entry.

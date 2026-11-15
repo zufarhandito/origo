@@ -8,13 +8,14 @@ mengikuti prompt lama di bagian akhir arsip. Gunakan NEXT_CHAT_PROMPT.md.
 
 - Workspace: D:\projects\bpdf, Windows x64, Rust/GPUI Kit. Bahasa komunikasi: Indonesia.
 - M1 viewer, M2 organizer, dan M3 Save As/Extract sudah diimplementasikan dalam batas
-  kompatibilitas yang dijelaskan di bawah. M4/release portable belum selesai.
+  kompatibilitas yang dijelaskan di bawah. M4 Split PDF sudah tersedia; Optimize dan
+  release portable belum selesai.
 - run.cmd memilih target/release/pdf-studio.exe, fallback debug. Release terbaru sudah
   dibangun. Build optimized tidak sama dengan produk portable yang telah tersertifikasi.
 - Konversi adalah halaman informasi dengan kartu Akan datang. PNG/JPEG/Word/TXT/
   Excel/PowerPoint serta konversi ke PDF belum berfungsi. Roadmap sudah disiapkan.
-- Permintaan terakhir pengguna hanya mengekspor progress untuk handover. Tidak ada
-  persetujuan otomatis untuk memulai milestone/konverter berikutnya.
+- Permintaan terbaru menyetujui Split PDF. Jangan otomatis memulai Optimize atau
+  konverter berikutnya tanpa arahan baru.
 
 ## Perilaku yang sudah tersedia
 
@@ -34,6 +35,11 @@ mengikuti prompt lama di bagian akhir arsip. Gunakan NEXT_CHAT_PROMPT.md.
 - Error operasi memakai popup GPUI Kit AlertDialog. Body memakai SelectableText:
   bisa drag-select, Salin pesan menyalin alasan lengkap, Tutup menutup popup. Guard
   mencegah popup bertumpuk dan klik memilih teks PDF di belakang modal.
+- Lainnya > Split PDF membagi page plan per N halaman atau rentang manual naik tanpa
+  overlap, ke folder baru dengan nama bagian-0001.pdf dst. Satu snapshot bersama,
+  consent seluruh batch, validasi semua PDF, flush dan no-replace folder publication.
+  Gagal/batal tidak menerbitkan batch. Split tidak memakai thumbnail selection dan
+  tidak menandai revisi tersimpan. Lihat docs/split.md.
 
 ## Kebijakan ekspor terkini: v4
 
@@ -88,6 +94,16 @@ size/mtime, bukan identitas kriptografis; crash-orphan recovery belum tersedia.
 
 ## Verifikasi terakhir yang benar-benar dijalankan
 
+- Sesi Split: **42 unit tests**, scripts/check.ps1 (fmt/Clippy/release), debug build,
+  native smoke termasuk multi-source split/consent/cancel/failure/race lulus.
+  Release Split UI lulus; bukti .research/split-ui-16cd253457374468a719b5847afcfb4e.
+  Release M3/unsaved guard dan debug M1 UI juga lulus pada build akhir.
+  Lihat bagian terbaru docs/testing.md untuk regresi UI dan detail aktual.
+- API baru PdfInspector::inspect_output melepas handle output setelah validasi,
+  agar Windows dapat memindahkan/membersihkan direktori batch. Publikasi memakai
+  atomicwrites 0.4.4 (MIT, notice di LICENSES); jangan mengganti dengan fs::rename
+  karena tes membuktikan std rename dapat mengganti folder tujuan kosong.
+
 - Sesi fitur unsaved-change guard: **39 unit tests**, fmt/Clippy, native smoke,
   build debug/release, release M3/M2/chrome UI dan debug M1 UI lulus. Bukti dan batas interpretasi
   ada di bagian terbaru docs/testing.md; catatan tagged Extract di bawah adalah historis.
@@ -139,8 +155,8 @@ size/mtime, bukan identitas kriptografis; crash-orphan recovery belum tersedia.
 
 ## Git dan langkah berikutnya
 
-Commit implementasi terakhir: **8adf7e9** di main. Sesudahnya mungkin ada commit
-dokumentasi/handoff; periksa Git sebelum melanjutkan. Commit lokal relevan:
+HEAD awal sesi Split: **f65cdc7** (feat: transition), di main. Implementasi Split
+ditambahkan sesudahnya; periksa Git/diff sebelum melanjutkan. Commit lokal relevan:
 
 - 8adf7e9 tagged partial Extract + consent/passive Ink.
 - cba06f6 whole-source empty-form/tagged Extract.
@@ -156,7 +172,7 @@ https://github.com/zufarhandito/origo.git, branch main. Konfirmasi tersebut belu
 ada; jangan retry/bypass atau mengklaim commit sudah dipush.
 
 Belum selesai: dukungan ekspor kompleks lebih luas/tag remapping, annotations lain,
-forms/signatures, split/optimize/M4, native isolation/hard timeout, crash recovery,
+forms/signatures, optimize/sisa M4, native isolation/hard timeout, crash recovery,
 physical trackpad/modifier/mixed-DPI/accessibility matrix, portable/license/clean-machine
 acceptance, serta konverter asli. Pilih pekerjaan berikutnya dari instruksi pengguna;
 jangan otomatis memulai semua daftar ini.

@@ -17,6 +17,7 @@ mod controller;
 mod conversion;
 mod exporting;
 mod feedback;
+mod splitting;
 mod transitions;
 use chrome::ViewerMode;
 mod navigation;
@@ -73,6 +74,7 @@ struct RenderStats {
     max_bitmap_bytes: usize,
 }
 struct Viewer {
+    split_dialog: Option<splitting::SplitDialog>,
     transition: transitions::Transition,
     error_popup: bool,
     export: exporting::ExportState,
@@ -263,6 +265,7 @@ fn main() -> anyhow::Result<()> {
                                 .unwrap_or(true)
                         });
                         let mut viewer = Viewer {
+                            split_dialog: None,
                             transition: transitions::Transition::default(),
                             error_popup: false,
                             export: exporting::ExportState::default(),

@@ -119,7 +119,7 @@ pub fn verify_whole_source_extract(
     Ok(())
 }
 
-fn verify(plan: &ExportPlan, path: &Path, renderer: &PdfiumRenderer) -> Result<()> {
+pub(super) fn verify(plan: &ExportPlan, path: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     let output = renderer.inspect(path)?;
     ensure!(output.pages.len() == plan.pages().len(), "M3 output count");
     for (index, page) in plan.pages().iter().enumerate() {

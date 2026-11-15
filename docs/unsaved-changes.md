@@ -40,7 +40,7 @@ another Open/Close request is accepted.
 
 If export is already running, wait for completion without cancelling it. **Tetap di
 aplikasi** cancels only the pending Open/Close; **Batal ekspor** still cancels the job.
-After success, recheck dirty: Extract and stale snapshots cannot mark current edits
+After success, recheck dirty: Extract, Split and stale snapshots cannot mark current edits
 saved. Failed/cancelled jobs never close the viewer or replace its workspace.
 
 The GPUI Kit alert shares the operational-modal guard, including global text-canvas

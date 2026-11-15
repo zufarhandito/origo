@@ -615,8 +615,8 @@ impl Viewer {
         ));
         json.pop();
         json.push_str(&format!(
-            ",\"transition\":\"{:?}\",\"workspaceInstance\":{}}}",
-            self.transition.phase, self.workspace_instance
+            ",\"transition\":\"{:?}\",\"workspaceInstance\":{},\"splitFiles\":{},\"splitDone\":{}}}",
+            self.transition.phase, self.workspace_instance, self.export.split_total, self.export.split_done.load(Ordering::SeqCst)
         ));
         cx.background_executor()
             .spawn(async move {

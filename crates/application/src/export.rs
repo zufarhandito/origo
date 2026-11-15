@@ -117,6 +117,28 @@ impl ExportPlan {
     pub fn sources(&self) -> &[SourceDocument] {
         &self.sources
     }
+    pub(crate) fn subset(&self, indices: &[usize]) -> Result<Self, ExportError> {
+        if indices.is_empty() {
+            return Err(ExportError::Empty);
+        }
+        let pages: Vec<_> = indices
+            .iter()
+            .map(|i| self.pages.get(*i).cloned().ok_or(ExportError::InvalidPlan))
+            .collect::<Result<_, _>>()?;
+        let sources = self
+            .sources
+            .iter()
+            .filter(|s| pages.iter().any(|p| p.entry.source_id == s.id))
+            .cloned()
+            .collect();
+        Ok(Self {
+            instance: self.instance,
+            revision: self.revision,
+            scope: ExportScope::Selected,
+            pages,
+            sources,
+        })
+    }
     /// Extracting every page of one source, in original order and orientation,
     /// can preserve that PDF byte-for-byte instead of rebuilding its catalog.
     pub fn is_whole_source_extract(&self) -> bool {
@@ -324,9 +346,9 @@ pub trait AtomicOutput {
     ) -> Result<Self::Transaction, ExportError>;
 }
 pub struct PreparedExport<T> {
-    plan: ExportPlan,
+    pub(crate) plan: ExportPlan,
     pub report: PreflightReport,
-    transaction: T,
+    pub(crate) transaction: T,
 }
 pub struct ExportReceipt {
     pub instance: u64,
@@ -390,7 +412,7 @@ pub fn finish_export<T: OutputTransaction>(
     control.set_phase(ExportPhase::Validation);
     exporter.check(transaction.output(), control)?;
     let info = inspector
-        .inspect(transaction.output())
+        .inspect_output(transaction.output())
         .map_err(|_| ExportError::Validation)?;
     control.checkpoint()?;
     if info.pages.len() != plan.pages.len()

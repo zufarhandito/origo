@@ -10,6 +10,9 @@ Open keeps the old workspace; see unsaved-changes.md. There is no autosave/recov
 
 The app opens in Baca mode. Its header contains the document name, Baca / Atur halaman,
 Konversi, Simpan sebagai, Buka PDF and Lainnya (import and theme choices).
+Lainnya also contains Split PDF in reading/organizer modes; see split.md for per-N
+and manual ranges, batch consent and new-folder publication. Split does not use
+thumbnail selection and never updates the saved baseline.
 Hover the name for full name/page size.
 The fixed reading toolbar groups sidebar/history, page navigation and zoom. Enter in
 the page field replaces the old Ke button; while focused, its draft is not overwritten

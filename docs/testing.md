@@ -1,3 +1,41 @@
+# Latest verification - Split PDF, 15 November 2026
+
+- Final scripts/check.ps1 passed formatting, workspace/all-target Clippy with denied
+  warnings, **42 unit tests** and the release workspace build. The three new tests
+  cover per-N/manual parsing and invalid input, folder-name safety, and actual Windows
+  directory no-replace behavior for existing empty directories/files and new targets.
+  The workspace debug build also passed.
+- Full debug native smoke passed existing M1/text/M3 checks plus Split: multi-source
+  order/rotations/text/sample raster identity; per-N/manual groups; progress; unchanged
+  dirty baseline; refusal/acceptance of tag-loss consent; passive Ink/page appearance;
+  byte-identical whole-source empty-form/tagged copy; a blocked later signed part;
+  unused-source exclusion; existing destination/race refusal; changed originals;
+  injected failure on the second writer call; cancellation after the first validated
+  part; no partial final folder and owned staging cleanup.
+- Release Split UI passed validation/preview, per-N and manual groups, real native
+  folder picker, deterministic names, QPDF count/rotation checks, unchanged workspace,
+  existing-output hashes, cancelled picker/consent, accepted batch tag loss/Ink,
+  Close waiting for Split followed by unsaved guard, source hashes and staging cleanup.
+  Evidence: .research/split-ui-16cd253457374468a719b5847afcfb4e.
+  split-dialog.png was visually inspected. Only owned synthetic fixtures/windows used.
+- Release M3 + unsaved-guard regression passed on the same final build:
+  .research/m3-ui-cb2003c199b84fffada56484845c959a. Final debug M1 UI passed empty
+  startup/clean close, lazy startup, 100-page navigation, thumbnail/scroll, rapid zoom
+  and resize: .research/m1-ui-1c2c841922ad4edea931c984d30e105f. Its fixture window
+  was closed normally afterward; the existing user viewer remained untouched.
+- Early checks exposed replacing std::fs::rename behavior, retained PDFium output
+  handles preventing directory moves, an error cleared on input blur, and the native
+  folder filename control differing from the file picker (Edit 1152). These were fixed
+  and final checks above passed. A negative fixture initially used an empty AcroForm,
+  which is correctly allowed by whole-source copy; the blocked-part test now uses a
+  synthetic signature structure. Intermediate attempts are not passing acceptance.
+- Added pinned Windows-only atomicwrites 0.4.4 and its MIT notice; no new toolchain,
+  native sidecar or external conversion runtime. Viewer session reuse is unchanged;
+  inspect_output validation releases its document before publication/cleanup.
+- No real user PDFs, remote CI, push, portable release, large-batch performance claim,
+  process isolation or crash-recovery claim. See split.md for current limits.
+
+---
 # Latest verification - unsaved-change guards, 15 November 2026
 
 - Added a single desktop Open/Close transition with candidate inspection, a final

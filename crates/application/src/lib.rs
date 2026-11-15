@@ -4,6 +4,7 @@ pub use pdf_domain::{
 };
 use std::path::{Path, PathBuf};
 pub mod export;
+pub mod split;
 pub mod text;
 pub mod viewer;
 
@@ -28,6 +29,10 @@ pub struct InspectedDocument {
 }
 pub trait PdfInspector {
     fn inspect(&self, source: &Path) -> Result<InspectedDocument, RenderError>;
+    /// Validate a staged output without retaining native file handles after return.
+    fn inspect_output(&self, source: &Path) -> Result<InspectedDocument, RenderError> {
+        self.inspect(source)
+    }
 }
 
 pub fn open_document(

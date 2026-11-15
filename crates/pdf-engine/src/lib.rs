@@ -52,6 +52,7 @@ pub struct PdfiumRenderer {
 }
 enum Operation {
     Inspect,
+    InspectOutput,
     Render(RenderRequest),
     Text(TextRequest),
 }
@@ -206,15 +207,17 @@ fn worker(
             }
             let document = session.as_ref().ok_or_else(worker_error)?;
             let result = match &job.operation {
-                Operation::Inspect => Output::Inspected(InspectedDocument {
-                    path: job.path.clone(),
-                    fingerprint: before,
-                    pages: document
-                        .pages()
-                        .iter()
-                        .map(|page| geometry(&page))
-                        .collect::<Result<Vec<_>, _>>()?,
-                }),
+                Operation::Inspect | Operation::InspectOutput => {
+                    Output::Inspected(InspectedDocument {
+                        path: job.path.clone(),
+                        fingerprint: before,
+                        pages: document
+                            .pages()
+                            .iter()
+                            .map(|page| geometry(&page))
+                            .collect::<Result<Vec<_>, _>>()?,
+                    })
+                }
                 Operation::Render(request) => {
                     renders += 1;
                     counters.renders.fetch_add(1, Ordering::Relaxed);
@@ -229,6 +232,10 @@ fn worker(
                 session = None;
                 session_key = None;
                 return Err(RenderError::SourceChanged);
+            }
+            if matches!(job.operation, Operation::InspectOutput) {
+                session = None;
+                session_key = None;
             }
             Ok(result)
         })();
@@ -248,6 +255,12 @@ fn worker(
 impl PdfInspector for PdfiumRenderer {
     fn inspect(&self, source: &Path) -> Result<InspectedDocument, RenderError> {
         match self.request(source, None, Operation::Inspect)? {
+            Output::Inspected(info) => Ok(info),
+            _ => Err(worker_error()),
+        }
+    }
+    fn inspect_output(&self, source: &Path) -> Result<InspectedDocument, RenderError> {
+        match self.request(source, None, Operation::InspectOutput)? {
             Output::Inspected(info) => Ok(info),
             _ => Err(worker_error()),
         }

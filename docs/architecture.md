@@ -1,5 +1,13 @@
 # Architecture - M3
 
+The first M4 slice adds application/split: immutable per-N/manual plans, aggregate
+consent and a distinct receipt that cannot advance the PDF clean revision.
+platform/split owns one shared source snapshot and a ready directory. Parts reuse
+finish_export validation before flushing and Windows no-replace publication.
+PdfInspector adds inspect_output with transient validation handles; normal viewer
+session reuse is unchanged. Desktop splitting.rs uses the existing export slot,
+progress timer and Open/Close guard. See split.md.
+
 ```text
 desktop (GPUI Kit) -> application -> domain
        |                  ^

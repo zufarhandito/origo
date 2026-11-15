@@ -7,6 +7,8 @@ use pdf_application::export::{
 use pdf_platform::LocalOutput;
 #[derive(Default)]
 pub(super) struct ExportState {
+    pub split_total: usize,
+    pub split_done: Arc<std::sync::atomic::AtomicUsize>,
     pub running: bool,
     job_id: u64,
     pub control: Option<ExportControl>,
@@ -16,6 +18,42 @@ pub(super) struct ExportState {
     pub pages: usize,
 }
 impl Viewer {
+    pub(super) fn start_export_job(&mut self, control: ExportControl, cx: &mut Context<Self>) {
+        self.export.split_total = 0;
+        self.export
+            .split_done
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+        self.export.job_id += 1;
+        let poll_id = self.export.job_id;
+        self.export.running = true;
+        self.export.control = Some(control.clone());
+        self.export.notice = None;
+        self.export.success = false;
+        self.report(cx);
+        cx.notify();
+        // A timer only projects phase state; all native work is off the UI thread.
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(150))
+                    .await;
+                let active = this
+                    .update(cx, |this, cx| {
+                        if this.export.running && this.export.job_id == poll_id {
+                            this.report(cx);
+                            cx.notify();
+                        }
+                        this.export.running && this.export.job_id == poll_id
+                    })
+                    .unwrap_or(false);
+                if !active {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
     pub(super) fn cancel_export(&mut self, cx: &mut Context<Self>) {
         if let Some(c) = &self.export.control {
             c.cancel();
@@ -119,35 +157,7 @@ impl Viewer {
         );
         let dialog = cx.prompt_for_new_path(&parent, Some(&suggested));
         let control = ExportControl::default();
-        self.export.job_id += 1;
-        let poll_id = self.export.job_id;
-        self.export.running = true;
-        self.export.control = Some(control.clone());
-        self.export.notice = None;
-        self.export.success = false;
-        self.report(cx);
-        cx.notify();
-        // A timer only projects phase state; all native work is off the UI thread.
-        cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor()
-                    .timer(std::time::Duration::from_millis(150))
-                    .await;
-                let active = this
-                    .update(cx, |this, cx| {
-                        if this.export.running && this.export.job_id == poll_id {
-                            this.report(cx);
-                            cx.notify();
-                        }
-                        this.export.running && this.export.job_id == poll_id
-                    })
-                    .unwrap_or(false);
-                if !active {
-                    break;
-                }
-            }
-        })
-        .detach();
+        self.start_export_job(control.clone(), cx);
         let exporter = self.exporter.clone();
         let renderer = self.renderer.clone();
         let handle = self.window_handle;

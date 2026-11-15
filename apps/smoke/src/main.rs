@@ -7,6 +7,7 @@ use qpdf_adapter::QpdfProbe;
 use std::path::PathBuf;
 mod books;
 mod exporting;
+mod splitting;
 mod synthetic;
 mod text;
 
@@ -211,5 +212,6 @@ fn main() -> Result<()> {
     m1_smoke(&root, &renderer)?;
     text::run(&root, &renderer)?;
     exporting::run(&root, &renderer)?;
+    splitting::run(&root, &renderer)?;
     Ok(())
 }
