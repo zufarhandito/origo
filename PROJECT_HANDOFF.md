@@ -1,3 +1,162 @@
+# Snapshot handoff terkini - 15 November 2026
+
+**Baca bagian ini sebagai status terbaru.** Catatan sesi di bawah bagian Arsip adalah
+historis dan dapat menyebut milestone/fitur yang saat itu belum tersedia. Jangan
+mengikuti prompt lama di bagian akhir arsip. Gunakan NEXT_CHAT_PROMPT.md.
+
+## Ringkasan proyek
+
+- Workspace: D:\projects\bpdf, Windows x64, Rust/GPUI Kit. Bahasa komunikasi: Indonesia.
+- M1 viewer, M2 organizer, dan M3 Save As/Extract sudah diimplementasikan dalam batas
+  kompatibilitas yang dijelaskan di bawah. M4/release portable belum selesai.
+- run.cmd memilih target/release/pdf-studio.exe, fallback debug. Release terbaru sudah
+  dibangun. Build optimized tidak sama dengan produk portable yang telah tersertifikasi.
+- Konversi adalah halaman informasi dengan kartu Akan datang. PNG/JPEG/Word/TXT/
+  Excel/PowerPoint serta konversi ke PDF belum berfungsi. Roadmap sudah disiapkan.
+- Permintaan terakhir pengguna hanya mengekspor progress untuk handover. Tidak ada
+  persetujuan otomatis untuk memulai milestone/konverter berikutnya.
+
+## Perilaku yang sudah tersedia
+
+- Baca: continuous virtualized viewer, thumbnail, navigasi/Enter page field, zoom/fit,
+  horizontal pan, light/dark, text selection/copy. Single-click membersihkan seleksi;
+  double-click memilih kalimat/label. OCR/search/content editing belum tersedia.
+- Atur halaman: Ctrl/Shift selection, import PDF, move/drag, rotate/delete dan bounded
+  Undo/Redo. Halaman memakai identitas stabil dan referensi multi-source non-destruktif.
+- Simpan sebagai / Ctrl+Shift+S menulis PDF baru. Ekstrak menulis halaman terpilih dalam
+  urutan workspace. Tidak ada overwrite file yang sudah ada atau Save-over-original.
+- Hanya receipt full Save As yang cocok dengan workspace instance DAN revisi saat ini
+  menandai baseline clean. Extract/hasil snapshot lama tidak menandai tersimpan. Undo/
+  Redo ke baseline tersimpan konsisten. History/referensi sumber tidak direbase ke output.
+- Edit virtual yang belum disimpan tetap hilang ketika Open/close; belum ada recovery
+  atau automatic save prompt. Jangan mengklaim ada session persistence.
+- Error operasi memakai popup GPUI Kit AlertDialog. Body memakai SelectableText:
+  bisa drag-select, Salin pesan menyalin alasan lengkap, Tutup menutup popup. Guard
+  mencegah popup bertumpuk dan klik memilih teks PDF di belakang modal.
+
+## Kebijakan ekspor terkini: v4
+
+1. Semua output memakai snapshot sumber privat, pemeriksaan QPDF, staging di parent
+   tujuan, validasi QPDF/PDFium, source recheck dan flushed non-clobber commit. Failure/
+   cancel membersihkan staging milik job. Sumber tidak dimodifikasi.
+2. Ekstrak seluruh halaman dari satu sumber, urutan asli dan tanpa virtual rotation:
+   is_whole_source_extract menyalin snapshot byte-per-byte. Struktur/tag/metadata tetap
+   utuh; tidak perlu persetujuan kehilangan data. Ini menyelesaikan invoice satu halaman
+   yang punya AcroForm kosong, tag dan viewer preferences.
+3. Ekstrak sebagian/transformasi Selected dari satu sumber bertag dapat dilanjutkan
+   lewat persetujuan Simpan tanpa tag. Dialog menjelaskan kehilangan tag aksesibilitas/
+   urutan baca serta bookmark/metadata/settings bila terdeteksi. Batal tidak menerbitkan
+   output. Halaman tetap berupa PDF, tidak dirasterisasi.
+4. Passive Ink didukung dengan closed-schema validation: geometri/stroke finite,
+   proper page owner, style/metadata yang dikenal, tanpa aksi/extra appearances. Ink
+   pada halaman terpilih dipertahankan sebagai anotasi, tidak di-flatten.
+5. Bookmark lokal biasa bisa dihilangkan setelah persetujuan Simpan tanpa bookmark.
+   Metadata dapat hilang pada jalur rebuild dan membutuhkan persetujuan. Whole-source
+   copy mempertahankan keduanya. Tag preservation/remapping umum belum tersedia.
+6. Active forms/XFA, digital-signature structures, encryption, active actions, annotation
+   types selain Ink yang didukung, extra appearances dan fitur kompleks lain tetap
+   diblokir. Full Save As/multi-source tagged restructuring belum mendapat pengecualian
+   yang sama dengan single-source Selected Extract. Baca docs/compatibility.md/ADR-0003.
+
+Batas default: 1024 aggregate source pages, 128 MiB sumber, history 128; bitmap max
+8192/dimensi dan 16 juta piksel. Cache page/thumbnail/text terpisah dan dibatasi. JSON
+inspection/job/patch 16 MiB, stderr 64 KiB. QPDF punya cancellation/kill/reap dan budget
+120 detik runtime child kumulatif. PDFium masih in-process: cancellation sebelum/
+sesudah native call, bukan hard timeout atau process sandbox. Fingerprint sumber
+size/mtime, bukan identitas kriptografis; crash-orphan recovery belum tersedia.
+
+## Peta kode/dokumen
+
+- crates/domain/src/lib.rs: workspace, stable IDs, commands/history/clean revision.
+- crates/application/src/export.rs: immutable plan, ports, preflight report v4,
+  phases/cancel, prepare/finish dan receipt. Plan/prepared-plan fields privat.
+- crates/platform/src/lib.rs: snapshot, staging/no-clobber dan bounded hidden processes.
+- crates/qpdf-adapter/src/export.rs: plan-aware preflight, QPDFJob, source copy,
+  current-output JSON inspection/update. No shell command construction.
+- crates/qpdf-adapter/src/preflight.rs dan preflight/bookmarks.rs, preflight/ink.rs:
+  strict feature checks dan pengecualian yang tervalidasi.
+- crates/qpdf-adapter/src/structure.rs: menghapus tag/parent references melalui patch
+  JSON pada object IDs output staging yang sama. Stream data tidak diganti; reinspect
+  memastikan tidak ada sisa references sebelum commit.
+- apps/desktop/src/exporting.rs/feedback.rs: async export, consent, popup/select-copy.
+  chrome.rs/views.rs: compact Baca/Atur/Konversi; organizer.rs: page commands.
+- apps/smoke/src/exporting.rs/synthetic.rs dan scripts/m3-ui-smoke.ps1: regressions.
+- PDF_EDITOR_CODEX_BLUEPRINT.md, docs/compatibility.md, docs/architecture.md,
+  docs/adr/0003-export-preservation-policy.md, docs/testing.md adalah referensi utama.
+  docs/conversion-roadmap.md menyimpan rencana format mendatang.
+
+## Verifikasi terakhir yang benar-benar dijalankan
+
+- Fmt, workspace/all-target Clippy -D warnings, **37 unit tests**, full debug native
+  smoke dan release workspace build lulus. Rincian lengkap ada di docs/testing.md.
+- File invoice pengguna: debug/release actual-file checks membuktikan identical bytes,
+  source unchanged, native geometry/text/raster. Tidak ada user PDF di tracked fixtures.
+- File tiga halaman pengguna: debug/release ekstrak halaman 1 dan 3 lulus consent
+  refusal, native validation, text dan exact full 512px RGBA equality, source unchanged.
+  Halaman 3 memiliki Ink. Hasil sementara dihapus; tidak ada capture isi dokumen pengguna.
+- Release M3 UI lulus: cancel/accept tag-loss, struktur output bersih, Ink tetap berupa
+  object/InkList, source hashes, serta organizer/history/consent/error popup/select-copy/
+  import/Open/cleanup. Evidence lokal ignored:
+  .research/m3-ui-fd8b8252153d4570bed5b349905dea15.
+- Path aktual dan baseline hash file uji pengguna disimpan hanya di
+  .research/PROJECT_HANDOFF_PRIVATE.md (gitignored). Jangan commit/upload file ini atau
+  PDF pengguna. Periksa lagi keberadaan/hash sumber sebelum mengulang tes.
+- Tidak ada tes/build dijalankan ulang pada turn ekspor handoff ini; yang diperiksa
+  adalah Git, dokumen dan keberadaan executable. Remote CI tidak dijalankan.
+
+## Toolchain, reproduksi, dan hal penting untuk dipertahankan
+
+- Toolchain/dependencies sudah ada di D:. Jangan install ulang rutin, memindahkan/
+  menghapus .tools, atau merusak registered VS/SDK junction. Pins: Rust 1.98.1,
+  GPUI Kit 0.9.1, pdfium-render 0.9.5/PDFium 8125 dan QPDF 12.4.2.
+- Aktifkan . ./scripts/use-build-environment.ps1. Quality: scripts/check.ps1. Native:
+  scripts/smoke-test.ps1. Untuk UI M3: cargo run --locked -p pdf-smoke --
+  --write-export-fixtures, lalu scripts/m3-ui-smoke.ps1 -Profile release.
+- Actual-file CLI: pdf-smoke --verify-whole-source-extract <path>; atau
+  --verify-tagged-extract <path> <1-based page>. Output hanya temporary lokal.
+- Jangan tutup/kill jendela pengguna agar build berhasil. Jika EXE terkunci, verifikasi
+  absolute source/destination tetap di target/release lalu rename loaded EXE ke nama
+  previous unik di direktori yang sama. Old windows tetap memakai build lama dan edit
+  mereka; run.cmd membuka build baru. Jangan mengasumsikan PID lama masih aktif.
+- Pertahankan 8 MiB stack reserve, deferred GPU drop_image, bounded caches, deferred
+  page-input projection/focused draft dan paint-time content-mask hit testing.
+- Global page listeners tidak boleh mengambil input dari toolbar/sidebar/modal.
+- Jangan menambahkan raw Button.hover; gunakan ButtonCustomVariant.
+- UI automation hanya HWND/PID fixture miliknya; tidak ada global SendKeys. Native
+  Open filename Edit 1148, Save Edit 1001 (bukan toolbar 1001). Picker bisa top-level:
+  fallback harus dibatasi PID test. GPUI native TaskDialog logical answers berbeda
+  dari native child IDs; gunakan TDM_CLICK_BUTTON seperti harness yang sudah lulus.
+- Tunggu modal entrance/exit dan Open generation/source identity, bukan page count
+  saja. Clipboard test harus disimpan/dipulihkan. Jangan jalankan dua headed suite
+  bersamaan. UIA child Button tidak bubble ke DialogAction: Tutup punya callback sendiri.
+
+## Git dan langkah berikutnya
+
+Commit implementasi terakhir: **8adf7e9** di main. Sesudahnya mungkin ada commit
+dokumentasi/handoff; periksa Git sebelum melanjutkan. Commit lokal relevan:
+
+- 8adf7e9 tagged partial Extract + consent/passive Ink.
+- cba06f6 whole-source empty-form/tagged Extract.
+- d6baaf4 selectable error text + copy action.
+- aaf449a GPUI Kit error popup + precise catalog diagnostics.
+- 3812a9c bookmark loss consent.
+- 2bb69c9 M3 safe PDF Save As/Extract.
+- 38929ab conversion home/roadmap; 0eb7337 M2 organizer/compact UX.
+
+Pengguna pernah meminta commit dan push. Local commits diizinkan. Push sebelumnya
+**ditolak automatic approval review** karena perlu konfirmasi eksplisit tujuan
+https://github.com/zufarhandito/origo.git, branch main. Konfirmasi tersebut belum
+ada; jangan retry/bypass atau mengklaim commit sudah dipush.
+
+Belum selesai: dukungan ekspor kompleks lebih luas/tag remapping, annotations lain,
+forms/signatures, split/optimize/M4, native isolation/hard timeout, crash recovery,
+physical trackpad/modifier/mixed-DPI/accessibility matrix, portable/license/clean-machine
+acceptance, serta konverter asli. Pilih pekerjaan berikutnya dari instruksi pengguna;
+jangan otomatis memulai semua daftar ini.
+
+---
+
+# Arsip catatan sesi sebelumnya (historis)
 # Current update - partial tagged Extract with consent (15 November 2026)
 
 - User supplied a different three-page PDF with tags, metadata, viewer preferences
