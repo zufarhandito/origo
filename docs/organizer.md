@@ -5,7 +5,8 @@ stay stable through move/rotate/delete/undo. Source PDFs are never written by or
 operations. Simpan sebagai (Ctrl+Shift+S) exports the full current plan to a new PDF;
 Ekstrak exports selected pages in workspace order. Both perform structural preflight
 and output validation. Existing destinations are refused. Opening another PDF or
-closing discards unsaved virtual edits; there is no automatic save/recovery prompt.
+closing prompts to save, discard or cancel unsaved virtual edits. Failed/cancelled
+Open keeps the old workspace; see unsaved-changes.md. There is no autosave/recovery.
 
 The app opens in Baca mode. Its header contains the document name, Baca / Atur halaman,
 Konversi, Simpan sebagai, Buka PDF and Lainnya (import and theme choices).

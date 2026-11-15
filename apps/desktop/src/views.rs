@@ -388,7 +388,7 @@ impl Viewer {
                         .text_color(colors.muted_foreground)
                         .child(format!("{}", index + 1)),
                 )
-                .when(organizing && !self.opening, |el| {
+                .when(organizing && !self.opening && !self.edits_locked(), |el| {
                     let weak = cx.weak_entity();
                     el.on_drag(organizer::PageDrag(drag_ids), move |_, _, _, cx| {
                         let _ = weak.update(cx, |this, cx| {
@@ -688,6 +688,41 @@ impl Render for Viewer {
                 ),
             )
             .child(header)
+            .when(
+                matches!(
+                    self.transition.phase,
+                    transitions::Phase::Inspecting | transitions::Phase::Applying
+                ),
+                |el| el.child(div().px_4().py_2().text_sm().child("Memeriksa PDF tujuan…")),
+            )
+            .when(
+                self.transition.phase == transitions::Phase::WaitingExport,
+                |el| {
+                    el.child(
+                        div()
+                            .id("waiting-to-leave")
+                            .px_4()
+                            .py_2()
+                            .flex()
+                            .items_center()
+                            .gap_3()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .text_sm()
+                                    .child("Menunggu ekspor selesai sebelum melanjutkan…"),
+                            )
+                            .child(
+                                Button::new("cancel-leaving")
+                                    .ghost()
+                                    .label("Tetap di aplikasi")
+                                    .on_click(
+                                        cx.listener(|this, _, _, cx| this.cancel_transition(cx)),
+                                    ),
+                            ),
+                    )
+                },
+            )
             .when_some(self.export.notice.clone(), |el, notice| {
                 el.child(
                     div()

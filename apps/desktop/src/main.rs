@@ -17,6 +17,7 @@ mod controller;
 mod conversion;
 mod exporting;
 mod feedback;
+mod transitions;
 use chrome::ViewerMode;
 mod navigation;
 mod organizer;
@@ -72,6 +73,7 @@ struct RenderStats {
     max_bitmap_bytes: usize,
 }
 struct Viewer {
+    transition: transitions::Transition,
     error_popup: bool,
     export: exporting::ExportState,
     exporter: qpdf_adapter::QpdfExporter,
@@ -257,18 +259,11 @@ fn main() -> anyhow::Result<()> {
                         let closing = cx.weak_entity();
                         window.on_window_should_close(cx, move |_, cx| {
                             closing
-                                .update(cx, |this: &mut Viewer, cx| {
-                                    if this.export.running {
-                                        this.export.close_after = true;
-                                        this.cancel_export(cx);
-                                        false
-                                    } else {
-                                        true
-                                    }
-                                })
+                                .update(cx, |this: &mut Viewer, cx| this.request_close(cx))
                                 .unwrap_or(true)
                         });
                         let mut viewer = Viewer {
+                            transition: transitions::Transition::default(),
                             error_popup: false,
                             export: exporting::ExportState::default(),
                             exporter: qpdf_adapter::QpdfExporter::new(&sidecars),

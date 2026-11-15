@@ -92,7 +92,7 @@ in-process and only cooperatively cancellable before/after its native call.
 Only a committed full Save As receipt matching workspace instance and current
 revision advances the saved baseline. Extract and stale results cannot mark current
 edits saved. Saving retains source references and history; it does not rebase them
-onto the generated file. Opening/closing still discards unsaved edits without a prompt.
+onto the generated file. Open/close now uses a desktop unsaved-change guard; see ../unsaved-changes.md.
 
 Acceptance includes ordinary two-source edits, all 16 intrinsic/virtual rotations,
 source text and sampled raster identity, metadata consent, structural unsafe fixtures,

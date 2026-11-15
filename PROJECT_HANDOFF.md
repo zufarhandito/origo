@@ -28,8 +28,9 @@ mengikuti prompt lama di bagian akhir arsip. Gunakan NEXT_CHAT_PROMPT.md.
 - Hanya receipt full Save As yang cocok dengan workspace instance DAN revisi saat ini
   menandai baseline clean. Extract/hasil snapshot lama tidak menandai tersimpan. Undo/
   Redo ke baseline tersimpan konsisten. History/referensi sumber tidak direbase ke output.
-- Edit virtual yang belum disimpan tetap hilang ketika Open/close; belum ada recovery
-  atau automatic save prompt. Jangan mengklaim ada session persistence.
+- Open/close sekarang meminta Simpan sebagai / Buang perubahan / Batal bila dirty.
+  Open gagal/batal mempertahankan workspace lama; tutup menunggu ekspor aktif.
+  Tidak ada autosave/crash recovery. Lihat docs/unsaved-changes.md dan docs/testing.md.
 - Error operasi memakai popup GPUI Kit AlertDialog. Body memakai SelectableText:
   bisa drag-select, Salin pesan menyalin alasan lengkap, Tutup menutup popup. Guard
   mencegah popup bertumpuk dan klik memilih teks PDF di belakang modal.
@@ -86,6 +87,12 @@ size/mtime, bukan identitas kriptografis; crash-orphan recovery belum tersedia.
   docs/conversion-roadmap.md menyimpan rencana format mendatang.
 
 ## Verifikasi terakhir yang benar-benar dijalankan
+
+- Sesi fitur unsaved-change guard: **39 unit tests**, fmt/Clippy, native smoke,
+  build debug/release, release M3/M2/chrome UI dan debug M1 UI lulus. Bukti dan batas interpretasi
+  ada di bagian terbaru docs/testing.md; catatan tagged Extract di bawah adalah historis.
+- Modul baru apps/desktop/src/transitions.rs mengatur Open kandidat, prompt dirty,
+  tunggu ekspor, kunci edit, serta receipt-gated Open/Close. Tidak ada close_after otomatis.
 
 - Fmt, workspace/all-target Clippy -D warnings, **37 unit tests**, full debug native
   smoke dan release workspace build lulus. Rincian lengkap ada di docs/testing.md.

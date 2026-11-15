@@ -1,3 +1,40 @@
+# Latest verification - unsaved-change guards, 15 November 2026
+
+- Added a single desktop Open/Close transition with candidate inspection, a final
+  fingerprint recheck, explicit Save As/discard/cancel and exact-receipt continuation.
+  Page mutations/history/import/additional exports are locked while leaving. No new
+  domain/export interfaces, dependencies or broader PDF preservation claims.
+- Formatting, workspace/all-target Clippy with denied warnings and **39 unit tests**
+  passed. The two new tests cover export completion/current-receipt requirements and
+  cancellation tokens. Existing source/snapshot/receipt/no-clobber tests remain green.
+  Final scripts/check.ps1 and workspace debug build passed, producing both profiles.
+- Full debug native smoke passed after generating synthetic export fixtures: M1,
+  text/16 rotations, M3, tagged extraction and byte-identical whole-source extraction.
+- Release M3 UI passed cancellation/invalid Open, candidate changed after inspection,
+  Batal focus, Escape, repeated close, disabled mutations, empty-plan save disabled,
+  cancelled Save As, successful save-before-Open, explicit discard/close, pending
+  export wait/cancel-intent, Extract remaining dirty, failed save keeping the old
+  workspace, consent refusal and successful save-before-close. Existing organizer,
+  export/popup/select-copy/source-hash/staging regressions passed too. Evidence:
+  .research/m3-ui-d31dabaa7f3d421896d095761ccad295 (final executable).
+  The unsaved-prompt screenshot was visually inspected. An earlier attempt exposed
+  missing accessible title/ambiguous save controls; a later stronger assertion was
+  corrected to expect Undo to restore the selection immediately before Delete.
+  These intermediate attempts are not counted as final acceptance.
+- Release M2 drag/history/import/multi-source UI passed, including dirty-window cleanup:
+  .research/m2-ui-d3733ea6ea414e4196ec75c063662db6.
+  Release chrome UI passed both themes, four widths and focused page entry:
+  .research/chrome-ui-74577653e9854d4c9a586b1a8f7afbc0.
+- Final debug M1 UI passed empty/no-argument startup and clean close, lazy 100-page
+  startup, navigation/thumbnail/scroll, rapid 50-400% zoom and resize:
+  .research/m1-ui-1b8b478590194c9ea5e455ec7010ca4b. Its owned fixture window was
+  closed normally after acceptance. No new 1000-page stress/physical-DPI test is claimed.
+- All UI input/captures used only owned synthetic fixtures and test HWNDs. No real
+  user PDFs, global SendKeys, new installations, remote CI or push were involved.
+  Autosave, crash recovery, forced termination and external-source recovery remain
+  outside this feature; see unsaved-changes.md.
+
+---
 # Latest verification - partial tagged Extract, 15 November 2026
 
 - Formatting, workspace/all-target denied-warning Clippy and **37 unit tests** passed.

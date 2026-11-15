@@ -1,4 +1,4 @@
-﻿param([ValidateSet('debug','release')][string]$Profile='debug')
+param([ValidateSet('debug','release')][string]$Profile='debug')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Add-Type -AssemblyName UIAutomationClient
@@ -134,18 +134,104 @@ function Open-Pdf($Path,[int]$ExpectedPages=1){
     $beforeGeneration=$previous.generation
     $beforeSource=if($previous.pageCount -gt 0){$previous.pagePlan[0][0]}else{-1}
     Picker 'Buka PDF';Fill-Picker $Path
+    if($previous.dirty){$null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Buang perubahan'}
     $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq $ExpectedPages -and $s.generation -gt $beforeGeneration -and $s.pagePlan[0][0] -ne $beforeSource}
 }
-function Capture-Error {
+function Capture-Error([string]$Name='error-popup.png') {
     $rect=New-Object M3Capture+Rect;[M3Capture]::GetWindowRect($app.MainWindowHandle,[ref]$rect)|Out-Null
     $bitmap=New-Object Drawing.Bitmap(($rect.R-$rect.L),($rect.B-$rect.T));$graphics=[Drawing.Graphics]::FromImage($bitmap);$dc=$graphics.GetHdc()
     try{$ok=[M3Capture]::PrintWindow($app.MainWindowHandle,$dc,2)}finally{$graphics.ReleaseHdc($dc)}
-    try{if(-not $ok){throw 'Popup capture failed'};$bitmap.Save((Join-Path $directory 'error-popup.png'))}finally{$graphics.Dispose();$bitmap.Dispose()}
+    try{if(-not $ok){throw 'Popup capture failed'};$bitmap.Save((Join-Path $directory $Name))}finally{$graphics.Dispose();$bitmap.Dispose()}
+}
+function Wait-Transition([string]$Phase) {
+    $deadline=(Get-Date).AddSeconds(20)
+    do {
+        Start-Sleep -Milliseconds 100
+        if($app.HasExited){throw 'Viewer exited during transition'}
+        try{$s=Get-Content -Raw $metrics|ConvertFrom-Json}catch{continue}
+        if($s.transition -eq $Phase){return $s}
+    }while((Get-Date) -lt $deadline)
+    throw "Transition did not reach $Phase"
+}
+function Request-Close {
+    [OutputDialog]::PostMessage($app.MainWindowHandle,0x10,[IntPtr]::Zero,[IntPtr]::Zero)|Out-Null
+}
+function Assert-SameWorkspace($Before) {
+    $s=Wait-Transition 'Idle'
+    if($s.workspaceInstance -ne $Before.workspaceInstance -or $s.revision -ne $Before.revision -or
+        $s.activePage -ne $Before.activePage -or $s.selectedPages -ne $Before.selectedPages -or
+        ($s.pagePlan|ConvertTo-Json -Compress) -ne ($Before.pagePlan|ConvertTo-Json -Compress)){
+        throw 'Cancelled/failed transition changed the workspace'
+    }
 }
 $clipboardSaved=[Windows.Forms.Clipboard]::GetDataObject();$clipboardBackup=New-Object Windows.Forms.DataObject
 if($clipboardSaved){foreach($format in $clipboardSaved.GetFormats($false)){$data=$clipboardSaved.GetData($format,$false);if($null -ne $data){$clipboardBackup.SetData($format,$data)}}}
 try {
     $null=Wait-State {param($s) $s.pageCount -eq 4}
+    # Open keeps the old plan/history until a validated replacement is accepted.
+    Invoke 'Atur halaman';Invoke 'Putar kanan'
+    $original=Wait-State {param($s) $s.dirty}
+    Picker 'Buka PDF';Fill-Picker '' -Cancel
+    Assert-SameWorkspace $original
+    $invalid=Join-Path $directory 'invalid-open.pdf';[IO.File]::WriteAllText($invalid,'Not a PDF')
+    Picker 'Buka PDF';Fill-Picker $invalid
+    $null=Find 'PDF belum dapat dibuka';Invoke 'Tutup';Assert-SameWorkspace $original
+    Picker 'Buka PDF';Fill-Picker $b
+    $null=Find 'Simpan perubahan sebelum melanjutkan?'
+    Start-Sleep -Milliseconds 400
+    Capture-Error 'unsaved-prompt.png'
+    if(-not (Find 'Batal').Current.HasKeyboardFocus){throw 'Unsaved dialog did not focus Batal'}
+    if((Find 'Putar kanan').Current.IsEnabled -or (Find 'Undo').Current.IsEnabled){throw 'Edits enabled during unsaved prompt'}
+    Request-Close # repeated intent must not replace Open or stack another dialog
+    Invoke 'Batal';Assert-SameWorkspace $original
+    Picker 'Buka PDF';Fill-Picker $b
+    $null=Find 'Simpan perubahan sebelum melanjutkan?';Start-Sleep -Milliseconds 300
+    [OutputDialog]::PostMessage($app.MainWindowHandle,0x100,[IntPtr]27,[IntPtr]0x10001)|Out-Null
+    [OutputDialog]::PostMessage($app.MainWindowHandle,0x101,[IntPtr]27,[IntPtr]0xC0010001)|Out-Null
+    Assert-SameWorkspace $original
+    # Candidate changes after inspection must not replace the current plan.
+    Picker 'Buka PDF';Fill-Picker $b
+    $null=Find 'Simpan perubahan sebelum melanjutkan?'
+    [IO.File]::AppendAllText($b,"`n% changed candidate`n")
+    Invoke 'Buang perubahan';$null=Find 'PDF belum dapat dibuka';Invoke 'Tutup'
+    Assert-SameWorkspace $original
+    Copy-Item $a $b -Force
+    # Cancelling Save As cancels the pending Open as well.
+    Picker 'Buka PDF';Fill-Picker $b
+    $null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Simpan perubahan sebagai PDF';Fill-Picker '' -Cancel
+    $null=Wait-State {param($s) -not $s.exporting -and $s.transition -eq 'Idle'}
+    Assert-SameWorkspace $original
+    # Empty edited plans still require a decision, but cannot be saved.
+    Invoke 'Seleksi';Invoke 'Pilih semua'
+    $allSelected=Wait-State {param($s) $s.selectedPages -eq 4}
+    Invoke 'Hapus'
+    $null=Wait-State {param($s) $s.pageCount -eq 0 -and $s.dirty}
+    Request-Close;$null=Find 'Simpan perubahan sebelum melanjutkan?'
+    if((Find 'Simpan perubahan sebagai PDF').Current.IsEnabled){throw 'Empty workspace save enabled'}
+    Invoke 'Batal';Invoke 'Undo';Assert-SameWorkspace $allSelected
+    # Only successful full Save As resumes Open, exactly once.
+    $guardSaved=Join-Path $directory 'before-open.pdf'
+    Picker 'Buka PDF';Fill-Picker $b
+    $null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Simpan perubahan sebagai PDF';Fill-Picker $guardSaved
+    $null=Wait-State {param($s) $s.transition -eq 'Idle' -and $s.workspaceInstance -gt $original.workspaceInstance -and -not $s.dirty}
+    if(-not (Test-Path $guardSaved)){throw 'Save-before-open did not publish output'}
+    # Explicit discard closes a dirty viewer; restart only our fixture process.
+    Invoke 'Atur halaman';Invoke 'Putar kanan'
+    $null=Wait-State {param($s) $s.dirty}
+    Request-Close;$null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Buang perubahan'
+    if(-not $app.WaitForExit(10000)){throw 'Discard did not close viewer'}
+    [IO.File]::Delete($metrics)
+    $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-Object Id)
+    $desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'"'),$root,'open',1)
+    $deadline=(Get-Date).AddSeconds(20)
+    do {
+        Start-Sleep -Milliseconds 200
+        $app=Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | Where-Object Id -NotIn $oldIds | Select-Object -First 1
+        if($app){$app.Refresh()}
+    }while((Get-Date) -lt $deadline -and (-not $app -or $app.MainWindowHandle -eq 0))
+    if(-not $app -or $app.MainWindowHandle -eq 0){throw 'Restarted fixture window unavailable'}
+    $null=Wait-State {param($s) $s.transition -eq 'Idle' -and $s.pageCount -eq 4}
+    Open-Pdf $a 4
     Invoke 'Atur halaman'
     Picker 'Impor PDF';Fill-Picker $b
     $null=Wait-State {param($s) $s.sourceCount -eq 2 -and $s.pageCount -eq 8}
@@ -173,6 +259,11 @@ try {
     Open-Pdf $info
     $metadataOutput=Join-Path $directory 'metadata.pdf';$before=(Get-Content -Raw $metrics|ConvertFrom-Json).exportsCompleted
     Picker 'Simpan sebagai';Fill-Picker $metadataOutput
+    # Closing during a native consent dialog waits without cancelling the export.
+    $null=Find 'Metadata dokumen dapat tidak terbawa'
+    Request-Close;$null=Wait-Transition 'WaitingExport'
+    Invoke 'Tetap di aplikasi'
+    $null=Wait-Transition 'Idle'
     Invoke 'Batal'
     $null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and -not $s.exportSuccess}
     if(Test-Path $metadataOutput){throw 'Unapproved metadata output exists'}
@@ -238,6 +329,16 @@ try {
     $ink=$objects.PSObject.Properties['obj:'+$annotations[0]].Value.value
     if($ink.'/Subtype' -ne '/Ink' -or $ink.'/InkList'.Count -ne 1){throw 'Ink was flattened or changed'}
     if((Get-FileHash $taggedSource).Hash -ne $taggedHash){throw 'Tagged source changed'}
+    # A successful pending Extract does not authorize discarding unsaved edits.
+    Invoke 'Putar kanan';$pendingExtract=Wait-State {param($s) $s.dirty}
+    $waitExtract=Join-Path $directory 'wait-extract.pdf'
+    Picker 'Ekstrak halaman';Fill-Picker $waitExtract
+    $null=Find 'Simpan PDF tanpa tag aksesibilitas?'
+    Request-Close;$null=Wait-Transition 'WaitingExport'
+    Invoke 'Simpan tanpa tag'
+    $null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Batal'
+    Assert-SameWorkspace $pendingExtract
+    if(-not (Test-Path $waitExtract)){throw 'Waiting cancelled the running Extract'}
     $form=Join-Path $directory 'form.pdf';Copy-Item (Join-Path $root '.research/export-fixtures/form.pdf') $form
     Open-Pdf $form
     $blocked=Join-Path $directory 'blocked.pdf';$state=Save-Pdf 'Simpan sebagai' $blocked
@@ -280,13 +381,46 @@ try {
     $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 1}
     Picker 'Buka PDF';Fill-Picker $corrupt
     $null=Find 'PDF belum dapat dibuka';Invoke 'Tutup'
-    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 0}
+    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 1 -and $s.transition -eq 'Idle'}
+    Open-Pdf $info
+    # Failed Save As must not execute the pending Open.
+    Open-Pdf $form
+    Invoke 'Atur halaman';Invoke 'Putar kanan'
+    $unsavable=Wait-State {param($s) $s.dirty}
+    Picker 'Buka PDF';Fill-Picker $a
+    $null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Simpan perubahan sebagai PDF'
+    $failedSave=Join-Path $directory 'before-open-blocked.pdf';Fill-Picker $failedSave
+    $null=Find 'PDF belum dapat diekspor';Invoke 'Tutup'
+    Assert-SameWorkspace $unsavable
+    if(Test-Path $failedSave){throw 'Blocked pending save created output'}
     Open-Pdf $info
     if((Get-FileHash $a).Hash -ne $hashA -or (Get-FileHash $b).Hash -ne $hashB){throw 'Originals changed'}
     if(Get-ChildItem $directory -Directory -Filter '.pdf-studio-export-*'){throw 'Owned staging leaked'}
     $state|ConvertTo-Json -Depth 6|Set-Content (Join-Path $directory 'final.json')
-    Write-Host "PASS M3 UI: organizer Save As/Extract/history, metadata/bookmark consent, GPUI Kit export/catalog/import/open error popups and dismiss/recovery, source hashes, cleanup. Evidence: $directory"
+    # Close -> Save As must stay open after refusal, then close only after commit.
+    Invoke 'Atur halaman';Invoke 'Putar kanan'
+    $closing=Wait-State {param($s) $s.dirty}
+    Request-Close;$null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Simpan perubahan sebagai PDF'
+    $closeOutput=Join-Path $directory 'before-close.pdf';Fill-Picker $closeOutput
+    Invoke 'Batal'
+    $null=Wait-State {param($s) -not $s.exporting -and $s.transition -eq 'Idle' -and $s.dirty}
+    Assert-SameWorkspace $closing
+    Request-Close;$null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Simpan perubahan sebagai PDF'
+    Fill-Picker $closeOutput;Invoke 'Lanjutkan'
+    if(-not $app.WaitForExit(20000)){throw 'Save-before-close did not close after commit'}
+    if(-not (Test-Path $closeOutput)){throw 'Save-before-close output missing'}
+    & $qpdf --check $closeOutput | Out-Null;if($LASTEXITCODE -ne 0){throw 'Close output invalid'}
+    if(Get-ChildItem $directory -Directory -Filter '.pdf-studio-export-*'){throw 'Close leaked staging'}
+    Write-Host "PASS M3 UI + unsaved guards: cancellation, candidate errors/change, save-before-open/close, modal focus/locks, empty plan, wait-export, organizer/export regressions, source hashes, cleanup. Evidence: $directory"
 } finally {
-    if(-not $app.HasExited){$null=$app.CloseMainWindow();$null=$app.WaitForExit(5000)}
+    for($cleanupAttempt=0;$cleanupAttempt -lt 3 -and -not $app.HasExited;$cleanupAttempt++){
+        $null=$app.CloseMainWindow();Start-Sleep -Milliseconds 300
+        if(-not $app.HasExited){
+            $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+            $discard=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Buang perubahan'))
+            if($discard){Invoke 'Buang perubahan'}
+        }
+        $null=$app.WaitForExit(1500)
+    }
     if($clipboardSaved){[Windows.Forms.Clipboard]::SetDataObject($clipboardBackup,$true)}else{[Windows.Forms.Clipboard]::Clear()}
 }

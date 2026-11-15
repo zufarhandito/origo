@@ -1,7 +1,7 @@
 use crate::*;
-use gpui_kit::{ListOffset, PathPromptOptions};
+use gpui_kit::ListOffset;
 use pdf_application::{
-    PageRenderer, RenderError, RenderRequest, SourceId, open_document,
+    PageRenderer, RenderError, RenderRequest,
     viewer::{RenderKind, RenderTicket},
 };
 use std::sync::atomic::Ordering;
@@ -74,9 +74,12 @@ impl Viewer {
         self.failures.clear();
     }
     pub(super) fn load(&mut self, path: PathBuf, cx: &mut Context<Self>) {
-        if self.opening {
+        if self.opening || self.edits_locked() {
             return;
         }
+        self.inspect_candidate(path, cx);
+    }
+    pub(super) fn install_workspace(&mut self, workspace: Workspace, cx: &mut Context<Self>) {
         if !self.export.running {
             self.export.notice = None;
         }
@@ -88,47 +91,22 @@ impl Viewer {
         self.source_sequence += 1;
         self.workspace_instance += 1;
         self.page_anchor = None;
-        let id = SourceId(self.source_sequence);
-        let generation = self.generation;
-        self.opening = true;
-        self.workspace = None;
+        self.opening = false;
+        self.workspace = Some(workspace);
         self.navigation = Navigation::default();
         self.clear_bitmaps(cx);
         self.stats = RenderStats::default();
         self.page_list.reset(0);
         self.thumbnail_list.reset(0);
         self.error = None;
-        self.status = "Memeriksa dokumen…".into();
-        let renderer = self.renderer.clone();
-        let task = cx
-            .background_executor()
-            .spawn(async move { open_document(&renderer, &path, id) });
-        cx.spawn(async move |this, cx| {
-            let result = task.await;
-            let _ = this.update(cx, |this, cx| {
-                this.opening = false;
-                if this.generation != generation {
-                    return;
-                }
-                match result {
-                    Ok(workspace) => {
-                        this.navigation.count = workspace.pages().len() as u16;
-                        this.workspace = Some(workspace);
-                        this.visible = 0..1;
-                        this.reset_layout();
-                        this.schedule_current(cx);
-                    }
-                    Err(error) => {
-                        this.error = Some(error.to_string());
-                        this.status = error.to_string();
-                        this.show_error_popup("PDF belum dapat dibuka", error.to_string(), cx);
-                    }
-                }
-                this.report(cx);
-                cx.notify();
-            });
-        })
-        .detach();
+        self.navigation.count = self
+            .workspace
+            .as_ref()
+            .map_or(0, |w| w.pages().len() as u16);
+        self.visible = 0..1;
+        self.reset_layout();
+        self.schedule_current(cx);
+        self.update_status();
         self.report(cx);
         cx.notify();
     }
@@ -635,6 +613,11 @@ impl Viewer {
             ",\"exporting\":{},\"exportsCompleted\":{},\"exportSuccess\":{},\"exportPages\":{}}}",
             self.export.running, self.export.completed, self.export.success, self.export.pages
         ));
+        json.pop();
+        json.push_str(&format!(
+            ",\"transition\":\"{:?}\",\"workspaceInstance\":{}}}",
+            self.transition.phase, self.workspace_instance
+        ));
         cx.background_executor()
             .spawn(async move {
                 if let Ok(_guard) = lock.lock()
@@ -646,29 +629,6 @@ impl Viewer {
             .detach();
     }
     pub(super) fn open(&mut self, _: &Open, _: &mut Window, cx: &mut Context<Self>) {
-        if self.opening {
-            return;
-        }
-        let dialog = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some("Pilih PDF".into()),
-        });
-        cx.spawn(async move |this, cx| match dialog.await {
-            Ok(Ok(Some(paths))) => {
-                if let Some(path) = paths.into_iter().next() {
-                    let _ = this.update(cx, |this, cx| this.load(path, cx));
-                }
-            }
-            Ok(Ok(None)) => {}
-            _ => {
-                let _ = this.update(cx, |this, cx| {
-                    this.status = "Dialog file gagal dibuka.".into();
-                    cx.notify();
-                });
-            }
-        })
-        .detach();
+        self.choose_open(cx);
     }
 }

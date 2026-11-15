@@ -47,7 +47,8 @@ aspect ratio. Visible requests wider than 1024 raster pixels first request a 512
 preview. The preview shares the byte cache and is displayed until the final bitmap
 arrives; obsolete generations still drop both stages. Smaller requests avoid duplicate
 preview work. Already-running native work cannot be preempted. UI item callbacks read cache/layout and defer scheduling; PDF work and
-metrics file writes run outside those callbacks. Optional metrics are numeric only.
+metrics file writes run outside those callbacks. Optional metrics contain counters,
+sizes and fixed operation states, without document paths or content.
 
 See ADR-0005, books.md and testing.md for measured memory and remaining acceptance limits.
 
@@ -94,7 +95,7 @@ presence in this catalog. No converter has been registered or implemented; no pl
 engine crates have been added.
 
 M3 application/export.rs owns immutable plans, preflight/export/output ports, phases,
-cancellation and completion receipts. A workspace instance advances on Open independently
+cancellation and completion receipts. A workspace instance advances on successful replacement independently
 of text invalidation tokens. Only a full committed receipt matching instance and revision
 can update the clean baseline. Selected exports and stale jobs cannot.
 
@@ -108,8 +109,15 @@ bookmark/metadata consent when needed and publishes sanitized notices. Reading/e
 continue against the live workspace; one export runs per window. Policy v2 separates
 bookmark omission from metadata loss, validates ordinary local outline/name trees,
 and requests specific consent before dropping navigation bookmarks. Complex actions
-remain blocked. Closing during a job
-requests cancellation and waits for owned cleanup. PDFium validation remains in-process.
+remain blocked. Closing during a job waits for export, then checks unsaved changes.
+Failed/cancelled exports abandon the pending close. PDFium validation remains in-process.
+
+transitions.rs owns a single Open/Close intent, candidate inspection, the unsaved
+decision and receipt-gated continuation. Replacement is installed only after inspecting
+the candidate and rechecking its fingerprint. Failed/cancelled Open retains the old
+plan/history/reading state. Page edits/history/import and additional exports are
+guarded while leaving; the modal shares the error popup's global input guard.
+See unsaved-changes.md. No domain or export preservation contracts change.
 
 feedback.rs centralizes modal operational errors using GPUI Kit AlertDialog and a
 deferred window update. A per-viewer guard prevents dialog stacking and background

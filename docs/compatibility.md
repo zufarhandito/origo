@@ -5,8 +5,9 @@ page selection, reorder, rotate, delete, import and bounded Undo/Redo are implem
 Save As exports the full plan; Extract exports selected pages in workspace order.
 Both require a new .pdf destination and never overwrite existing files or sources.
 Only a successful full export matching the current workspace instance/revision marks
-that revision clean. Extract and older snapshots do not. Unsaved edits are discarded
-on Open/close; there is no recovery or automatic save prompt. See organizer.md for controls and
+that revision clean. Extract and older snapshots do not. Unsaved edits prompt for
+Save As, discard or cancel on Open/close. Failed/cancelled Open keeps the old workspace.
+There is no autosave/crash recovery; see unsaved-changes.md. See organizer.md for controls and
 aggregate limits. Baca mode is for navigation/text; Atur halaman exposes page operations.
 Mode changes do not mark content dirty. Structural edits explicitly clear text selection and positional caches.
 

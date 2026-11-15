@@ -1,4 +1,4 @@
-﻿# PDF Studio
+# PDF Studio
 
 For the next development chat, read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) first.
 It maps progress to the blueprint, records verification/limitations, and includes
@@ -23,7 +23,9 @@ Use **Simpan sebagai** or **Ctrl+Shift+S** to save the current page plan to a ne
 In **Atur halaman**, **Ekstrak** saves selected pages in their workspace order.
 Existing files are never overwritten; source PDFs remain untouched. Save As marks the
 exported current revision clean, while Extract keeps the workspace's saved status.
-Opening another PDF or closing still discards any unsaved virtual edits.
+Opening another PDF or closing asks to save, discard or cancel when virtual edits are
+unsaved. Failed/cancelled Open preserves the current workspace. See
+[unsaved changes](docs/unsaved-changes.md).
 See [organizer controls and limits](docs/organizer.md).
 See [testing](docs/testing.md), [compatibility](docs/compatibility.md) and
 [architecture](docs/architecture.md) for evidence and remaining limits.
@@ -146,7 +148,7 @@ Optional numeric diagnostics (parent directory must exist):
 ./target/debug/pdf-studio.exe ./tests/fixtures/hundred-pages.pdf --metrics ./.research/metrics.json
 ```
 
-Metrics contain counters and sizes, no document paths or content. See
+Metrics contain counters, sizes and fixed operation states, no document paths or content. See
 [ADR-0005](docs/adr/0005-m1-viewer.md) for cache and scheduler decisions.
 Text extraction and selection details are in [text-selection.md](docs/text-selection.md).
 

@@ -12,11 +12,14 @@ Kebijakan ekspor sekarang v4: whole-source Extract bisa byte-identical; partial
 single-source tagged Extract meminta persetujuan Simpan tanpa tag dan mempertahankan
 passive Ink yang didukung. Bookmark/metadata loss juga memerlukan persetujuan.
 Error memakai popup GPUI Kit dengan selectable text dan tombol Salin pesan.
+Open/close melindungi perubahan yang belum disimpan dengan Simpan sebagai/Buang/Batal;
+Open gagal/batal mempertahankan workspace lama dan Close menunggu ekspor aktif.
 Konversi masih kartu Akan datang, bukan engine yang sudah berfungsi.
 
 Commit implementasi terakhir: 8adf7e9; HEAD dapat lebih baru karena commit handoff.
-Verifikasi terakhir: 37 unit tests, Clippy, native,
-release build dan M3 UI lulus; lihat docs/testing.md, jangan menganggap tes lama baru
+Verifikasi terakhir: 39 unit tests, Clippy, native,
+build debug/release, release M3/M2/chrome dan debug M1 UI lulus; lihat docs/testing.md,
+jangan menganggap tes lama baru
 saja dijalankan. run.cmd memakai release. Jangan menutup sesi pengguna untuk rebuild,
 install ulang toolchain, atau menghapus .tools. Semua toolchain sudah disiapkan di D:.
 

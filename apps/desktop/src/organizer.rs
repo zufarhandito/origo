@@ -19,7 +19,7 @@ impl Viewer {
         extend: bool,
         cx: &mut Context<Self>,
     ) {
-        if self.mode != ViewerMode::Organize {
+        if self.edits_locked() || self.mode != ViewerMode::Organize {
             return;
         }
         let Some(w) = self.workspace.as_mut() else {
@@ -55,7 +55,8 @@ impl Viewer {
     }
     pub(super) fn edit(&mut self, command: Command, cx: &mut Context<Self>) {
         let importing = matches!(command, Command::Import(_));
-        if self.opening || (!importing && self.mode != ViewerMode::Organize) {
+        if self.edits_locked() || self.opening || (!importing && self.mode != ViewerMode::Organize)
+        {
             return;
         }
         let Some(w) = self.workspace.as_mut() else {
@@ -134,7 +135,7 @@ impl Viewer {
             .unwrap_or_default()
     }
     pub(super) fn history(&mut self, redo: bool, cx: &mut Context<Self>) {
-        if self.opening || self.mode == ViewerMode::Convert {
+        if self.edits_locked() || self.opening || self.mode == ViewerMode::Convert {
             return;
         }
         if let Some(w) = &mut self.workspace {
@@ -180,7 +181,7 @@ impl Viewer {
         }
     }
     pub(super) fn import_pdf(&mut self, cx: &mut Context<Self>) {
-        if self.opening || self.workspace.is_none() {
+        if self.edits_locked() || self.opening || self.workspace.is_none() {
             return;
         }
         let dialog = cx.prompt_for_paths(gpui::PathPromptOptions {
@@ -189,17 +190,25 @@ impl Viewer {
             multiple: false,
             prompt: Some("Impor PDF (tambahkan halaman)".into()),
         });
+        self.opening = true;
+        cx.notify();
         cx.spawn(async move |this, cx| {
-            if let Ok(Ok(Some(paths))) = dialog.await
-                && let Some(path) = paths.into_iter().next()
-            {
-                let _ = this.update(cx, |this, cx| this.import_path(path, cx));
-            }
+            let result = dialog.await;
+            let _ = this.update(cx, |this, cx| {
+                this.opening = false;
+                if let Ok(Ok(Some(paths))) = result
+                    && let Some(path) = paths.into_iter().next()
+                {
+                    this.import_path(path, cx);
+                }
+                this.report(cx);
+                cx.notify();
+            });
         })
         .detach();
     }
     fn import_path(&mut self, path: PathBuf, cx: &mut Context<Self>) {
-        if self.opening || self.workspace.is_none() {
+        if self.edits_locked() || self.opening || self.workspace.is_none() {
             return;
         }
         self.opening = true;

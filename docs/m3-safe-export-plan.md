@@ -19,8 +19,9 @@ Implementation notes: preflight reports are bound to owned prepared source copie
 there is no cache. Source fingerprints remain size/mtime, not hashes. QPDF's 120-second
 budget measures cumulative child-process runtime, excluding user dialogs/copying and
 PDFium work. PDFium validation is cooperative, without a hard native-call deadline.
-Save As retains original source references/history. Opening/closing still discards
-unsaved edits without an automatic save/recovery prompt. Destination overwrite,
+Save As retains original source references/history. Open/close now prompts to save,
+discard or cancel unsaved changes; see unsaved-changes.md. There is no autosave.
+Destination overwrite,
 crash-orphan recovery and broader complex-PDF preservation remain outside M3.
 
 ## Starting gap (historical, before M3)

@@ -51,7 +51,7 @@ impl Viewer {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.opening || self.mode == mode {
+        if self.edits_locked() || self.opening || self.mode == mode {
             return;
         }
         cx.stop_active_drag(window);
@@ -74,7 +74,7 @@ impl Viewer {
         cx.notify();
     }
     pub(super) fn select_all_pages(&mut self, all: bool, cx: &mut Context<Self>) {
-        if self.mode != ViewerMode::Organize || self.opening {
+        if self.edits_locked() || self.mode != ViewerMode::Organize || self.opening {
             return;
         }
         if let Some(w) = &mut self.workspace {
@@ -106,7 +106,7 @@ impl Viewer {
             .map(|g| format!("{name}\n{:.0} x {:.0} pt", g.width_points, g.height_points))
             .unwrap_or_else(|| name.clone());
         let weak = cx.weak_entity();
-        let disabled = !available || self.opening;
+        let disabled = !available || self.opening || self.edits_locked();
         let dark = cx.theme().is_dark();
         let more =
             icon("more", IconName::Ellipsis, "Lainnya", "").dropdown_menu(move |menu, _, _| {
@@ -162,7 +162,7 @@ impl Viewer {
                             .h(px(32.))
                             .ghost()
                             .selected(self.mode == ViewerMode::Read)
-                            .disabled(self.opening)
+                            .disabled(self.opening || self.edits_locked())
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.set_mode(ViewerMode::Read, window, cx)
                             })),
@@ -184,7 +184,7 @@ impl Viewer {
                             .h(px(32.))
                             .ghost()
                             .selected(self.mode == ViewerMode::Convert)
-                            .disabled(self.opening)
+                            .disabled(self.opening || self.edits_locked())
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.set_mode(ViewerMode::Convert, window, cx)
                             })),
@@ -197,7 +197,12 @@ impl Viewer {
                         .label("Simpan sebagai")
                         .h(px(32.))
                         .tooltip("Simpan PDF baru - Ctrl+Shift+S")
-                        .disabled(self.opening || self.export.running || self.navigation.count == 0)
+                        .disabled(
+                            self.opening
+                                || self.edits_locked()
+                                || self.export.running
+                                || self.navigation.count == 0,
+                        )
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.start_export(pdf_application::export::ExportScope::All, cx)
                         })),
@@ -220,7 +225,7 @@ impl Viewer {
                     .label("Buka PDF")
                     .h(px(32.))
                     .tooltip("Buka PDF - Ctrl+O")
-                    .disabled(self.opening)
+                    .disabled(self.opening || self.edits_locked())
                     .on_click(cx.listener(|this, _, window, cx| this.open(&Open, window, cx))),
             )
             .child(more)
@@ -434,6 +439,7 @@ impl Viewer {
                         icon("undo", IconName::Undo2, "Undo", "Ctrl+Z")
                             .disabled(
                                 self.opening
+                                    || self.edits_locked()
                                     || !self.workspace.as_ref().is_some_and(|w| w.can_undo()),
                             )
                             .on_click(cx.listener(|this, _, _, cx| this.history(false, cx))),
@@ -442,6 +448,7 @@ impl Viewer {
                         icon("redo", IconName::Redo2, "Redo", "Ctrl+Y")
                             .disabled(
                                 self.opening
+                                    || self.edits_locked()
                                     || !self.workspace.as_ref().is_some_and(|w| w.can_redo()),
                             )
                             .on_click(cx.listener(|this, _, _, cx| this.history(true, cx))),
@@ -477,7 +484,7 @@ impl Viewer {
     }
     pub(super) fn organizer_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let count = self.selected_ids().len();
-        let disabled = count == 0 || self.opening;
+        let disabled = count == 0 || self.opening || self.edits_locked();
         let weak = cx.weak_entity();
         let w2 = weak.clone();
         let move_menu = Button::new("move-pages")
@@ -501,7 +508,7 @@ impl Viewer {
                 )
             });
         let weak = cx.weak_entity();
-        let opening = self.opening;
+        let opening = self.opening || self.edits_locked();
         let selection_menu = Button::new("select-pages")
             .ghost()
             .label("Seleksi")
@@ -537,7 +544,7 @@ impl Viewer {
                     .label("Impor PDF")
                     .h(px(32.))
                     .tooltip("Tambahkan PDF - Ctrl+Shift+O")
-                    .disabled(self.opening)
+                    .disabled(self.opening || self.edits_locked())
                     .on_click(cx.listener(|this, _, _, cx| this.import_pdf(cx))),
             )
             .child(

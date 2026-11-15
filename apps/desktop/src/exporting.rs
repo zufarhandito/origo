@@ -14,7 +14,6 @@ pub(super) struct ExportState {
     pub success: bool,
     pub completed: u64,
     pub pages: usize,
-    pub close_after: bool,
 }
 impl Viewer {
     pub(super) fn cancel_export(&mut self, cx: &mut Context<Self>) {
@@ -31,9 +30,11 @@ impl Viewer {
         self.export.running = false;
         self.export.control = None;
         self.export.completed += 1;
+        let success = result.is_ok();
+        let mut current = false;
         match result {
             Ok(receipt) => {
-                let current = self
+                current = self
                     .workspace
                     .as_mut()
                     .is_some_and(|w| receipt.apply(self.workspace_instance, w));
@@ -61,31 +62,37 @@ impl Viewer {
                     self.export.notice = Some(e.to_string());
                 } else {
                     self.export.notice = None;
-                    if !self.export.close_after {
-                        self.show_error_popup("PDF belum dapat diekspor", e.to_string(), cx);
-                    }
+                    self.show_error_popup("PDF belum dapat diekspor", e.to_string(), cx);
                 }
             }
         }
         self.report(cx);
         cx.notify();
-        if self.export.close_after {
-            let handle = self.window_handle;
-            cx.defer(move |cx| {
-                let _ = handle.update(cx, |_, window, _| window.remove_window());
-            });
-        }
+        self.transition_export_finished(success, current, cx);
     }
     pub(super) fn start_export(&mut self, scope: ExportScope, cx: &mut Context<Self>) {
+        if self.edits_locked() {
+            return;
+        }
+        self.begin_export(scope, cx);
+    }
+    pub(super) fn start_transition_export(&mut self, cx: &mut Context<Self>) {
+        self.begin_export(ExportScope::All, cx);
+    }
+    fn begin_export(&mut self, scope: ExportScope, cx: &mut Context<Self>) {
         if self.export.running || self.opening || self.error_popup {
             return;
         }
         let Some(w) = &self.workspace else {
+            // A source-change result may have invalidated the workspace while
+            // an unsaved-change dialog was open. Never strand its saving intent.
+            self.cancel_transition(cx);
             return;
         };
         let plan = match ExportPlan::capture(w, self.workspace_instance, scope) {
             Ok(p) => p,
             Err(e) => {
+                self.cancel_transition(cx);
                 self.show_error_popup("PDF belum dapat diekspor", e.to_string(), cx);
                 return;
             }

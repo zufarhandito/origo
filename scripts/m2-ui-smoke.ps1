@@ -142,5 +142,13 @@ try {
     $final|ConvertTo-Json -Depth 5|Set-Content (Join-Path $directory 'final.json')
     Write-Host "PASS M2 UI: drag, rotate, move, delete, empty, history, native import, multi-source plan, unchanged sources. Evidence: $directory"
 } finally {
-    if(-not $app.HasExited){$null=$app.CloseMainWindow();if(-not $app.WaitForExit(3000)){$null=$app.CloseMainWindow();$null=$app.WaitForExit(3000)}}
+    if(-not $app.HasExited){
+        $null=$app.CloseMainWindow();Start-Sleep -Milliseconds 400
+        if(-not $app.HasExited){
+            $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+            $discard=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Buang perubahan'))
+            if($discard){Invoke 'Buang perubahan'}
+        }
+        $null=$app.WaitForExit(5000)
+    }
 }
