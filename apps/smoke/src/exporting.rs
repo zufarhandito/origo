@@ -14,6 +14,44 @@ use pdf_platform::{LocalOutput, fingerprint};
 use qpdf_adapter::QpdfExporter;
 use std::{path::Path, process::Command as ProcessCommand};
 
+/// Explicit local verification; user PDFs and outputs never enter tracked fixtures.
+pub fn verify_whole_source_extract(
+    root: &Path,
+    path: &Path,
+    renderer: &PdfiumRenderer,
+) -> Result<()> {
+    let mut workspace = open_document(renderer, path, SourceId(1000))?;
+    let original = std::fs::read(path)?;
+    workspace.select(workspace.pages().iter().map(|p| p.id).collect::<Vec<_>>());
+    let plan = ExportPlan::capture(&workspace, 1, ExportScope::Selected)?;
+    ensure!(plan.is_whole_source_extract(), "Whole-source plan");
+    std::fs::create_dir_all(root.join(".research"))?;
+    let dir = tempfile::tempdir_in(root.join(".research"))?;
+    let dest = dir.path().join("extract.pdf");
+    let exporter = QpdfExporter::new(&root.join("sidecars"));
+    let control = ExportControl::default();
+    let prepared = prepare_export(plan.clone(), &dest, &LocalOutput, &exporter, &control)?;
+    ensure!(
+        !prepared.report.requires_acknowledgement(),
+        "No loss for byte-identical copy"
+    );
+    let receipt = finish_export(prepared, false, &exporter, renderer, &control)?;
+    ensure!(
+        std::fs::read(&dest)? == original,
+        "Copy preserves every source byte"
+    );
+    ensure!(std::fs::read(path)? == original, "Source unchanged");
+    ensure!(
+        !receipt.apply(1, &mut workspace),
+        "Extract does not mark clean"
+    );
+    verify(&plan, &dest, renderer)?;
+    println!(
+        "PASS whole-source Extract: byte-identical PDF, native validation/rendering, unchanged source, cleanup"
+    );
+    Ok(())
+}
+
 fn verify(plan: &ExportPlan, path: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     let output = renderer.inspect(path)?;
     ensure!(output.pages.len() == plan.pages().len(), "M3 output count");
@@ -95,6 +133,35 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     std::fs::write(&a, &bytes_a)?;
     std::fs::write(&b, &bytes_b)?;
     let exporter = QpdfExporter::new(&root.join("sidecars"));
+    let tagged = dir.path().join("empty-form-tagged.pdf");
+    std::fs::write(
+        &tagged,
+        super::synthetic::export_safety_pdf("empty-form-tagged"),
+    )?;
+    verify_whole_source_extract(root, &tagged, renderer)?;
+    let mut changed = open_document(renderer, &tagged, SourceId(490))?;
+    let ids = changed.pages().iter().map(|p| p.id).collect::<Vec<_>>();
+    changed.execute(Command::Rotate {
+        ids: ids.clone(),
+        turns: 1,
+    })?;
+    changed.select(ids);
+    let changed_plan = ExportPlan::capture(&changed, 1, ExportScope::Selected)?;
+    ensure!(
+        !changed_plan.is_whole_source_extract(),
+        "Rotation must not use source copy"
+    );
+    ensure!(
+        prepare_export(
+            changed_plan,
+            &dir.path().join("rotated-tagged.pdf"),
+            &LocalOutput,
+            &exporter,
+            &ExportControl::default()
+        )
+        .is_err(),
+        "Unsupported tagged transforms remain blocked"
+    );
     let mut workspace = open_document(renderer, &a, SourceId(501))?;
     let source_b = open_document(renderer, &b, SourceId(502))?.source().clone();
     workspace.execute(Command::Import(source_b))?;

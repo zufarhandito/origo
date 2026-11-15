@@ -92,6 +92,11 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
 
 fn main() -> Result<()> {
     let root = dunce::canonicalize(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
+    if std::env::args().nth(1).as_deref() == Some("--verify-whole-source-extract") {
+        let path = std::env::args_os().nth(2).context("PDF path required")?;
+        let renderer = PdfiumRenderer::new(&root.join("sidecars"));
+        return exporting::verify_whole_source_extract(&root, &PathBuf::from(path), &renderer);
+    }
     if std::env::args().nth(1).as_deref() == Some("--write-export-fixtures") {
         let dir = root.join(".research/export-fixtures");
         std::fs::create_dir_all(&dir)?;
@@ -100,6 +105,7 @@ fn main() -> Result<()> {
             "info",
             "metadata",
             "form",
+            "empty-form-tagged",
             "signature",
             "tagged",
             "bookmark",

@@ -4,6 +4,12 @@ Status: M3 implemented, 11 November 2026. The conversion hub remains presentatio
 Production PDF Save As/Extract now follow this contract; format converters remain planned.
 See testing.md for actual verification and ADR-0003 for the preservation policy.
 
+Policy v3 adds byte-identical whole-source Extract for a complete, original-order,
+unrotated selection from one source. It preserves rather than drops structures and
+can accept verified empty AcroForm plus tagged structure/viewer preferences. All
+normal checks/atomic-output protections remain. Other plans retain the policy below;
+this does not enable structural edits of tagged PDFs or exports of active forms/XFA.
+
 Implementation notes: preflight reports are bound to owned prepared source copies;
 there is no cache. Source fingerprints remain size/mtime, not hashes. QPDF's 120-second
 budget measures cumulative child-process runtime, excluding user dialogs/copying and

@@ -41,6 +41,9 @@ remains independent. Ordinary local bookmarks can be exported with explicit
 **Simpan tanpa bookmark** consent: navigation bookmarks are omitted from the output.
 Info/XMP metadata also requires consent because it may be lost. Complex bookmark
 actions remain blocked. See [export policy](docs/adr/0003-export-preservation-policy.md).
+Whole-source Extract has a narrow preservation path: selecting every page of one PDF
+without reorder/rotation copies its snapshot byte-for-byte, including supported
+empty-form/tagged documents. Active forms/XFA and structural edits remain restricted.
 The [conversion roadmap](docs/conversion-roadmap.md) separates raster export, text,
 Office layout reconstruction and OCR. It does not assume that the same engine can
 provide every format or that editable Word output will exactly reproduce the PDF.

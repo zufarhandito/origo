@@ -2,6 +2,18 @@
 
 Status: implemented in M3, 11 November 2026. This supersedes the M0-only deferral.
 
+Policy v3 (15 November 2026): a complete, unmodified, single-source selected-page
+Extract may copy the owned snapshot byte-for-byte. The immutable plan must contain
+every original page exactly in source order with zero virtual rotation. This path
+allows tags/StructParents/Tabs, viewer preferences and a verified empty AcroForm
+dictionary containing only Fields, with no XFA or actual fields. Known active content,
+signatures, encryption and other unsupported catalog features remain blocked.
+QPDF structure checks, PDFium validation, source rechecks and non-clobber commit still
+run. Metadata/bookmarks are preserved, so no loss acknowledgement is needed. Partial,
+reordered, rotated, multi-source or full Save As plans retain the structural policy
+below. This exception fixes extraction of a supplied one-page invoice while avoiding
+any flattening, tag stripping or weakened transformation preservation claims.
+
 Save As and selected-page Extract create a new PDF with pinned QPDF 12.4.2.
 Use QPDFJob JSON with empty, consecutive source/page runs in workspace order and
 relative rotations addressed by final output position. Supported page content and

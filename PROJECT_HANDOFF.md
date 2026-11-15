@@ -1,3 +1,38 @@
+# Current update - whole-source invoice Extract (15 November 2026)
+
+- User supplied a one-page invoice failing Extract page 1. Read-only inspection found
+  clean QPDF structure, no encryption, AcroForm with only empty Fields/no XFA, plus
+  tagged structure, viewer preferences, page StructParents/Tabs and empty Annots.
+  No invoice text/content was printed or added to tracked fixtures.
+- Policy v3 adds ExportPlan::is_whole_source_extract: Selected scope, one referenced
+  source, every source page in original order, zero virtual rotation. Only that plan
+  may copy the private snapshot byte-for-byte, preserving its tags/metadata/catalog.
+  Partial/rotated/reordered/multi-source and Save As plans retain the strict policy.
+- Application now calls ExportPreflight::preflight_plan (default delegates to existing
+  preflight). QPDF's copy-only preflight accepts the narrow empty AcroForm/tags/viewer
+  preferences/page tag attributes; active forms, XFA, signatures, encryption, actions
+  and other unknown catalog features still fail closed. No flattening or tag stripping.
+- QPDF writer copies only the staged snapshot with 64 KiB buffers, size bound and
+  cancellation checks. Normal QPDF/PDFium validation, source recheck and no-clobber
+  commit still run. No metadata/bookmark warning is needed for identical bytes.
+  Extract still never advances the clean baseline. Plan/prepared-plan fields are
+  private so the selected mode cannot change after preflight.
+- Verification passed: formatting, workspace/all-target denied-warning Clippy,
+  35 unit tests, full debug native smoke, and debug/release actual-invoice verification.
+  Both actual-file checks produced identical output/source bytes and validated native
+  page geometry, text and sampled raster. The original source hash stayed unchanged.
+  Temporary outputs were owned/cleaned; no user PDF is committed.
+- Release workspace build and M3 headed regression passed, including the matching
+  synthetic tagged/empty-form whole-source Extract and output/source hash equality.
+  Evidence: .research/m3-ui-e453bedfe89b411cab9338b41a136ca6.
+- Optional local reproduction: pdf-smoke --verify-whole-source-extract <PDF path>.
+  This reads the supplied source and validates a temporary output inside .research;
+  it does not publish a user output file. Synthetic fixture: empty-form-tagged.pdf.
+- Existing user windows were preserved by verified in-workspace executable rename.
+  run.cmd launches the new release. Old windows retain old code and their own edits.
+  Earlier GitHub push destination confirmation remains pending; do not bypass it.
+
+---
 # Current update - selectable/copyable error messages (15 November 2026)
 
 - Error popup body now uses GPUI Kit base::SelectableText for literal plain text,

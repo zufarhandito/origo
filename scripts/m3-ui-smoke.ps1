@@ -206,6 +206,12 @@ try {
         if($output.qpdf[1].PSObject.Properties[$key].Value.value.'/Rotate' -ne 90){throw 'Bookmark export lost rotation'}
         if((Get-FileHash $bookmark).Hash -ne $bookmarkHash){throw 'Bookmark source changed'}
     }
+    $copySource=Join-Path $directory 'empty-form-tagged.pdf';Copy-Item (Join-Path $root '.research/export-fixtures/empty-form-tagged.pdf') $copySource
+    $copyHash=(Get-FileHash $copySource).Hash
+    Open-Pdf $copySource;Invoke 'Atur halaman'
+    $copyOutput=Join-Path $directory 'whole-source-extract.pdf';$state=Save-Pdf 'Ekstrak halaman' $copyOutput
+    if(-not $state.exportSuccess -or $state.exportPages -ne 1){throw 'Whole-source extract failed'}
+    if((Get-FileHash $copyOutput).Hash -ne $copyHash -or (Get-FileHash $copySource).Hash -ne $copyHash){throw 'Whole-source extraction changed PDF structure or source'}
     $form=Join-Path $directory 'form.pdf';Copy-Item (Join-Path $root '.research/export-fixtures/form.pdf') $form
     Open-Pdf $form
     $blocked=Join-Path $directory 'blocked.pdf';$state=Save-Pdf 'Simpan sebagai' $blocked

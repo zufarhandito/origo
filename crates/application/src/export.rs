@@ -61,9 +61,9 @@ pub struct ExportPage {
 }
 #[derive(Clone)]
 pub struct ExportPlan {
-    pub instance: u64,
-    pub revision: u64,
-    pub scope: ExportScope,
+    instance: u64,
+    revision: u64,
+    scope: ExportScope,
     pages: Vec<ExportPage>,
     sources: Vec<SourceDocument>,
 }
@@ -114,6 +114,18 @@ impl ExportPlan {
     }
     pub fn sources(&self) -> &[SourceDocument] {
         &self.sources
+    }
+    /// Extracting every page of one source, in original order and orientation,
+    /// can preserve that PDF byte-for-byte instead of rebuilding its catalog.
+    pub fn is_whole_source_extract(&self) -> bool {
+        self.scope == ExportScope::Selected
+            && self.sources.len() == 1
+            && self.pages.len() == self.sources[0].geometries.len()
+            && self.pages.iter().enumerate().all(|(index, page)| {
+                page.entry.source_id == self.sources[0].id
+                    && usize::from(page.entry.source_page_index) == index
+                    && page.entry.rotation_delta == 0
+            })
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -208,7 +220,7 @@ pub struct PreflightReport {
     pub bookmarks_loss: bool,
     pub policy_version: u32,
 }
-pub const EXPORT_POLICY_VERSION: u32 = 2;
+pub const EXPORT_POLICY_VERSION: u32 = 3;
 impl PreflightReport {
     pub fn requires_acknowledgement(&self) -> bool {
         self.metadata_loss || self.bookmarks_loss
@@ -242,6 +254,14 @@ impl PreflightReport {
     }
 }
 pub trait ExportPreflight {
+    fn preflight_plan(
+        &self,
+        _plan: &ExportPlan,
+        sources: &[SourceDocument],
+        control: &ExportControl,
+    ) -> Result<PreflightReport, ExportError> {
+        self.preflight(sources, control)
+    }
     fn preflight(
         &self,
         sources: &[SourceDocument],
@@ -276,7 +296,7 @@ pub trait AtomicOutput {
     ) -> Result<Self::Transaction, ExportError>;
 }
 pub struct PreparedExport<T> {
-    pub plan: ExportPlan,
+    plan: ExportPlan,
     pub report: PreflightReport,
     transaction: T,
 }
@@ -305,7 +325,7 @@ pub fn prepare_export<O: AtomicOutput>(
     control.set_phase(ExportPhase::Snapshot);
     let transaction = output.stage(&plan, destination, control)?;
     control.set_phase(ExportPhase::Preflight);
-    let report = preflight.preflight(transaction.sources(), control)?;
+    let report = preflight.preflight_plan(&plan, transaction.sources(), control)?;
     control.checkpoint()?;
     Ok(PreparedExport {
         plan,
@@ -458,6 +478,31 @@ mod tests {
             ExportPlan::capture(&w, 7, ExportScope::All),
             Err(ExportError::Empty)
         ));
+        Ok(())
+    }
+    #[test]
+    fn source_copy_requires_complete_selected_original_order_and_orientation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut w = workspace()?;
+        let ids = w.pages().iter().map(|p| p.id).collect::<Vec<_>>();
+        w.select(ids.clone());
+        assert!(ExportPlan::capture(&w, 1, ExportScope::Selected)?.is_whole_source_extract());
+        assert!(!ExportPlan::capture(&w, 1, ExportScope::All)?.is_whole_source_extract());
+        w.select([ids[0]]);
+        assert!(!ExportPlan::capture(&w, 1, ExportScope::Selected)?.is_whole_source_extract());
+        w.select(ids.clone());
+        w.execute(Command::Rotate {
+            ids: vec![ids[0]],
+            turns: 1,
+        })?;
+        assert!(!ExportPlan::capture(&w, 1, ExportScope::Selected)?.is_whole_source_extract());
+        w.undo();
+        w.execute(Command::Move {
+            ids: vec![ids[2]],
+            target: 0,
+        })?;
+        w.select(ids);
+        assert!(!ExportPlan::capture(&w, 1, ExportScope::Selected)?.is_whole_source_extract());
         Ok(())
     }
     struct Transaction {

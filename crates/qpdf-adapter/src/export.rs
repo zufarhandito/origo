@@ -45,10 +45,28 @@ impl QpdfExporter {
     }
 }
 impl ExportPreflight for QpdfExporter {
+    fn preflight_plan(
+        &self,
+        plan: &ExportPlan,
+        sources: &[SourceDocument],
+        control: &ExportControl,
+    ) -> Result<PreflightReport, ExportError> {
+        self.preflight_mode(sources, control, plan.is_whole_source_extract())
+    }
     fn preflight(
         &self,
         sources: &[SourceDocument],
         control: &ExportControl,
+    ) -> Result<PreflightReport, ExportError> {
+        self.preflight_mode(sources, control, false)
+    }
+}
+impl QpdfExporter {
+    fn preflight_mode(
+        &self,
+        sources: &[SourceDocument],
+        control: &ExportControl,
+        source_copy: bool,
     ) -> Result<PreflightReport, ExportError> {
         self.version(control)?;
         let mut metadata_loss = false;
@@ -90,7 +108,11 @@ impl ExportPreflight for QpdfExporter {
             }
             let parsed: Value =
                 serde_json::from_slice(&out.stdout).map_err(|_| ExportError::Inspection)?;
-            let report = crate::preflight::inspect_json(&parsed, source.geometries.len())?;
+            let report = if source_copy {
+                crate::preflight::inspect_source_copy(&parsed, source.geometries.len())?
+            } else {
+                crate::preflight::inspect_json(&parsed, source.geometries.len())?
+            };
             metadata_loss |= report.metadata_loss;
             bookmarks_loss |= report.bookmarks_loss;
             if fingerprint(&source.path)? != source.fingerprint {
@@ -167,6 +189,33 @@ impl PdfExporter for QpdfExporter {
         work: &Path,
         control: &ExportControl,
     ) -> Result<(), ExportError> {
+        if plan.is_whole_source_extract() {
+            use std::io::{Read, Write};
+            let source = resolve_source(sources, plan.sources()[0].id)?;
+            let mut input =
+                std::fs::File::open(&source.path).map_err(|_| ExportError::SourceChanged)?;
+            let mut target = std::fs::File::create(output).map_err(|_| ExportError::Io)?;
+            let mut buffer = [0; 65536];
+            let mut copied = 0;
+            loop {
+                control.checkpoint()?;
+                let size = input.read(&mut buffer).map_err(|_| ExportError::Io)?;
+                if size == 0 {
+                    break;
+                }
+                copied += size as u64;
+                if copied > source.fingerprint.bytes {
+                    return Err(ExportError::SourceChanged);
+                }
+                target
+                    .write_all(&buffer[..size])
+                    .map_err(|_| ExportError::Io)?;
+            }
+            if copied != source.fingerprint.bytes {
+                return Err(ExportError::SourceChanged);
+            }
+            return Ok(());
+        }
         self.version(control)?;
         let bytes = serde_json::to_vec(&job(plan, sources, output)?)
             .map_err(|_| ExportError::InvalidPlan)?;

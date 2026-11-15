@@ -70,6 +70,14 @@ No implicit flattening,
 decryption, signature stripping or rasterization is performed. Supported pages retain
 PDF content/resources, but universal semantic preservation is not claimed.
 
+Policy v3 adds a narrow whole-source Extract path: selecting every page of one source
+in its original order with no virtual rotation produces a byte-identical copy from
+the private snapshot. It can preserve tags, viewer preferences and an AcroForm that
+contains only an empty Fields array, without dropping metadata/bookmarks or requesting
+loss consent. Active fields, XFA, signatures, encryption and active content remain
+blocked. This is not support for restructuring tagged/form PDFs: partial selection,
+rotation/reorder and Save As still use the conservative structural-export policy.
+
 Private source copies and staged output are owned by the job in the destination folder.
 QPDF checks and PDFium count/geometry/orientation validation precede a flushed
 non-clobber commit. Source size/mtime is rechecked, including before publication.

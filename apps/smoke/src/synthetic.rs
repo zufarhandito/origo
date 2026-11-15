@@ -163,6 +163,16 @@ pub fn export_safety_pdf(feature: &str) -> Vec<u8> {
             vec![b"<< /Fields [] >>".to_vec()],
             "",
         ),
+        "empty-form-tagged" => (
+            "/AcroForm 6 0 R /StructTreeRoot 7 0 R /MarkInfo << /Marked true >> /ViewerPreferences << /DisplayDocTitle true >>",
+            "/StructParents 0 /Tabs /S /Annots []",
+            vec![
+                b"<< /Fields [] >>".to_vec(),
+                b"<< /Type /StructTreeRoot /K [8 0 R] /ParentTree 9 0 R >>".to_vec(),
+                b"<< /Type /StructElem /S /P /P 7 0 R /Pg 4 0 R /K 0 >>".to_vec(),
+                b"<< /Nums [0 [8 0 R]] >>".to_vec(),
+            ], "",
+        ),
         "signature" => (
             "/Perms << /DocMDP 6 0 R >>",
             "",
@@ -259,7 +269,12 @@ pub fn export_safety_pdf(feature: &str) -> Vec<u8> {
         "unknown" => ("/FutureFeature true", "", vec![], ""),
         _ => ("", "", vec![], ""),
     };
-    let mut objects=vec![format!("<< /Type /Catalog /Pages 2 0 R {catalog} >>").into_bytes(),b"<< /Type /Pages /Kids [4 0 R] /Count 1 >>".to_vec(),b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R {page} >>").into_bytes(),stream("",b"BT /F1 12 Tf 20 80 Td (SAFE) Tj ET")];
+    let contents: &[u8] = if feature == "empty-form-tagged" {
+        b"/P << /MCID 0 >> BDC BT /F1 12 Tf 20 80 Td (SAFE) Tj ET EMC"
+    } else {
+        b"BT /F1 12 Tf 20 80 Td (SAFE) Tj ET"
+    };
+    let mut objects=vec![format!("<< /Type /Catalog /Pages 2 0 R {catalog} >>").into_bytes(),b"<< /Type /Pages /Kids [4 0 R] /Count 1 >>".to_vec(),b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R {page} >>").into_bytes(),stream("",contents)];
     objects.extend(extra);
     assemble_trailer(&objects, trailer)
 }

@@ -13,7 +13,7 @@ fn object<'a>(
         .and_then(|v| v.get("value"))
         .ok_or(ExportError::Inspection)
 }
-fn forbidden(v: &Value) -> Result<(), ExportError> {
+fn forbidden(v: &Value, source_copy: bool) -> Result<(), ExportError> {
     match v {
         Value::Object(dict) => {
             for (key, value) in dict {
@@ -30,10 +30,14 @@ fn forbidden(v: &Value) -> Result<(), ExportError> {
                         | "/RichMedia"
                         | "/OC"
                         | "/OCProperties"
-                        | "/StructTreeRoot"
                 ) {
                     return Err(ExportError::Unsupported(
                         "signature, form, tag, aksi aktif, lampiran atau konten kompleks belum didukung.",
+                    ));
+                }
+                if key == "/StructTreeRoot" && !source_copy {
+                    return Err(ExportError::Unsupported(
+                        "struktur aksesibilitas belum didukung untuk penyusunan ulang PDF.",
                     ));
                 }
                 if key == "/Annots" && !value.as_array().is_some_and(|a| a.is_empty()) {
@@ -70,12 +74,12 @@ fn forbidden(v: &Value) -> Result<(), ExportError> {
                         "dokumen memiliki aksi atau tautan interaktif.",
                     ));
                 }
-                forbidden(value)?;
+                forbidden(value, source_copy)?;
             }
         }
         Value::Array(array) => {
             for value in array {
-                forbidden(value)?;
+                forbidden(value, source_copy)?;
             }
         }
         _ => {}
@@ -88,6 +92,7 @@ fn walk_tree(
     seen: &mut HashSet<String>,
     pages: &mut Vec<String>,
     depth: usize,
+    source_copy: bool,
 ) -> Result<usize, ExportError> {
     if depth > 64 {
         return Err(ExportError::ResourceLimit);
@@ -119,7 +124,10 @@ fn walk_tree(
                 "/ArtBox",
                 "/Annots",
             ];
-            if node.keys().any(|k| !KEYS.contains(&k.as_str())) {
+            if node.keys().any(|k| {
+                !KEYS.contains(&k.as_str())
+                    && !(source_copy && matches!(k.as_str(), "/StructParents" | "/Tabs"))
+            }) {
                 return Err(ExportError::Unsupported(
                     "atribut halaman di luar kebijakan ekspor awal.",
                 ));
@@ -149,7 +157,7 @@ fn walk_tree(
                 .ok_or(ExportError::Inspection)?;
             let mut count = 0;
             for kid in kids {
-                count += walk_tree(objects, kid, seen, pages, depth + 1)?;
+                count += walk_tree(objects, kid, seen, pages, depth + 1, source_copy)?;
             }
             if node.get("/Count").and_then(Value::as_u64) != Some(count as u64) {
                 return Err(ExportError::Inspection);
@@ -162,6 +170,19 @@ fn walk_tree(
 pub(super) fn inspect_json(
     json: &Value,
     page_count: usize,
+) -> Result<PreflightReport, ExportError> {
+    inspect(json, page_count, false)
+}
+pub(super) fn inspect_source_copy(
+    json: &Value,
+    page_count: usize,
+) -> Result<PreflightReport, ExportError> {
+    inspect(json, page_count, true)
+}
+fn inspect(
+    json: &Value,
+    page_count: usize,
+    source_copy: bool,
 ) -> Result<PreflightReport, ExportError> {
     if json.get("version").and_then(Value::as_u64) != Some(2)
         || json.pointer("/qpdf/0/jsonversion").and_then(Value::as_u64) != Some(2)
@@ -178,6 +199,7 @@ pub(super) fn inspect_json(
         .and_then(Value::as_bool)
     {
         Some(false) => {}
+        Some(true) if source_copy => {}
         Some(true) => return Err(ExportError::Unsupported("AcroForm/XFA belum didukung.")),
         None => return Err(ExportError::Inspection),
     }
@@ -186,7 +208,9 @@ pub(super) fn inspect_json(
         .and_then(Value::as_array)
         .is_some_and(|a| a.is_empty())
     {
-        return Err(ExportError::Inspection);
+        return Err(ExportError::Unsupported(
+            "PDF memiliki field form aktif; ekspor AcroForm/XFA belum didukung.",
+        ));
     }
     let outlines = json
         .get("outlines")
@@ -211,6 +235,34 @@ pub(super) fn inspect_json(
     .as_object()
     .ok_or(ExportError::Inspection)?;
     if catalog.get("/Type").and_then(Value::as_str) != Some("/Catalog") {
+        return Err(ExportError::Inspection);
+    }
+    if source_copy && let Some(form) = catalog.get("/AcroForm") {
+        let form = if form.is_object() {
+            form
+        } else {
+            object(objects, form)?
+        };
+        let dict = form.as_object().ok_or(ExportError::Inspection)?;
+        let fields = dict.get("/Fields").ok_or(ExportError::Inspection)?;
+        let fields = if fields.is_array() {
+            fields
+        } else {
+            object(objects, fields)?
+        };
+        if dict.keys().any(|k| k != "/Fields") || !fields.as_array().is_some_and(|f| f.is_empty()) {
+            return Err(ExportError::Unsupported(
+                "hanya AcroForm kosong tanpa XFA yang dapat disalin utuh.",
+            ));
+        }
+    }
+    if source_copy
+        && json
+            .pointer("/acroform/hasacroform")
+            .and_then(Value::as_bool)
+            == Some(true)
+        && !catalog.contains_key("/AcroForm")
+    {
         return Err(ExportError::Inspection);
     }
     // Report the actual unsupported feature instead of suggesting that every
@@ -258,6 +310,14 @@ pub(super) fn inspect_json(
         ),
     ] {
         if catalog.contains_key(key) {
+            if source_copy
+                && matches!(
+                    key,
+                    "/AcroForm" | "/StructTreeRoot" | "/MarkInfo" | "/ViewerPreferences"
+                )
+            {
+                continue;
+            }
             return Err(ExportError::Unsupported(reason));
         }
     }
@@ -272,7 +332,14 @@ pub(super) fn inspect_json(
         "/Names",
         "/Dests",
     ];
-    if let Some(key) = catalog.keys().find(|k| !CATALOG_KEYS.contains(&k.as_str())) {
+    if let Some(key) = catalog.keys().find(|k| {
+        !CATALOG_KEYS.contains(&k.as_str())
+            && !(source_copy
+                && matches!(
+                    k.as_str(),
+                    "/AcroForm" | "/StructTreeRoot" | "/MarkInfo" | "/ViewerPreferences"
+                ))
+    }) {
         // Only a short PDF attribute name reaches the UI, never QPDF diagnostics
         // or the object's value. Nothing is added to production metrics/logs.
         let attribute: String = key
@@ -289,6 +356,7 @@ pub(super) fn inspect_json(
         &mut HashSet::new(),
         &mut tree_pages,
         0,
+        source_copy,
     )?;
     let pages = json
         .get("pages")
@@ -307,7 +375,7 @@ pub(super) fn inspect_json(
         bookmarks::inspect(catalog, objects, &tree_pages, outlines)?;
     for (id, value) in objects {
         if !checked_bookmarks.contains(id) {
-            forbidden(value)?;
+            forbidden(value, source_copy)?;
         }
     }
     if let Some(info) = trailer.get("/Info")
@@ -327,8 +395,9 @@ pub(super) fn inspect_json(
         }
     }
     Ok(PreflightReport {
-        metadata_loss: trailer.contains_key("/Info") || catalog.contains_key("/Metadata"),
-        bookmarks_loss,
+        metadata_loss: !source_copy
+            && (trailer.contains_key("/Info") || catalog.contains_key("/Metadata")),
+        bookmarks_loss: !source_copy && bookmarks_loss,
         policy_version: pdf_application::export::EXPORT_POLICY_VERSION,
     })
 }
@@ -360,6 +429,54 @@ mod tests {
         let mut v = json();
         v["qpdf"][1]["trailer"]["value"]["/Info"] = serde_json::json!("4 0 R");
         assert!(inspect_json(&v, 1).is_err());
+    }
+    #[test]
+    fn whole_source_copy_preserves_tags_but_does_not_allow_active_forms_or_actions()
+    -> Result<(), ExportError> {
+        let mut v = json();
+        v["acroform"]["hasacroform"] = serde_json::json!(true);
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/AcroForm"] = serde_json::json!("4 0 R");
+        v["qpdf"][1]["obj:4 0 R"] = serde_json::json!({"value":{"/Fields":[]}});
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/StructTreeRoot"] = serde_json::json!("5 0 R");
+        v["qpdf"][1]["obj:5 0 R"] =
+            serde_json::json!({"value":{"/Type":"/StructTreeRoot","/K":[]}});
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/MarkInfo"] = serde_json::json!({"/Marked":true});
+        v["qpdf"][1]["obj:1 0 R"]["value"]["/ViewerPreferences"] =
+            serde_json::json!({"/DisplayDocTitle":true});
+        v["qpdf"][1]["obj:3 0 R"]["value"]["/StructParents"] = serde_json::json!(0);
+        v["qpdf"][1]["obj:3 0 R"]["value"]["/Tabs"] = serde_json::json!("/S");
+        assert!(!inspect_source_copy(&v, 1)?.requires_acknowledgement());
+        assert!(
+            inspect_json(&v, 1).is_err(),
+            "Transforms still require strict policy"
+        );
+        for (key, value) in [
+            ("/Fields", serde_json::json!(["6 0 R"])),
+            ("/XFA", serde_json::json!("6 0 R")),
+            ("/SigFlags", serde_json::json!(3)),
+        ] {
+            let mut bad = v.clone();
+            bad["qpdf"][1]["obj:4 0 R"]["value"][key] = value;
+            assert!(inspect_source_copy(&bad, 1).is_err());
+        }
+        for (key, value) in [
+            (
+                "/OpenAction",
+                serde_json::json!({"/S":"/JavaScript","/JS":"u:void 0"}),
+            ),
+            ("/Perms", serde_json::json!({})),
+        ] {
+            let mut bad = v.clone();
+            bad["qpdf"][1]["obj:1 0 R"]["value"][key] = value;
+            assert!(inspect_source_copy(&bad, 1).is_err());
+        }
+        let mut bad = v.clone();
+        bad["encrypt"]["encrypted"] = serde_json::json!(true);
+        assert!(inspect_source_copy(&bad, 1).is_err());
+        let mut bad = v;
+        bad["acroform"]["fields"] = serde_json::json!([{}]);
+        assert!(inspect_source_copy(&bad, 1).is_err());
+        Ok(())
     }
     #[test]
     fn catalog_rejections_identify_the_actual_attribute() {

@@ -1,3 +1,31 @@
+# Latest verification - whole-source Extract, 15 November 2026
+
+- Read-only inspection of the user's supplied one-page invoice found an empty
+  AcroForm (only Fields, zero field summaries, no XFA), tags, viewer preferences and
+  page-level StructParents/Tabs. QPDF check returned 0. No user contents or file copy
+  were added to tracked fixtures; outputs lived only in owned temporary directories.
+- Workspace/all-target denied-warning Clippy, formatting and **35 unit tests** passed.
+  New cases cover original-order/full-selection eligibility, rejection after partial
+  selection/reorder/rotation, copy-only tag acceptance and rejection of active fields,
+  XFA, signature flags, encryption and document actions. Immutable plan fields prevent
+  strategy changes after the source preflight.
+- Full debug native suite passed existing M1/text/M3 checks plus a matching synthetic
+  tagged/empty-form whole-source Extract. Output equals every original byte, and
+  rotated tagged extraction remains blocked rather than stripping structures.
+- Explicit debug and release verification against the supplied invoice passed:
+  identical output bytes, unchanged source bytes, QPDF/PDFium checks, page text and
+  sampled raster comparison. Temporary outputs were removed. Source SHA-256 checked
+  independently before/after and remained unchanged. No actual invoice screenshot or
+  contents were captured in acceptance evidence.
+- Release workspace build and expanded headed M3 suite passed, including UI selection
+  and Extract of the matching one-page fixture, identical output/source hashes, and
+  existing Save As/Extract/history/consent/error-popup/copy/recovery/cleanup checks.
+  Evidence: .research/m3-ui-e453bedfe89b411cab9338b41a136ca6.
+- Existing user processes were retained during rebuild. No installation, new native
+  engine, format converter, remote CI or push occurred. This is a narrow complete-
+  source extraction path, not general form/tag-preserving structural editing.
+
+---
 # Latest verification - selectable error text, 15 November 2026
 
 - Popup error body now uses GPUI Kit SelectableText for plain literal text. The

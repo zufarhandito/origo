@@ -117,6 +117,14 @@ text selection; on_close restores interaction. Export cancellations remain non-m
 Catalog preflight reports feature-specific reasons or a bounded sanitized unknown
 attribute name, without exposing object contents or raw QPDF diagnostics.
 
+ExportPlan::is_whole_source_extract recognizes only complete, original-order,
+unrotated selections from a single source. ExportPreflight::preflight_plan defaults
+to normal source preflight; QPDF additionally validates a restricted copy-only mode.
+The writer copies the staged snapshot with bounded buffers/cancellation, then uses
+the same validation/transaction/receipt pipeline. Plan fields and the prepared plan
+are private to keep the chosen mode immutable. Copy-only preflight preserves tagged
+structure, viewer preferences and verified empty AcroForm instead of rebuilding them.
+
 See m3-safe-export-plan.md and ADR-0003 for policy and known limits.
 conversion-roadmap.md reserves separate
 structural-PDF, raster, text, reflow/Office and OCR adapter boundaries, sharing snapshots
