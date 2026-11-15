@@ -1,6 +1,10 @@
 //! Modal error feedback shared by file, organizer and export operations.
 use crate::*;
-use gpui::component::{WindowExt, dialog::DialogButtonProps};
+use gpui::component::{
+    WindowExt,
+    button::{Button, ButtonVariants},
+    dialog::DialogFooter,
+};
 
 impl Viewer {
     pub(super) fn show_error_popup(
@@ -23,6 +27,8 @@ impl Viewer {
             let _ = handle.update(cx, |_, window, cx| {
                 window.open_alert_dialog(cx, move |dialog, _, _| {
                     let weak = weak.clone();
+                    let close_view = weak.clone();
+                    let copy_message = message.clone();
                     dialog
                         .title(
                             gpui::div()
@@ -39,11 +45,38 @@ impl Viewer {
                                 .id("operation-error-message")
                                 .role(gpui::Role::Group)
                                 .aria_label(message.clone())
-                                .child(message.clone()),
+                                .child(gpui::base::SelectableText::new(
+                                    "selectable-error-message",
+                                    message.clone(),
+                                )),
                         )
                         .centered()
                         .width(px(520.))
-                        .button_props(DialogButtonProps::default().ok_text("Tutup"))
+                        .footer(
+                            DialogFooter::new()
+                                .child(
+                                    Button::new("copy-error-message")
+                                        .ghost()
+                                        .label("Salin pesan")
+                                        .on_click(move |_, _, cx| {
+                                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+                                                copy_message.clone(),
+                                            ));
+                                        }),
+                                )
+                                .child(
+                                    Button::new("close-error-message")
+                                        .primary()
+                                        .label("Tutup")
+                                        .on_click(move |_, window, cx| {
+                                            window.close_dialog(cx);
+                                            let _ = close_view.update(cx, |this, cx| {
+                                                this.error_popup = false;
+                                                cx.notify();
+                                            });
+                                        }),
+                                ),
+                        )
                         .on_close(move |_, _, cx| {
                             let _ = weak.update(cx, |this, cx| {
                                 this.error_popup = false;

@@ -1,3 +1,28 @@
+# Latest verification - selectable error text, 15 November 2026
+
+- Popup error body now uses GPUI Kit SelectableText for plain literal text. The
+  Salin pesan button copies the complete original reason without dismissing the
+  dialog. Tutup has a direct accessible callback and restores the modal guard.
+- Desktop all-target Clippy with denied warnings and the release build passed.
+  No backend/domain/dependency changes were made; full unit/native-only suites
+  were not repeated for this UI-only fix.
+- Final release M3 UI suite passed: drag selection over the error body, visible
+  highlight (screenshot inspected), exact clipboard text after Salin pesan, popup
+  remaining open, Tutup/repeated error recovery, plus existing Save As/Extract/
+  history/bookmark consent/catalog/import/Open/source-hash/staging checks.
+  Evidence: .research/m3-ui-dbb145fcc2394193b732bb34be6e2fb5/error-popup.png.
+  Original clipboard formats were restored. Input targeted only the test's HWND.
+- Tests wait for modal entrance/hover before dragging and modal exit before further
+  input. Open waits for a new workspace generation/source identity, including when
+  recovering from an empty state. Intermediate failed attempts exposed an accessible
+  footer callback issue and stale/empty-state assumptions in the harness; they are
+  not counted as passing acceptance. The final rerun above completed successfully.
+- Existing user windows were preserved by an in-workspace executable rename before
+  rebuilding. run.cmd launches the new release; existing windows keep old code.
+  This change does not alter export preservation policy or resolve the user's
+  separate unknown-catalog PDF. No remote CI, installation or push was performed.
+
+---
 # Latest verification - GPUI Kit error popups, 12 November 2026
 
 - scripts/check.ps1 passed fmt, workspace/all-target denied-warning Clippy,

@@ -1,3 +1,28 @@
+# Current update - selectable/copyable error messages (15 November 2026)
+
+- Error popup body now uses GPUI Kit base::SelectableText for literal plain text,
+  preserving the accessible message group. Users can drag-select the actual reason.
+- Salin pesan copies the complete original reason and keeps the popup open. Tutup
+  closes the modal directly and resets the viewer guard; on_close also handles
+  the normal dialog close lifecycle. The body is not parsed as Markdown/HTML.
+- Avoid DialogAction wrapping a child Button with no on_click in this footer:
+  UIA Invoke on the child does not bubble to the wrapper. The final Tutup button
+  has its own callback, so accessible activation works as well as pointer input.
+- M3 headed harness now saves/restores clipboard, drags over the error body after
+  entrance animation and hover settle, captures selection, asserts exact copied
+  text and checks that copying leaves the popup open. It waits for modal exit and
+  new workspace generation/source identity on Open, including empty-state recovery.
+- Desktop all-target denied-warning Clippy and release build passed. Full release
+  M3 UI passed including visible drag selection, exact clipboard copy, Tutup and
+  repeated popup/Open/import recovery. Clipboard restored. Evidence:
+  .research/m3-ui-dbb145fcc2394193b732bb34be6e2fb5/error-popup.png (inspected).
+  See docs/testing.md. Existing user
+  sessions were preserved; run.cmd uses the new release, old windows retain old code.
+- This change does not broaden PDF export policy or resolve the previously reported
+  unknown catalog document. The PDF/path is still needed for that separate issue.
+  GitHub push confirmation remains pending as described in older notes below.
+
+---
 # Current update - GPUI Kit error popups and catalog diagnostics (12 November 2026)
 
 - User reported the generic catalog blocker and requested error popups. Shared

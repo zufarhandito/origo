@@ -4,6 +4,7 @@ $root=Split-Path $PSScriptRoot -Parent
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type 'using System;using System.Runtime.InteropServices;public static class M3Capture{[StructLayout(LayoutKind.Sequential)]public struct Rect{public int L,T,R,B;}[DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out Rect r);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint flags);}'
 $directory=Join-Path $root ('.research/m3-ui-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $directory | Out-Null
@@ -70,6 +71,15 @@ function Invoke($Name) {
         [OrganizerClick]::SendMessage($app.MainWindowHandle,0x202,[IntPtr]0,$lp)|Out-Null
     }
     Start-Sleep -Milliseconds 200
+    if($Name -eq 'Tutup'){
+        $deadline=(Get-Date).AddSeconds(5)
+        do {
+            Start-Sleep -Milliseconds 100
+            $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+            $closing=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Tutup'))
+        }while($closing -and (Get-Date) -lt $deadline)
+        if($closing){throw 'Error popup did not close'}
+    }
 }
 
 Add-Type 'using System;using System.Text;using System.Runtime.InteropServices;public static class OutputDialog{public delegate bool EnumProc(IntPtr h,IntPtr l);[DllImport("user32.dll")]public static extern bool EnumChildWindows(IntPtr h,EnumProc p,IntPtr l);[DllImport("user32.dll")]public static extern int GetDlgCtrlID(IntPtr h);[DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern int GetClassName(IntPtr h,StringBuilder s,int n);[DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,string l);[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);}'
@@ -119,13 +129,21 @@ function Save-Pdf($Name,$Path){
     Picker $Name;Fill-Picker $Path
     return Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before}
 }
-function Open-Pdf($Path){Picker 'Buka PDF';Fill-Picker $Path;Start-Sleep -Milliseconds 400;$null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 1}}
+function Open-Pdf($Path){
+    $previous=Get-Content -Raw $metrics|ConvertFrom-Json
+    $beforeGeneration=$previous.generation
+    $beforeSource=if($previous.pageCount -gt 0){$previous.pagePlan[0][0]}else{-1}
+    Picker 'Buka PDF';Fill-Picker $Path
+    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq 1 -and $s.generation -gt $beforeGeneration -and $s.pagePlan[0][0] -ne $beforeSource}
+}
 function Capture-Error {
     $rect=New-Object M3Capture+Rect;[M3Capture]::GetWindowRect($app.MainWindowHandle,[ref]$rect)|Out-Null
     $bitmap=New-Object Drawing.Bitmap(($rect.R-$rect.L),($rect.B-$rect.T));$graphics=[Drawing.Graphics]::FromImage($bitmap);$dc=$graphics.GetHdc()
     try{$ok=[M3Capture]::PrintWindow($app.MainWindowHandle,$dc,2)}finally{$graphics.ReleaseHdc($dc)}
     try{if(-not $ok){throw 'Popup capture failed'};$bitmap.Save((Join-Path $directory 'error-popup.png'))}finally{$graphics.Dispose();$bitmap.Dispose()}
 }
+$clipboardSaved=[Windows.Forms.Clipboard]::GetDataObject();$clipboardBackup=New-Object Windows.Forms.DataObject
+if($clipboardSaved){foreach($format in $clipboardSaved.GetFormats($false)){$data=$clipboardSaved.GetData($format,$false);if($null -ne $data){$clipboardBackup.SetData($format,$data)}}}
 try {
     $null=Wait-State {param($s) $s.pageCount -eq 4}
     Invoke 'Atur halaman'
@@ -193,8 +211,25 @@ try {
     $blocked=Join-Path $directory 'blocked.pdf';$state=Save-Pdf 'Simpan sebagai' $blocked
     if($state.exportSuccess -or (Test-Path $blocked) -or $state.pageCount -ne 1){throw 'Unsupported PDF was exported or viewer invalidated'}
     $null=Find 'PDF belum dapat diekspor'
-    $null=Find 'Ekspor diblokir: AcroForm/XFA belum didukung.'
+    # Wait for the modal entrance animation before using its text coordinates.
+    Start-Sleep -Milliseconds 600
+    $reason='Ekspor diblokir: AcroForm/XFA belum didukung.'
+    $messageNode=Find $reason;$bounds=$messageNode.Current.BoundingRectangle
+    $start=New-Object OrganizerClick+Point;$start.X=[int]$bounds.Left+1;$start.Y=[int]($bounds.Top+$bounds.Height/2)
+    $end=New-Object OrganizerClick+Point;$end.X=[int]$bounds.Right-1;$end.Y=$start.Y
+    [OrganizerClick]::ScreenToClient($app.MainWindowHandle,[ref]$start)|Out-Null
+    [OrganizerClick]::ScreenToClient($app.MainWindowHandle,[ref]$end)|Out-Null
+    [OrganizerClick]::SendMessage($app.MainWindowHandle,0x200,[IntPtr]0,[IntPtr](($start.Y -shl 16) -bor ($start.X -band 0xffff)))|Out-Null
+    Start-Sleep -Milliseconds 150
+    [OrganizerClick]::SendMessage($app.MainWindowHandle,0x201,[IntPtr]1,[IntPtr](($start.Y -shl 16) -bor ($start.X -band 0xffff)))|Out-Null
+    for($step=1;$step -le 12;$step++){$x=[int]($start.X+($end.X-$start.X)*$step/12);[OrganizerClick]::SendMessage($app.MainWindowHandle,0x200,[IntPtr]1,[IntPtr](($end.Y -shl 16) -bor ($x -band 0xffff)))|Out-Null;Start-Sleep -Milliseconds 15}
+    [OrganizerClick]::SendMessage($app.MainWindowHandle,0x202,[IntPtr]0,[IntPtr](($end.Y -shl 16) -bor ($end.X -band 0xffff)))|Out-Null
+    Start-Sleep -Milliseconds 200
     Capture-Error
+    [Windows.Forms.Clipboard]::SetText('NO_ERROR_MESSAGE_COPY')
+    Invoke 'Salin pesan'
+    if([Windows.Forms.Clipboard]::GetText() -ne $reason){throw 'Error message copy mismatch'}
+    $null=Find 'PDF belum dapat diekspor'
     Invoke 'Tutup'
     foreach($case in @(
         @{Feature='tagged';Reason='Ekspor diblokir: PDF memiliki tag/struktur aksesibilitas (/StructTreeRoot); penyimpanan struktur ini belum didukung.'},
@@ -221,4 +256,5 @@ try {
     Write-Host "PASS M3 UI: organizer Save As/Extract/history, metadata/bookmark consent, GPUI Kit export/catalog/import/open error popups and dismiss/recovery, source hashes, cleanup. Evidence: $directory"
 } finally {
     if(-not $app.HasExited){$null=$app.CloseMainWindow();$null=$app.WaitForExit(5000)}
+    if($clipboardSaved){[Windows.Forms.Clipboard]::SetDataObject($clipboardBackup,$true)}else{[Windows.Forms.Clipboard]::Clear()}
 }

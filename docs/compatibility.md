@@ -41,7 +41,9 @@ during a new native read invalidate the workspace; cached pages are not live-wat
 and fingerprints are not cryptographic hashes. Reopen after editing a source externally.
 
 Operational failures appear in a GPUI Kit modal error dialog with a specific reason
-and Tutup, including export, Open and import. Cancellation is normal feedback rather
+and Tutup, including export, Open and import. Error text supports drag selection through
+GPUI Kit SelectableText; Salin pesan copies the complete original message without closing
+the dialog. Cancellation is normal feedback rather
 than an error popup. Background failures do not stack dialogs. Catalog export blockers
 name the detected attribute instead of listing unrelated possibilities; unsupported
 structures remain blocked pending validated preservation support.
