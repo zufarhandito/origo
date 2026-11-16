@@ -1,3 +1,8 @@
+> **Blueprint awal (historis).** Status "implementation not yet started" di bawah
+> adalah status pada 9 November 2026. Untuk implementasi yang sudah tersedia, baca
+> [handoff aktif](../handoff/PROJECT_HANDOFF.md). Rencana UI/multi-tab ada di
+> [dokumen terpisah](../plans/UI_REDESIGN_MULTITAB_PLAN.md). Path kode/command dan
+> struktur folder contoh di blueprint mengacu pada root repository.
 # Native PDF Editor (Level 1) — Architecture & Implementation Blueprint for Codex
 
 **Status:** Approved architecture proposal; implementation not yet started  

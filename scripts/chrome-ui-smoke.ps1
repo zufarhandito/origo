@@ -22,7 +22,7 @@ do {
         $app.Refresh()
         if($app.MainWindowHandle -ne 0){
             $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
-            $ready=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Konversi'))
+            $ready=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Berkas'))
         }
     }
 } while(-not $ready -and (Get-Date) -lt $deadline)
@@ -46,37 +46,40 @@ function Capture($Name){
     try{$ok=[ChromeWindow]::PrintWindow($app.MainWindowHandle,$dc,2);if(-not $ok){throw 'Capture failed'}}finally{$g.ReleaseHdc($dc)}
     try{$bmp.Save((Join-Path $directory "$Name.png"))}finally{$g.Dispose();$bmp.Dispose()}
 }
-function Assert-Conversion {
-    foreach($label in @('PDF ke gambar','PDF ke Word','PDF ke teks','PDF ke Excel','PDF ke PowerPoint','Gambar ke PDF','Dokumen Office ke PDF')) {
-        $card=Find ($label+' - Akan datang')
-        if(-not $card){throw "Missing planned card: $label"}
-        $pattern=$null
-        if($card.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)){throw "Planned converter is executable: $label"}
-    }
-    if(Find 'Zoom'){throw 'Reader controls leaked into conversion hub'}
-    $s=Get-Content -Raw $metrics|ConvertFrom-Json
-    if(-not $s.conversionHubVisible -or $s.dirty){throw 'Conversion hub changed content state'}
+function Wait-Mode([bool]$Organizing) {
+    $deadline=(Get-Date).AddSeconds(8);$stable=0
+    do {
+        Start-Sleep -Milliseconds 100
+        try {$state=Get-Content -Raw $metrics|ConvertFrom-Json} catch {continue}
+        $visible=[bool](Find 'Hapus')
+        if($state.organizing -eq $Organizing -and $visible -eq $Organizing){$stable++}else{$stable=0}
+        if($stable -ge 2){return}
+    } while((Get-Date) -lt $deadline)
+    throw "Mode projection did not settle: organizing=$Organizing"
 }
 try {
     if($NoDocument){
-        Invoke 'Konversi';Assert-Conversion;Capture 'conversion-no-document'
-        if((Get-Content -Raw $metrics|ConvertFrom-Json).pageCount -ne 0){throw 'Unexpected loaded document'}
-        Invoke 'Kembali membaca'
-        Write-Host "PASS conversion hub without a document. Evidence: $directory"
+        if(Find 'Konversi'){throw 'Placeholder conversion leaked into navigation'}
+        if(-not (Find 'Buka PDF')){throw 'Empty Open action missing'}
+        Capture 'empty-desktop'
+        Write-Host "PASS empty desktop. Evidence: $directory"
         return
     }
     Capture initial-read
-    Invoke 'Atur halaman'
+    Invoke 'Panel alat'
+    Wait-Mode $true
     Capture initial-organize
     if(-not (Find 'Halaman 1')){throw 'Thumbnail not visible in Organize'}
     foreach($theme in @('Terang','Gelap')) {
-        Invoke 'Lainnya';Invoke $theme
+        Invoke 'Tampilan';Invoke $theme
         foreach($width in @(860,1000,1200,1600)) {
             [ChromeWindow]::MoveWindow($app.MainWindowHandle,30,20,$width,900,$true)|Out-Null
             Start-Sleep -Milliseconds 500
-            foreach($mode in @('Baca','Atur halaman','Konversi')) {
-                Invoke $mode
-                if($mode -eq 'Konversi') {Assert-Conversion;Capture "$theme-$width-$mode";continue}
+            foreach($mode in @('Baca','Atur halaman')) {
+                $panel=Find 'Kembali membaca'
+                if($mode -eq 'Baca' -and $panel){Invoke 'Kembali membaca'}
+                if($mode -eq 'Atur halaman' -and -not $panel){Invoke 'Panel alat'}
+                Wait-Mode ($mode -eq 'Atur halaman')
                 $previous=(Find 'Halaman sebelumnya').Current.BoundingRectangle
                 $next=(Find 'Halaman berikutnya').Current.BoundingRectangle
                 $zoom=(Find 'Zoom').Current.BoundingRectangle
@@ -89,7 +92,23 @@ try {
             }
         }
     }
-    Invoke 'Baca'
+    # A global text-canvas listener must not swallow physical drawer clicks.
+    [ChromeWindow]::MoveWindow($app.MainWindowHandle,30,20,860,900,$true)|Out-Null
+    Start-Sleep -Milliseconds 500
+    $rotate=Find 'Putar kanan';$box=$rotate.Current.BoundingRectangle
+    $pt=New-Object ChromeWindow+Point;$pt.X=[int]($box.X+$box.Width/2);$pt.Y=[int]($box.Y+$box.Height/2)
+    [ChromeWindow]::ScreenToClient($app.MainWindowHandle,[ref]$pt)|Out-Null
+    $lp=[IntPtr](($pt.Y -shl 16) -bor ($pt.X -band 0xffff))
+    [ChromeWindow]::SendMessage($app.MainWindowHandle,0x201,[IntPtr]1,$lp)|Out-Null
+    [ChromeWindow]::SendMessage($app.MainWindowHandle,0x202,[IntPtr]0,$lp)|Out-Null
+    Start-Sleep -Milliseconds 500
+    if(-not (Get-Content -Raw $metrics|ConvertFrom-Json).dirty){throw 'Drawer click was swallowed by page canvas'}
+    Invoke 'Undo'
+    [ChromeWindow]::PostMessage($app.MainWindowHandle,0x100,[IntPtr]27,[IntPtr]0x10001)|Out-Null
+    [ChromeWindow]::PostMessage($app.MainWindowHandle,0x101,[IntPtr]27,[IntPtr]0xC0010001)|Out-Null
+    Start-Sleep -Milliseconds 300
+    Wait-Mode $false
+    if(Find 'Kembali membaca'){throw 'Escape did not close drawer'}
     # Enter navigation replaces the old Go button; focused text is not overwritten.
     $input=Find 'Nomor halaman tujuan';$input.SetFocus()
     $input.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('3')
@@ -105,5 +124,5 @@ try {
     $s=Get-Content -Raw $metrics|ConvertFrom-Json
     if($s.activePage -ne 3 -or $s.dirty -or $s.conversionHubVisible -or $s.pageCount -ne 4){throw 'Enter navigation or presentation-only state failed'}
     [pscustomobject]@{Profile=$Profile;Dpi=[ChromeWindow]::GetDpiForWindow($app.MainWindowHandle);Widths=@(860,1000,1200,1600);Themes=@('Terang','Gelap');PhysicalMixedDpiTested=$false}|ConvertTo-Json|Set-Content (Join-Path $directory 'acceptance.json')
-    Write-Host "PASS chrome: modes/conversion placeholders, two themes, four widths, non-overlapping toolbar, Enter input. Evidence: $directory"
+    Write-Host "PASS desktop chrome: reader/organizer, two themes, four widths, non-overlapping toolbar, Enter input. Evidence: $directory"
 } finally {if(-not $app.HasExited){$null=$app.CloseMainWindow();$null=$app.WaitForExit(5000)}}

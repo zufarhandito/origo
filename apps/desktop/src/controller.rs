@@ -6,7 +6,7 @@ use pdf_application::{
 };
 use std::sync::atomic::Ordering;
 
-impl Viewer {
+impl DocumentSession {
     pub(super) fn release_images(&self, images: Vec<Arc<RenderImage>>, cx: &mut Context<Self>) {
         if images.is_empty() {
             return;
@@ -72,12 +72,6 @@ impl Viewer {
         self.generation += 1;
         self.queue.reset(self.generation);
         self.failures.clear();
-    }
-    pub(super) fn load(&mut self, path: PathBuf, cx: &mut Context<Self>) {
-        if self.opening || self.edits_locked() {
-            return;
-        }
-        self.inspect_candidate(path, cx);
     }
     pub(super) fn install_workspace(&mut self, workspace: Workspace, cx: &mut Context<Self>) {
         if !self.export.running {
@@ -364,6 +358,9 @@ impl Viewer {
         }
     }
     pub(super) fn schedule_current(&mut self, cx: &mut Context<Self>) {
+        if !self.active {
+            return;
+        }
         let index = usize::from(self.navigation.current);
         self.ensure_render(index, RenderKind::Page, 0, cx);
         if index > 0 {
@@ -379,6 +376,9 @@ impl Viewer {
         priority: u8,
         cx: &mut Context<Self>,
     ) {
+        if !self.active {
+            return;
+        }
         let Some(key) = self.key(index, kind) else {
             return;
         };
@@ -424,7 +424,7 @@ impl Viewer {
         self.pump(cx);
     }
     pub(super) fn pump(&mut self, cx: &mut Context<Self>) {
-        if self.inflight.is_some() || self.opening {
+        if !self.active || self.inflight.is_some() || self.opening {
             return;
         }
         let Some(job) = self.queue.pop() else {
@@ -468,7 +468,7 @@ impl Viewer {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
                 this.inflight = None;
-                if job.generation != this.generation {
+                if !this.active || job.generation != this.generation {
                     this.stats.stale += 1;
                 } else {
                     match result {
@@ -541,6 +541,9 @@ impl Viewer {
             };
     }
     pub(super) fn report(&self, cx: &mut Context<Self>) {
+        if !self.active {
+            return;
+        }
         self.defer_page_input(cx);
         let Some(path) = self.metrics.clone() else {
             return;
@@ -602,6 +605,12 @@ impl Viewer {
         json.push_str(&format!(
             ",\"navCommands\":{}}}",
             self.stats.navigation_commands
+        ));
+        json.pop();
+        json.push_str(&format!(
+            ",\"tabId\":{},\"tabCount\":{}}}",
+            self.tab_id.0,
+            self.resources.tab_count.load(Ordering::SeqCst)
         ));
         json.pop();
         json.push_str(&format!(

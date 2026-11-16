@@ -124,7 +124,7 @@ fn planned_group(title: &'static str, tools: &[PlannedTool], columns: u16, cx: &
         )
         .into_any_element()
 }
-impl Viewer {
+impl DocumentSession {
     pub(super) fn conversion_hub(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let c = cx.theme().colors;
         let width = window.viewport_size().width;

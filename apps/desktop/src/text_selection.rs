@@ -25,9 +25,10 @@ impl Default for TextState {
         }
     }
 }
-impl Viewer {
+impl DocumentSession {
     pub(super) fn request_text(&mut self, index: usize, cx: &mut Context<Self>) {
-        if self.opening
+        if !self.active
+            || self.opening
             || self.text.busy
             || self.text.pages.contains(&index)
             || self.text.errors.contains_key(&index)
@@ -63,6 +64,9 @@ impl Viewer {
                     return;
                 }
                 this.text.busy = false;
+                if !this.active {
+                    return;
+                }
                 match result {
                     Ok(mut page) => {
                         page.rotate(rotation);

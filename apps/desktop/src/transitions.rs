@@ -10,16 +10,13 @@ use gpui::component::{
 pub(super) enum Phase {
     #[default]
     Idle,
-    Choosing,
-    Inspecting,
+
     WaitingExport,
     Prompt,
     Saving,
-    Applying,
 }
 pub(super) enum Intent {
     Close,
-    Open(Workspace),
 }
 #[derive(Default)]
 pub(super) struct Transition {
@@ -54,9 +51,19 @@ impl Transition {
         }
     }
 }
-impl Viewer {
+impl DocumentSession {
     pub(super) fn edits_locked(&self) -> bool {
-        self.transition.active() || self.error_popup
+        self.transition.active()
+            || self.error_popup
+            || self
+                .resources
+                .closing
+                .load(std::sync::atomic::Ordering::SeqCst)
+            || self
+                .resources
+                .modal_owner
+                .load(std::sync::atomic::Ordering::SeqCst)
+                != 0
     }
     pub(super) fn cancel_transition(&mut self, cx: &mut Context<Self>) {
         self.transition.clear();
@@ -77,77 +84,10 @@ impl Viewer {
         false
     }
     pub(super) fn choose_open(&mut self, cx: &mut Context<Self>) {
-        if self.opening || self.edits_locked() {
-            return;
-        }
-        self.transition.begin(Phase::Choosing);
-        let token = self.transition.token;
-        let dialog = cx.prompt_for_paths(gpui::PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some("Pilih PDF".into()),
+        let owner = self.owner.clone();
+        cx.defer(move |cx| {
+            let _ = owner.update(cx, |shell, cx| shell.choose_open(cx));
         });
-        self.report(cx);
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            let result = dialog.await;
-            let _ = this.update(cx, |this, cx| {
-                if this.transition.token != token {
-                    return;
-                }
-                match result {
-                    Ok(Ok(Some(paths))) => {
-                        if let Some(path) = paths.into_iter().next() {
-                            this.inspect_candidate(path, cx);
-                        } else {
-                            this.cancel_transition(cx);
-                        }
-                    }
-                    Ok(Ok(None)) => this.cancel_transition(cx),
-                    _ => {
-                        this.cancel_transition(cx);
-                        this.show_error_popup(
-                            "PDF belum dapat dibuka",
-                            "Dialog file gagal dibuka.".into(),
-                            cx,
-                        );
-                    }
-                }
-            });
-        })
-        .detach();
-    }
-    pub(super) fn inspect_candidate(&mut self, path: PathBuf, cx: &mut Context<Self>) {
-        self.transition.begin(Phase::Inspecting);
-        let token = self.transition.token;
-        // Reserve an ID without invalidating the current workspace's text results.
-        let id = pdf_domain::SourceId(self.source_sequence + 1);
-        let renderer = self.renderer.clone();
-        let task = cx
-            .background_executor()
-            .spawn(async move { pdf_application::open_document(&renderer, &path, id) });
-        cx.spawn(async move |this, cx| {
-            let result = task.await;
-            let _ = this.update(cx, |this, cx| {
-                if this.transition.token != token {
-                    return;
-                }
-                match result {
-                    Ok(candidate) => {
-                        this.transition.intent = Some(Intent::Open(candidate));
-                        this.advance_transition(cx);
-                    }
-                    Err(e) => {
-                        this.cancel_transition(cx);
-                        this.show_error_popup("PDF belum dapat dibuka", e.to_string(), cx);
-                    }
-                }
-            });
-        })
-        .detach();
-        self.report(cx);
-        cx.notify();
     }
     pub(super) fn transition_export_finished(
         &mut self,
@@ -178,6 +118,9 @@ impl Viewer {
             return;
         }
         self.transition.phase = Phase::Prompt;
+        self.resources
+            .modal_owner
+            .store(self.tab_id.0, std::sync::atomic::Ordering::SeqCst);
         self.error_popup = true; // Shared modal/input guard, including global canvas listeners.
         self.text.dragging = false;
         self.text.pending = None;
@@ -190,6 +133,18 @@ impl Viewer {
         let token = self.transition.token;
         let handle = self.window_handle;
         let weak = cx.weak_entity();
+        let document_name = self
+            .workspace
+            .as_ref()
+            .map(|w| {
+                w.source()
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .unwrap_or_default();
         cx.defer(move |cx| {
             let _ = handle.update(cx, |_, window, cx| {
                 let cancel_focus = cx.focus_handle();
@@ -205,10 +160,11 @@ impl Viewer {
                         } else {
                             "Perubahan belum disimpan. Minimal satu halaman diperlukan untuk menyimpan PDF. Pilih Batal untuk Undo atau impor halaman."
                         };
+                    let description = format!("{document_name}\n{description}");
                     dialog.title(gpui::div().id("unsaved-title").role(gpui::Role::Group)
                             .aria_label("Simpan perubahan sebelum melanjutkan?")
                             .child("Simpan perubahan sebelum melanjutkan?"))
-                        .description(gpui::div().id("unsaved-description").role(gpui::Role::Group).aria_label(description).child(description))
+                        .description(gpui::div().id("unsaved-description").role(gpui::Role::Group).aria_label(description.clone()).child(description))
                         .centered().width(px(540.)).close_button(true)
                         .footer(DialogFooter::new()
                             .child(Button::new("unsaved-cancel").label("Batal").track_focus(&cancel_focus)
@@ -245,7 +201,7 @@ impl Viewer {
         if self.transition.token != token || self.transition.phase != Phase::Prompt {
             return;
         }
-        self.error_popup = false;
+        self.clear_modal();
         match save {
             None => self.cancel_transition(cx),
             Some(false) => self.apply_transition(cx),
@@ -256,42 +212,11 @@ impl Viewer {
         }
     }
     fn apply_transition(&mut self, cx: &mut Context<Self>) {
-        self.transition.phase = Phase::Applying;
         match self.transition.intent.take() {
             Some(Intent::Close) => {
-                let handle = self.window_handle;
-                cx.defer(move |cx| {
-                    let _ = handle.update(cx, |_, window, _| window.remove_window());
-                });
-            }
-            Some(Intent::Open(candidate)) => {
-                let token = self.transition.token;
-                let path = candidate.source().path.clone();
-                let expected = candidate.source().fingerprint;
-                let task = cx.background_executor().spawn(async move {
-                    pdf_platform::fingerprint(&path).is_ok_and(|actual| actual == expected)
-                });
-                cx.spawn(async move |this, cx| {
-                    let unchanged = task.await;
-                    let _ = this.update(cx, |this, cx| {
-                        if this.transition.token != token {
-                            return;
-                        }
-                        if unchanged {
-                            this.install_workspace(candidate, cx);
-                        }
-                        this.cancel_transition(cx);
-                        if !unchanged {
-                            this.show_error_popup(
-                                "PDF belum dapat dibuka",
-                                "PDF tujuan berubah atau tidak tersedia. Pilih ulang PDF tersebut."
-                                    .into(),
-                                cx,
-                            );
-                        }
-                    });
-                })
-                .detach();
+                self.close_approved = true;
+                self.transition.clear();
+                cx.notify();
             }
             None => self.cancel_transition(cx),
         }
@@ -322,13 +247,13 @@ mod tests {
     #[test]
     fn cancellation_invalidates_async_callbacks_and_allows_new_intent() {
         let mut state = Transition::default();
-        state.begin(Phase::Choosing);
+        state.begin(Phase::Prompt);
         let old = state.token;
         state.clear();
-        state.begin(Phase::Inspecting);
+        state.begin(Phase::Prompt);
         assert_ne!(old, state.token);
         assert!(state.active());
         assert!(!state.exported(true, true));
-        assert_eq!(state.phase, Phase::Inspecting);
+        assert_eq!(state.phase, Phase::Prompt);
     }
 }

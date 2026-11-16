@@ -1,4 +1,14 @@
-# Architecture - M3
+# Architecture - desktop multi-tab
+
+WindowShell owns stable TabIds, active-tab/menu state, transactional multi-document
+close and window-wide export/modal coordination. Each DocumentSession is a separate
+GPUI entity, preserving its workspace, history, input and viewport. Async completions
+target their originating weak entity; removed tabs cannot be confused with new indices.
+Sessions share a cloned PDFium renderer/worker. Inactive sessions stop scheduling,
+clear CPU raster/text caches and defer GPU release through the actual Window. Thus
+cache budgets apply to the active session across the window, not eight independent
+resident caches. Metrics writes also share a sequence/lock across sessions.
+See [multi-tab](multitab.md) for lifecycle, layout and remaining verification limits.
 
 Optimize adds ExportScope::Optimized and optional OptimizationSizes on the receipt.
 QPDF builds an ordinary current-plan baseline in staging, then applies lossless
@@ -128,11 +138,13 @@ and requests specific consent before dropping navigation bookmarks. Complex acti
 remain blocked. Closing during a job waits for export, then checks unsaved changes.
 Failed/cancelled exports abandon the pending close. PDFium validation remains in-process.
 
-transitions.rs owns a single Open/Close intent, candidate inspection, the unsaved
+Historically, transitions.rs owned a single Open/Close intent, candidate inspection, the unsaved
 decision and receipt-gated continuation. Replacement is installed only after inspecting
 the candidate and rechecking its fingerprint. Failed/cancelled Open retains the old
 plan/history/reading state. Page edits/history/import and additional exports are
 guarded while leaving; the modal shares the error popup's global input guard.
+That Open-replacement flow has been superseded: shell.rs opens new sessions and owns
+close batches; transitions.rs retains each document's receipt-gated unsaved close.
 See unsaved-changes.md. No domain or export preservation contracts change.
 
 feedback.rs centralizes modal operational errors using GPUI Kit AlertDialog and a

@@ -1,19 +1,21 @@
-﻿# M2 page organizer
+# M2 page organizer
 
 The workspace owns multiple sources and one authoritative ordered page plan. Page IDs
 stay stable through move/rotate/delete/undo. Source PDFs are never written by organizer
 operations. Simpan sebagai (Ctrl+Shift+S) exports the full current plan to a new PDF;
 Ekstrak exports selected pages in workspace order. Both perform structural preflight
-and output validation. Existing destinations are refused. Opening another PDF or
-closing prompts to save, discard or cancel unsaved virtual edits. Failed/cancelled
-Open keeps the old workspace; see unsaved-changes.md. There is no autosave/recovery.
+and output validation. Existing destinations are refused. Open creates/focuses a tab;
+closing tabs/windows prompts to save, discard or cancel unsaved virtual edits.
+Failed/cancelled Open preserves existing tabs; see unsaved-changes.md. There is no autosave/recovery.
 
-The app opens in Baca mode. Its header contains the document name, Baca / Atur halaman,
-Konversi, Simpan sebagai, Buka PDF and Lainnya (import and theme choices).
-Lainnya also contains Split PDF in reading/organizer modes; see split.md for per-N
+The app opens in reading mode, with desktop menus, tabs and a fixed reading toolbar.
+Alat → Atur halaman or Panel alat opens page commands in the right panel. Kembali
+membaca returns to reading. Theme lives under Tampilan, and import/output under Alat.
+See [multi-tab](multitab.md). The previous Konversi placeholder is not in navigation.
+Alat also contains Split PDF in reading/organizer modes; see split.md for per-N
 and manual ranges, batch consent and new-folder publication. Split does not use
 thumbnail selection and never updates the saved baseline.
-Lainnya also contains Optimize PDF (lossless), which captures the full current plan
+Alat also contains Optimize PDF (lossless), which captures the full current plan
 and reports size before/after compression to a new PDF. It leaves the saved baseline
 and history unchanged, and valid output may grow. See optimize.md.
 Hover the name for full name/page size.

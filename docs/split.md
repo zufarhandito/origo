@@ -1,6 +1,6 @@
 # Split PDF
 
-Open **Lainnya → Split PDF** from Baca or Atur halaman. Split captures the current
+Open **Alat → Split PDF** from Baca or Atur halaman. Split captures the current
 page order, imports, deletions and virtual rotations. It does not change the page
 plan, selection, history or saved baseline. Thumbnail selection does not restrict
 Split; use manual ranges to choose positions explicitly.

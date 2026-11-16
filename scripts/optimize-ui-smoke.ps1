@@ -131,11 +131,11 @@ function Save-Pdf($Name,$Path){
 }
 function Open-Pdf($Path,[int]$ExpectedPages=1){
     $previous=Get-Content -Raw $metrics|ConvertFrom-Json
-    $beforeGeneration=$previous.generation
-    $beforeSource=if($previous.pageCount -gt 0){$previous.pagePlan[0][0]}else{-1}
-    Picker 'Buka PDF';Fill-Picker $Path
+    Invoke 'Berkas';Invoke 'Tutup tab  Ctrl+W'
     if($previous.dirty){$null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Buang perubahan'}
-    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq $ExpectedPages -and $s.generation -gt $beforeGeneration -and $s.pagePlan[0][0] -ne $beforeSource}
+    Start-Sleep -Milliseconds 300
+    Picker 'Buka PDF';Fill-Picker $Path
+    $null=Wait-State {param($s) $s.pageCount -eq $ExpectedPages -and $s.tabId -ne $previous.tabId}
 }
 function Capture-Error([string]$Name='error-popup.png') {
     $rect=New-Object M3Capture+Rect;[M3Capture]::GetWindowRect($app.MainWindowHandle,[ref]$rect)|Out-Null
@@ -165,7 +165,7 @@ function Assert-SameWorkspace($Before) {
     }
 }
 function Start-Optimize([string]$Path) {
-    Invoke 'Lainnya';Picker 'Optimize PDF (lossless)';Fill-Picker $Path
+    Invoke 'Alat';Picker 'Optimize PDF (lossless)…';Fill-Picker $Path
 }
 function Optimize-Pdf([string]$Path) {
     $before=(Get-Content -Raw $metrics|ConvertFrom-Json).exportsCompleted
@@ -186,10 +186,10 @@ function Check-SizeReport($State,[string]$Path) {
 try {
     $initial=Wait-State {param($s) $s.pageCount -eq 4 -and $s.transition -eq 'Idle'}
     $before=$initial.exportsCompleted
-    Invoke 'Lainnya';Picker 'Optimize PDF (lossless)';Fill-Picker '' -Cancel
+    Invoke 'Alat';Picker 'Optimize PDF (lossless)…';Fill-Picker '' -Cancel
     $null=Wait-State {param($s) -not $s.exporting -and $s.exportsCompleted -gt $before -and -not $s.exportSuccess}
     Assert-SameWorkspace $initial
-    Invoke 'Atur halaman';Picker 'Impor PDF';Fill-Picker $b
+    Invoke 'Panel alat';Picker 'Impor PDF';Fill-Picker $b
     $null=Wait-State {param($s) $s.pageCount -eq 8}
     Invoke 'Halaman 2';Invoke 'Putar kanan';Invoke 'Pindahkan';Invoke 'Lebih akhir - Alt+Down'
     Invoke 'Halaman 1';Invoke 'Hapus'
@@ -222,7 +222,7 @@ try {
     Check-SizeReport $state $metadataOutput
     if($state.dirty){throw 'Clean workspace changed after Optimize'}
     # A completed Optimize cannot authorize closing a dirty workspace.
-    Invoke 'Atur halaman';Invoke 'Putar kanan'
+    Invoke 'Panel alat';Invoke 'Putar kanan'
     $dirty=Wait-State {param($s) $s.dirty}
     $waiting=Join-Path $directory 'close-wait-optimized.pdf'
     Start-Optimize $waiting;$null=Find 'Metadata dokumen dapat tidak terbawa'

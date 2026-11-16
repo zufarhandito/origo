@@ -1,3 +1,11 @@
+# Arsip handoff sebelum penataan dokumentasi
+
+> **Historis, bukan status terkini.** Baca [handoff aktif](../handoff/PROJECT_HANDOFF.md)
+> dan [rencana UI/multi-tab](../plans/UI_REDESIGN_MULTITAB_PLAN.md) untuk melanjutkan.
+> Prompt/instruksi sesi di bawah ini dipertahankan sebagai catatan, bukan izin untuk
+> memulai pekerjaan. Path kode/command dalam teks mengacu pada root repository.
+
+---
 # Snapshot handoff terkini - 16 November 2026
 
 **Baca bagian ini sebagai status terbaru.** Catatan sesi di bawah bagian Arsip adalah
@@ -545,7 +553,7 @@ owner in Indonesian. Continue reading the blueprint and docs/organizer.md.
 
 Dicatat: **11 November 2026**, zona waktu Asia/Bangkok.
 Dokumen ini merangkum sesi pengembangan sampai perbaikan perilaku text selection.
-Blueprint utama tetap [PDF_EDITOR_CODEX_BLUEPRINT.md](PDF_EDITOR_CODEX_BLUEPRINT.md).
+Blueprint utama tetap [PDF_EDITOR_CODEX_BLUEPRINT.md](../blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md).
 Jika instruksi terbaru pemilik berbeda dengan blueprint, ikuti instruksi pemilik.
 
 ## 1. Baca ini terlebih dahulu
@@ -869,14 +877,14 @@ Perubahan model yang perlu direncanakan:
 
 ## 11. Dokumen pendamping
 
-- [README.md](README.md): setup/run/check commands.
-- [docs/testing.md](docs/testing.md): log verifikasi bertahap, terbaru di atas.
-- [docs/architecture.md](docs/architecture.md): desain saat ini.
-- [docs/compatibility.md](docs/compatibility.md): fitur dan batas pengguna.
-- [docs/books.md](docs/books.md): benchmark buku dan batas interpretasinya.
-- [docs/text-selection.md](docs/text-selection.md): perilaku dan tests teks.
-- [docs/decisions.md](docs/decisions.md), [docs/adr](docs/adr): keputusan dan tradeoff.
-- [sidecars.lock.json](sidecars.lock.json), [Cargo.lock](Cargo.lock): pins/checksums.
+- [README.md](../../README.md): setup/run/check commands.
+- [docs/testing.md](../testing.md): log verifikasi bertahap, terbaru di atas.
+- [docs/architecture.md](../architecture.md): desain saat ini.
+- [docs/compatibility.md](../compatibility.md): fitur dan batas pengguna.
+- [docs/books.md](../books.md): benchmark buku dan batas interpretasinya.
+- [docs/text-selection.md](../text-selection.md): perilaku dan tests teks.
+- [docs/decisions.md](../decisions.md), [docs/adr](../adr): keputusan dan tradeoff.
+- [sidecars.lock.json](../../sidecars.lock.json), [Cargo.lock](../../Cargo.lock): pins/checksums.
 
 ## 12. Prompt siap pakai untuk chat baru
 

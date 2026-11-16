@@ -1,6 +1,6 @@
 # Optimize PDF (lossless)
 
-Choose **Lainnya → Optimize PDF (lossless)** and a new `.pdf` destination. Optimize
+Choose **Alat → Optimize PDF (lossless)** and a new `.pdf` destination. Optimize
 captures all current workspace pages, including imports, reorder, rotations and
 deletions. Thumbnail selection does not restrict the operation. Source PDFs and
 existing destinations are never overwritten.

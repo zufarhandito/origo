@@ -1,5 +1,8 @@
 ﻿# Conversion roadmap and extension boundaries
 
+Desktop multi-tab follow-up: the old Akan datang catalog is excluded from primary
+navigation. It remains a future capability direction, with no converter enabled.
+
 Status: future design, 11 November 2026. The owner explicitly requested a visible
 Konversi page with Akan datang cards. That page is implemented; all conversion engines
 below remain planned. M3 PDF Save As/Extract is implemented; format conversion is separate.

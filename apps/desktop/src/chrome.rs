@@ -1,11 +1,10 @@
-use crate::*;
+﻿use crate::*;
 use gpui::assets::IconName;
 use gpui::component::{
-    ActiveTheme, Disableable, Selectable, Sizable, StyledExt, Theme, ThemeMode,
+    ActiveTheme, Disableable, Selectable, Sizable, StyledExt,
     button::{Button, ButtonCustomVariant, ButtonVariants},
     input::Input,
     menu::{DropdownMenu, PopupMenuItem},
-    tooltip::Tooltip,
 };
 use gpui::{AnyElement, Focusable, IntoElement, div};
 
@@ -44,7 +43,7 @@ fn divider(cx: &App) -> AnyElement {
         .flex_shrink_0()
         .into_any_element()
 }
-impl Viewer {
+impl DocumentSession {
     pub(super) fn set_mode(
         &mut self,
         mode: ViewerMode,
@@ -90,169 +89,6 @@ impl Viewer {
         }
         self.report(cx);
         cx.notify();
-    }
-    pub(super) fn document_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let available = self.workspace.is_some();
-        let name = self
-            .workspace
-            .as_ref()
-            .and_then(|w| w.source().path.file_name())
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "PDF Studio".into());
-        let detail = self
-            .workspace
-            .as_ref()
-            .and_then(|w| w.geometry(usize::from(self.navigation.current)).ok())
-            .map(|g| format!("{name}\n{:.0} x {:.0} pt", g.width_points, g.height_points))
-            .unwrap_or_else(|| name.clone());
-        let weak = cx.weak_entity();
-        let disabled = !available || self.opening || self.edits_locked();
-        let split_disabled = disabled || self.export.running || self.navigation.count == 0;
-        let dark = cx.theme().is_dark();
-        let more =
-            icon("more", IconName::Ellipsis, "Lainnya", "").dropdown_menu(move |menu, _, _| {
-                let weak = weak.clone();
-                let split_view = weak.clone();
-                let optimize_view = weak.clone();
-                menu.item(PopupMenuItem::new("Impor PDF").disabled(disabled).on_click(
-                    move |_, _, cx| {
-                        let _ = weak.update(cx, |this, cx| this.import_pdf(cx));
-                    },
-                ))
-                .item(
-                    PopupMenuItem::new("Split PDF")
-                        .disabled(split_disabled)
-                        .on_click(move |_, window, cx| {
-                            let _ = split_view.update(cx, |this, cx| this.show_split(window, cx));
-                        }),
-                )
-                .separator()
-                .item(
-                    PopupMenuItem::new("Optimize PDF (lossless)")
-                        .disabled(split_disabled)
-                        .on_click(move |_, _, cx| {
-                            let _ = optimize_view.update(cx, |this, cx| {
-                                this.start_export(
-                                    pdf_application::export::ExportScope::Optimized,
-                                    cx,
-                                )
-                            });
-                        }),
-                )
-                .separator()
-                .item(
-                    PopupMenuItem::new("Terang")
-                        .checked(!dark)
-                        .on_click(|_, window, cx| {
-                            Theme::change(ThemeMode::Light, Some(window), cx)
-                        }),
-                )
-                .item(
-                    PopupMenuItem::new("Gelap")
-                        .checked(dark)
-                        .on_click(|_, window, cx| Theme::change(ThemeMode::Dark, Some(window), cx)),
-                )
-            });
-        div()
-            .id("document-header")
-            .h(px(44.))
-            .flex_shrink_0()
-            .px_4()
-            .flex()
-            .items_center()
-            .gap_3()
-            .border_b_1()
-            .border_color(cx.theme().border)
-            .child(
-                div()
-                    .id("document-name")
-                    .flex_1()
-                    .min_w_0()
-                    .text_sm()
-                    .font_semibold()
-                    .text_ellipsis()
-                    .tooltip(move |window, cx| Tooltip::new(detail.clone()).build(window, cx))
-                    .child(name),
-            )
-            .child(
-                div()
-                    .id("viewer-modes")
-                    .flex()
-                    .gap_1()
-                    .child(
-                        Button::new("mode-read")
-                            .label("Baca")
-                            .h(px(32.))
-                            .ghost()
-                            .selected(self.mode == ViewerMode::Read)
-                            .disabled(self.opening || self.edits_locked())
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.set_mode(ViewerMode::Read, window, cx)
-                            })),
-                    )
-                    .child(
-                        Button::new("mode-organize")
-                            .label("Atur halaman")
-                            .h(px(32.))
-                            .ghost()
-                            .selected(self.mode == ViewerMode::Organize)
-                            .disabled(disabled)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.set_mode(ViewerMode::Organize, window, cx)
-                            })),
-                    )
-                    .child(
-                        Button::new("mode-convert")
-                            .label("Konversi")
-                            .h(px(32.))
-                            .ghost()
-                            .selected(self.mode == ViewerMode::Convert)
-                            .disabled(self.opening || self.edits_locked())
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.set_mode(ViewerMode::Convert, window, cx)
-                            })),
-                    ),
-            )
-            .when(available && self.mode != ViewerMode::Convert, |el| {
-                el.child(
-                    Button::new("save-as")
-                        .primary()
-                        .label("Simpan sebagai")
-                        .h(px(32.))
-                        .tooltip("Simpan PDF baru - Ctrl+Shift+S")
-                        .disabled(
-                            self.opening
-                                || self.edits_locked()
-                                || self.export.running
-                                || self.navigation.count == 0,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.start_export(pdf_application::export::ExportScope::All, cx)
-                        })),
-                )
-            })
-            .when(self.export.running, |el| {
-                el.child(
-                    Button::new("cancel-export")
-                        .ghost()
-                        .label("Batal ekspor")
-                        .h(px(32.))
-                        .on_click(cx.listener(|this, _, _, cx| this.cancel_export(cx))),
-                )
-            })
-            .child(
-                Button::new("open")
-                    .when(!available, |b| b.primary())
-                    .when(available, |b| b.ghost())
-                    .icon(IconName::FolderOpen)
-                    .label("Buka PDF")
-                    .h(px(32.))
-                    .tooltip("Buka PDF - Ctrl+O")
-                    .disabled(self.opening || self.edits_locked())
-                    .on_click(cx.listener(|this, _, window, cx| this.open(&Open, window, cx))),
-            )
-            .child(more)
-            .into_any_element()
     }
     pub(super) fn defer_page_input(&self, cx: &mut Context<Self>) {
         let weak = cx.weak_entity();
@@ -449,6 +285,26 @@ impl Viewer {
                     .items_center()
                     .gap_1()
                     .child(
+                        icon("open", IconName::FolderOpen, "Buka PDF", "Ctrl+O")
+                            .disabled(self.edits_locked())
+                            .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
+                    )
+                    .child(
+                        icon("save-as", IconName::Save, "Simpan sebagai", "Ctrl+Shift+S")
+                            .disabled(
+                                !available
+                                    || self.edits_locked()
+                                    || self
+                                        .resources
+                                        .export_owner
+                                        .load(std::sync::atomic::Ordering::SeqCst)
+                                        != 0,
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.start_export(pdf_application::export::ExportScope::All, cx)
+                            })),
+                    )
+                    .child(
                         icon("sidebar", IconName::PanelLeft, "Panel thumbnail", "")
                             .selected(self.sidebar)
                             .disabled(self.workspace.is_none())
@@ -495,6 +351,22 @@ impl Viewer {
                         icon("zoom-in", IconName::Plus, "Perbesar", "Ctrl++")
                             .disabled(!available || self.zoom_percent() >= 400)
                             .on_click(cx.listener(|this, _, _, cx| this.zoom_step(25, cx))),
+                    )
+                    .child(
+                        icon("mode-organize", IconName::PanelRight, "Panel alat", "")
+                            .selected(self.mode == ViewerMode::Organize)
+                            .disabled(!available || self.edits_locked())
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.set_mode(
+                                    if this.mode == ViewerMode::Organize {
+                                        ViewerMode::Read
+                                    } else {
+                                        ViewerMode::Organize
+                                    },
+                                    window,
+                                    cx,
+                                );
+                            })),
                     )
                     .when(self.text.selection.is_some(), |el| {
                         el.child(divider(cx)).child(
@@ -552,14 +424,21 @@ impl Viewer {
             });
         div()
             .id("organizer-toolbar")
-            .h(px(40.))
-            .flex_shrink_0()
-            .px_3()
+            .h_full()
+            .overflow_y_scroll()
             .flex()
-            .items_center()
-            .gap_2()
-            .border_b_1()
-            .border_color(cx.theme().border)
+            .flex_col()
+            .gap_3()
+            .p_3()
+            .child(
+                Button::new("mode-read")
+                    .ghost()
+                    .label("Kembali membaca")
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.set_mode(ViewerMode::Read, window, cx)
+                    })),
+            )
+            .child(div().text_sm().font_semibold().child("Atur halaman"))
             .child(
                 Button::new("import-pdf")
                     .ghost()
@@ -582,34 +461,37 @@ impl Viewer {
                         this.start_export(pdf_application::export::ExportScope::Selected, cx)
                     })),
             )
-            .child(divider(cx))
+            .child(div().w_full().h(px(1.)).bg(cx.theme().border))
             .child(
                 div()
                     .text_sm()
                     .text_color(cx.theme().muted_foreground)
                     .child(format!("{count} halaman dipilih")),
             )
-            .child(divider(cx))
+            .child(div().w_full().h(px(1.)).bg(cx.theme().border))
             .child(
-                icon(
-                    "rotate-left",
-                    IconName::RotateCcw,
-                    "Putar kiri",
-                    "Ctrl+Shift+R",
-                )
-                .disabled(disabled)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.edit(
-                        pdf_domain::Command::Rotate {
-                            ids: this.selected_ids(),
-                            turns: 3,
-                        },
-                        cx,
-                    )
-                })),
+                Button::new("rotate-left")
+                    .ghost()
+                    .icon(IconName::RotateCcw)
+                    .label("Putar kiri")
+                    .tooltip("Putar kiri - Ctrl+Shift+R")
+                    .disabled(disabled)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.edit(
+                            pdf_domain::Command::Rotate {
+                                ids: this.selected_ids(),
+                                turns: 3,
+                            },
+                            cx,
+                        )
+                    })),
             )
             .child(
-                icon("rotate-right", IconName::RotateCw, "Putar kanan", "Ctrl+R")
+                Button::new("rotate-right")
+                    .ghost()
+                    .icon(IconName::RotateCw)
+                    .label("Putar kanan")
+                    .tooltip("Putar kanan - Ctrl+R")
                     .disabled(disabled)
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.edit(
@@ -622,7 +504,11 @@ impl Viewer {
                     })),
             )
             .child(
-                icon("delete-pages", IconName::Trash, "Hapus", "Delete")
+                Button::new("delete-pages")
+                    .ghost()
+                    .icon(IconName::Trash)
+                    .label("Hapus")
+                    .tooltip("Hapus - Delete")
                     .disabled(disabled)
                     .custom(
                         ButtonCustomVariant::new(cx)
@@ -639,7 +525,7 @@ impl Viewer {
                         )
                     })),
             )
-            .child(divider(cx))
+            .child(div().w_full().h(px(1.)).bg(cx.theme().border))
             .child(move_menu)
             .child(div().flex_1())
             .child(selection_menu)

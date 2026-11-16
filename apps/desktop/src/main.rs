@@ -17,6 +17,7 @@ mod controller;
 mod conversion;
 mod exporting;
 mod feedback;
+mod shell;
 mod splitting;
 mod transitions;
 use chrome::ViewerMode;
@@ -30,6 +31,9 @@ actions!(
     pdf_studio,
     [
         Open,
+        CloseTab,
+        NextTab,
+        PreviousTab,
         SaveAs,
         ExtractPages,
         ImportPdf,
@@ -73,7 +77,12 @@ struct RenderStats {
     peak_cache_bytes: usize,
     max_bitmap_bytes: usize,
 }
-struct Viewer {
+struct DocumentSession {
+    tab_id: shell::TabId,
+    owner: gpui::WeakEntity<shell::WindowShell>,
+    resources: Arc<shell::WindowResources>,
+    active: bool,
+    close_approved: bool,
     split_dialog: Option<splitting::SplitDialog>,
     transition: transitions::Transition,
     error_popup: bool,
@@ -159,6 +168,9 @@ fn main() -> anyhow::Result<()> {
             gpui_kit::component::Theme::update(cx, |theme| theme.font_family = "Segoe UI".into());
             cx.bind_keys([
                 KeyBinding::new("ctrl-o", Open, None),
+                KeyBinding::new("ctrl-w", CloseTab, None),
+                KeyBinding::new("ctrl-tab", NextTab, None),
+                KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
                 KeyBinding::new("ctrl-shift-s", SaveAs, Some("PdfViewer")),
                 KeyBinding::new("ctrl-shift-o", ImportPdf, Some("PdfViewer")),
                 KeyBinding::new("ctrl-z", UndoEdit, Some("PdfViewer")),
@@ -211,110 +223,15 @@ fn main() -> anyhow::Result<()> {
                 },
                 cx,
                 |window, cx| {
-                    cx.new(|cx| {
-                        let focus = cx.focus_handle();
-                        cx.observe_window_activation(window, |this: &mut Viewer, window, _| {
-                            if !window.is_window_active() {
-                                this.page_dragging = false;
-                                this.text.dragging = false;
-                                this.text.pending = None;
-                                this.text.sentence_anchor = None;
-                            }
-                        })
-                        .detach();
-                        focus.focus(window, cx);
-                        let jump = cx.new(|cx| InputState::new(window, cx).placeholder("No."));
-                        cx.subscribe_in(
-                            &jump,
-                            window,
-                            |this: &mut Viewer, _, event: &InputEvent, window, cx| {
-                                if matches!(event, InputEvent::PressEnter { .. }) {
-                                    this.jump_to(window, cx);
-                                } else if matches!(event, InputEvent::Blur) {
-                                    this.defer_page_input(cx);
-                                }
-                            },
-                        )
-                        .detach();
-                        let page_list = ListState::new(0, ListAlignment::Top, px(100.));
-                        let entity = cx.weak_entity();
-                        page_list.set_scroll_handler(move |event, _, cx| {
-                            let range = event.visible_range.clone();
-                            let entity = entity.clone();
-                            cx.defer(move |cx| {
-                                let _ = entity
-                                    .update(cx, |this: &mut Viewer, cx| this.scrolled(range, cx));
-                            });
-                        });
-                        let thumbnail_list = ListState::new(0, ListAlignment::Top, px(50.));
-                        let entity = cx.weak_entity();
-                        thumbnail_list.set_scroll_handler(move |event, _, cx| {
-                            let range = event.visible_range.clone();
-                            let entity = entity.clone();
-                            cx.defer(move |cx| {
-                                let _ = entity.update(cx, |this: &mut Viewer, cx| {
-                                    this.thumbnail_visible = range;
-                                    this.trim_gpu(cx);
-                                });
-                            });
-                        });
-                        let closing = cx.weak_entity();
-                        window.on_window_should_close(cx, move |_, cx| {
-                            closing
-                                .update(cx, |this: &mut Viewer, cx| this.request_close(cx))
-                                .unwrap_or(true)
-                        });
-                        let mut viewer = Viewer {
-                            split_dialog: None,
-                            transition: transitions::Transition::default(),
-                            error_popup: false,
-                            export: exporting::ExportState::default(),
-                            exporter: qpdf_adapter::QpdfExporter::new(&sidecars),
-                            workspace_instance: 0,
-                            mode: ViewerMode::Read,
-                            page_dragging: false,
-                            text: text_selection::TextState::default(),
-                            page_anchor: None,
-                            page_focus: cx.focus_handle(),
-                            focus,
-                            renderer: PdfiumRenderer::new(&sidecars),
-                            workspace: None,
-                            navigation: Navigation::default(),
-                            opening: false,
-                            error: None,
-                            status: "Siap · Ctrl+O untuk membuka PDF".into(),
-                            page_list,
-                            thumbnail_list,
-                            horizontal: ScrollHandle::new(),
-                            zoom: Zoom::default(),
-                            gesture_zoom: GestureZoom::default(),
-                            viewport: (900., 650.),
-                            dpr: window.scale_factor(),
-                            sidebar: true,
-                            generation: 0,
-                            source_sequence: 0,
-                            queue: RenderQueue::new(32),
-                            inflight: None,
-                            pages: ByteCache::new(page_budget),
-                            thumbnails: ByteCache::new(thumbnail_budget),
-                            failures: HashMap::new(),
-                            gpu_images: HashMap::new(),
-                            thumbnail_visible: 0..0,
-                            window_handle: window.window_handle(),
-                            jump,
-                            visible: 0..0,
-                            stats: RenderStats::default(),
-                            metrics,
-                            metrics_sequence: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-                            metrics_lock: Arc::new(std::sync::Mutex::new(())),
-                            gpu_releases: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-                            gpu_release_errors: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-                        };
-                        if let Some(path) = initial {
-                            viewer.load(path, cx);
-                        }
-                        viewer
-                    })
+                    shell::WindowShell::new(
+                        window,
+                        cx,
+                        sidecars.clone(),
+                        page_budget,
+                        thumbnail_budget,
+                        metrics.clone(),
+                        initial.clone(),
+                    )
                 },
             );
             if let Err(error) = result {
@@ -324,4 +241,121 @@ fn main() -> anyhow::Result<()> {
             cx.activate(true);
         });
     Ok(())
+}
+
+impl DocumentSession {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        window: &mut Window,
+        cx: &mut App,
+        sidecars: &std::path::Path,
+        renderer: PdfiumRenderer,
+        page_budget: usize,
+        thumbnail_budget: usize,
+        metrics: Option<PathBuf>,
+        owner: gpui::WeakEntity<shell::WindowShell>,
+        resources: Arc<shell::WindowResources>,
+        tab_id: shell::TabId,
+    ) -> Entity<Self> {
+        cx.new(|cx| {
+            let focus = cx.focus_handle();
+            cx.observe_window_activation(window, |this: &mut DocumentSession, window, _| {
+                if !window.is_window_active() {
+                    this.page_dragging = false;
+                    this.text.dragging = false;
+                    this.text.pending = None;
+                    this.text.sentence_anchor = None;
+                }
+            })
+            .detach();
+            focus.focus(window, cx);
+            let jump = cx.new(|cx| InputState::new(window, cx).placeholder("No."));
+            cx.subscribe_in(
+                &jump,
+                window,
+                |this: &mut DocumentSession, _, event: &InputEvent, window, cx| {
+                    if matches!(event, InputEvent::PressEnter { .. }) {
+                        this.jump_to(window, cx);
+                    } else if matches!(event, InputEvent::Blur) {
+                        this.defer_page_input(cx);
+                    }
+                },
+            )
+            .detach();
+            let page_list = ListState::new(0, ListAlignment::Top, px(100.));
+            let entity = cx.weak_entity();
+            page_list.set_scroll_handler(move |event, _, cx| {
+                let range = event.visible_range.clone();
+                let entity = entity.clone();
+                cx.defer(move |cx| {
+                    let _ = entity.update(cx, |this: &mut DocumentSession, cx| {
+                        this.scrolled(range, cx)
+                    });
+                });
+            });
+            let thumbnail_list = ListState::new(0, ListAlignment::Top, px(50.));
+            let entity = cx.weak_entity();
+            thumbnail_list.set_scroll_handler(move |event, _, cx| {
+                let range = event.visible_range.clone();
+                let entity = entity.clone();
+                cx.defer(move |cx| {
+                    let _ = entity.update(cx, |this: &mut DocumentSession, cx| {
+                        this.thumbnail_visible = range;
+                        this.trim_gpu(cx);
+                    });
+                });
+            });
+            DocumentSession {
+                tab_id,
+                owner,
+                resources: resources.clone(),
+                active: false,
+                close_approved: false,
+                split_dialog: None,
+                transition: transitions::Transition::default(),
+                error_popup: false,
+                export: exporting::ExportState::default(),
+                exporter: qpdf_adapter::QpdfExporter::new(sidecars),
+                workspace_instance: 0,
+                mode: ViewerMode::Read,
+                page_dragging: false,
+                text: text_selection::TextState::default(),
+                page_anchor: None,
+                page_focus: cx.focus_handle(),
+                focus,
+                renderer,
+                workspace: None,
+                navigation: Navigation::default(),
+                opening: false,
+                error: None,
+                status: "Siap · Ctrl+O untuk membuka PDF".into(),
+                page_list,
+                thumbnail_list,
+                horizontal: ScrollHandle::new(),
+                zoom: Zoom::default(),
+                gesture_zoom: GestureZoom::default(),
+                viewport: (900., 650.),
+                dpr: window.scale_factor(),
+                sidebar: true,
+                generation: 0,
+                source_sequence: tab_id.0 << 32,
+                queue: RenderQueue::new(32),
+                inflight: None,
+                pages: ByteCache::new(page_budget),
+                thumbnails: ByteCache::new(thumbnail_budget),
+                failures: HashMap::new(),
+                gpu_images: HashMap::new(),
+                thumbnail_visible: 0..0,
+                window_handle: window.window_handle(),
+                jump,
+                visible: 0..0,
+                stats: RenderStats::default(),
+                metrics,
+                metrics_sequence: resources.metrics_sequence.clone(),
+                metrics_lock: resources.metrics_lock.clone(),
+                gpu_releases: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+                gpu_release_errors: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            }
+        })
+    }
 }

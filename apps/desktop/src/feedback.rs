@@ -6,7 +6,16 @@ use gpui::component::{
     dialog::DialogFooter,
 };
 
-impl Viewer {
+impl DocumentSession {
+    pub(super) fn clear_modal(&mut self) {
+        self.error_popup = false;
+        let _ = self.resources.modal_owner.compare_exchange(
+            self.tab_id.0,
+            0,
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+        );
+    }
     pub(super) fn show_error_popup(
         &mut self,
         title: &'static str,
@@ -14,9 +23,33 @@ impl Viewer {
         cx: &mut Context<Self>,
     ) {
         // Concurrent background failures must not stack modal dialogs.
-        if self.error_popup {
+        if self.error_popup
+            || self
+                .resources
+                .modal_owner
+                .compare_exchange(
+                    0,
+                    self.tab_id.0,
+                    std::sync::atomic::Ordering::SeqCst,
+                    std::sync::atomic::Ordering::SeqCst,
+                )
+                .is_err()
+        {
             return;
         }
+        let message = format!(
+            "{}\n{message}",
+            self.workspace
+                .as_ref()
+                .map(|w| w
+                    .source()
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned())
+                .unwrap_or_else(|| "PDF Studio".into())
+        );
         self.error_popup = true;
         self.text.dragging = false;
         self.text.pending = None;
@@ -71,7 +104,7 @@ impl Viewer {
                                         .on_click(move |_, window, cx| {
                                             window.close_dialog(cx);
                                             let _ = close_view.update(cx, |this, cx| {
-                                                this.error_popup = false;
+                                                this.clear_modal();
                                                 cx.notify();
                                             });
                                         }),
@@ -79,7 +112,7 @@ impl Viewer {
                         )
                         .on_close(move |_, _, cx| {
                             let _ = weak.update(cx, |this, cx| {
-                                this.error_popup = false;
+                                this.clear_modal();
                                 cx.notify();
                             });
                         })

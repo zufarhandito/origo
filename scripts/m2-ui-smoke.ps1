@@ -60,11 +60,11 @@ try {
     if($initial.organizing -or $initial.dirty){throw 'Expected clean Read mode'}
     Invoke 'Halaman 2'
     $null=Wait-State {param($s) $s.activePage -eq 2 -and $s.selectedPages -eq 0 -and -not $s.dirty}
-    Invoke 'Atur halaman'
+    Invoke 'Panel alat'
     $null=Wait-State {param($s) $s.organizing -and $s.selectedPages -eq 1 -and -not $s.dirty}
-    Invoke 'Baca'
+    Invoke 'Kembali membaca'
     $null=Wait-State {param($s) -not $s.organizing -and $s.selectedPages -eq 0 -and -not $s.dirty}
-    Invoke 'Atur halaman'
+    Invoke 'Panel alat'
     Add-Type 'using System;using System.Runtime.InteropServices;public static class M2DragInput{[StructLayout(LayoutKind.Sequential)]public struct Point{public int X,Y;}[DllImport("user32.dll")]public static extern bool ScreenToClient(IntPtr h,ref Point p);[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);}'
     function DragPoint($node) {
         $r=$node.Current.BoundingRectangle

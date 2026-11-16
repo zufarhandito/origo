@@ -1,10 +1,20 @@
 # Unsaved changes: Open and Close
 
-Open and normal window close (X/Alt+F4) protect virtual page edits. The existing
+The desktop now uses [multi-tab sessions](multitab.md). Open adds/focuses a tab;
+it does not replace a dirty document. Closing a tab retains the receipt-gated
+Save As/discard/cancel flow. Window close checks tabs left to right and removes none
+until the entire batch succeeds. Cancel preserves all tabs; prior saves remain clean.
+
+Tab close and normal window close (X/Alt+F4) protect virtual page edits. The existing
 revision/clean-baseline model is authoritative; navigation, zoom, text/page selection
 and mode changes do not dirty a document. Undo to the saved revision is clean.
 
-## Open
+## Open (historical replacement flow)
+
+The following describes the older single-workspace implementation. The current
+shell instead inspects new files off-thread, reserves up to eight loading/loaded
+tabs, rechecks fingerprints and publishes successful DocumentSessions. Existing tabs
+survive partial failure/cancellation. Duplicate primary paths focus the existing tab.
 
 Choose the replacement PDF first. Inspect it in the background as a candidate,
 without clearing the current workspace or advancing its identity. Cancelling the
@@ -32,7 +42,7 @@ that at least one page is required. Cancel allows Undo/import to restore pages.
 
 ## Active work and interaction
 
-Only one leaving intent exists per window. Repeated Open/Close requests do not stack
+Only one close batch exists per window. Repeated Open/Close requests do not stack
 dialogs or replace an in-flight intent. Page mutations, import, history and additional
 exports are blocked during the transition, including keyboard and drag handlers.
 Reading/zoom remain available outside the modal. An active import must finish before
@@ -54,6 +64,7 @@ It adds no dependencies, format converters or broader PDF export compatibility.
 ## Verification
 
 Transition unit tests cover successful/current receipts, failed/cancelled jobs and
-async token invalidation. `scripts/m3-ui-smoke.ps1 -Profile release` covers the real
-dialog/Open/export/close flow using only its own synthetic fixtures and test HWND.
+async token invalidation. `scripts/tabs-ui-smoke.ps1 -Profile release` covers the
+current multi-document lifecycle using owned synthetic fixtures and test HWNDs.
+The older `m3-ui-smoke.ps1` Open-replacement scenarios remain historical and need migration.
 See testing.md for actual executions and evidence.

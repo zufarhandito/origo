@@ -11,7 +11,7 @@ impl gpui::Render for DragLabel {
             .child("Pindahkan halaman")
     }
 }
-impl Viewer {
+impl DocumentSession {
     pub(super) fn select_page(
         &mut self,
         index: usize,

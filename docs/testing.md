@@ -1,3 +1,65 @@
+# Latest verification - desktop UI and multi-tab, 16 November 2026
+
+- `scripts/check.ps1` passed fmt, denied-warning workspace/all-target Clippy,
+  **46 unit tests**, and release workspace build. Debug desktop/workspace builds
+  also passed during implementation. No domain/export preservation contract changed.
+- Final full native smoke passed M1/text/M3/tagged and whole-source Extract/Split/
+  Optimize, including consent/blockers, source/raster/text identity, no-clobber races,
+  cancellation/failure and owned cleanup.
+- Final release multi-tab UI passed: last-tab close to empty state and reopen,
+  isolated edit/history/viewport, duplicate Open preserving state, mixed valid/corrupt
+  multi-file Open, capacity refusal and eight tabs, Save As cleaning only its owner,
+  Optimize retaining dirty, cancelled save picker, discard-then-cancel retaining all
+  tabs, save-then-cancel retaining earlier clean receipt, final window close,
+  active cache bounds, zero GPU-release errors and unchanged source hashes.
+  Evidence: `.research/tabs-ui-81d435fb01574f91a955fd2c061a7fd2`.
+- Debug chrome passed light/dark at 860/1000/1200/1600 px, non-overlapping fixed
+  toolbar, focused page draft/Enter, actual HWND click on drawer Rotate and Esc
+  returning to reading. Evidence: `.research/chrome-ui-7e012d11ea8c4e7693594601e6b7eb00`.
+  Physical DPI was 96; this is not mixed-monitor acceptance. Dark narrow-drawer and
+  light eight-tab screenshots were visually inspected.
+- Final release chrome, including actual drawer hit-testing/Esc, passed with settled
+  mode/accessibility checks: `.research/chrome-ui-ce32122af63e4c07b5e16faa37d53137`.
+  Final release Split passed validation/preview, per-N/manual, native folder picker,
+  order/rotation, collisions/cancel, batch loss consent/Ink, close-wait, hashes and
+  cleanup: `.research/split-ui-b5a4775bedaa4a77aa63704914828e27`.
+- Final release Optimize passed picker cancellation, edited multi-source plan,
+  exact size reporting, unchanged dirty/history, loss consent, close-wait guard,
+  blockers/JPEG, hashes and cleanup:
+  `.research/optimize-ui-90c0f46c82214b50993f2d404ac13a0d`.
+- Debug M2 UI passed drag, rotate/move/delete, empty/history, native import,
+  multi-source order and unchanged-source checks:
+  `.research/m2-ui-cec52a4635594f499cb8429698b62d6b`.
+  Debug M1 passed no-argument startup/close, lazy 100-page startup, boundary jump,
+  thumbnail/continuous scroll, rapid 50–400% zoom with stale-result rejection and
+  resize/fit: `.research/m1-ui-503dddfaf2734145be1be4f51a04cb69`.
+  Empty desktop chrome also passed:
+  `.research/chrome-ui-139c3484698e421786381f09e560bdc5`.
+- Debug M2 drag/rotate/move/delete/empty/history/native import/multi-source/source
+  hashes passed: `.research/m2-ui-cec52a4635594f499cb8429698b62d6b`. Debug M1 empty
+  startup/100-page navigation/thumbnail/scroll/rapid 50-400% zoom/resize passed:
+  `.research/m1-ui-503dddfaf2734145be1be4f51a04cb69`. These ran before the final
+  drawer hit-test guard; the added guard was then checked by the chrome suite above.
+- Final release Chrome/Split/Optimize evidence is recorded in the follow-up below.
+- Intermediate UI runs found a close guard blocking the shell's own close request,
+  duplicate control labels confusing test actions, and stale UIAutomation projections.
+  The final code fixes the guard/labels. Chrome acceptance waits for both numeric
+  mode state and accessibility projection instead of assuming a fixed delay.
+  Mouse-based save activation during dialog animation was replaced with the existing
+  UIAutomation Invoke pattern. Failed intermediate attempts are not acceptance.
+- The old `m3-ui-smoke.ps1` remains intact, with historical single-workspace
+  Open-replacement assertions. It was not claimed as passing. Automatic approval
+  review rejected replacing that suite because it would remove existing coverage;
+  the safe alternative adds `tabs-ui-smoke.ps1` and preserves the older test.
+- Original user viewer was preserved. To rebuild release without closing it, its
+  old executable was moved within `target/release` to `pdf-studio.previous-*.exe`;
+  `run.cmd` starts the newly built release. Owned passing test windows were closed.
+- No push/fetch/remote CI, real user PDF, converter, OCR, portable certification or
+  physical mixed-DPI/trackpad claim. Full native/GPU/process memory profiling and
+  broader corpus/accessibility acceptance remain release gates. CPU cache bounds
+  are not a total process-memory limit. See [multi-tab](multitab.md).
+
+---
 # Latest verification - lossless Optimize, 16 November 2026
 
 - scripts/check.ps1 passed formatting, workspace/all-target denied-warning Clippy,
@@ -322,7 +384,7 @@ Akan datang. See ADR-0003 and m3-safe-export-plan.md for exact export limits.
 # Verification log
 
 Results below were accumulated during the implementation sessions of 9–10 November
-2026. See [PROJECT_HANDOFF.md](../PROJECT_HANDOFF.md), recorded 11 November 2026,
+2026. See [arsip handoff](archive/PROJECT_HANDOFF_HISTORY.md), recorded 11 November 2026,
 for the consolidated status. Earlier sections retain historical test counts and
 “left open” observations; these do not establish current process state. No suites
 were rerun for the documentation-only handoff.

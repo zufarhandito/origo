@@ -1,12 +1,17 @@
 # Current compatibility
 
-Optimize PDF (lossless) is under Lainnya. It exports the entire captured page plan
+Desktop navigation now uses grouped menus and up to eight independent document tabs.
+Open creates/focuses a tab; unsaved protection applies to tab/window Close, with
+transactional cancellation across all tabs. See [multi-tab](multitab.md). Historical
+single-workspace Open-replacement and conversion-page descriptions below are superseded.
+
+Optimize PDF (lossless) is under Alat. It exports the entire captured page plan
 to a new PDF, comparing an ordinary export of that same plan with the final bytes.
 Object/stream recompression does not rasterize or lower image quality; valid output
 may grow. It follows full Save As compatibility/consent, and never marks edits saved.
 See optimize.md. No wider form/signature/tag preservation support is implied.
 
-Split PDF is available under Lainnya. It divides the captured plan per N pages or
+Split PDF is available under Alat. It divides the captured plan per N pages or
 increasing, non-overlapping manual ranges into a new Windows output folder. All
 parts pass the existing Extract policy and validation before publication. Failure
 or cancellation publishes no batch; existing directories/files are refused and

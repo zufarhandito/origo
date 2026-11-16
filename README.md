@@ -1,15 +1,18 @@
 # PDF Studio
 
-For the next development chat, read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) first.
-It maps progress to the blueprint, records verification/limitations, and includes
-toolchain precautions and organizer design notes. See docs/organizer.md for current M2 behavior.
+For the next development chat, start with the [documentation index](docs/README.md)
+and [current handoff](docs/handoff/PROJECT_HANDOFF.md). A [ready-to-copy prompt](docs/handoff/NEXT_CHAT_PROMPT.md)
+records progress, verification, toolchain precautions and the pending push status.
+The [desktop UI and multi-tab design](docs/plans/UI_REDESIGN_MULTITAB_PLAN.md) is implemented;
+see [current multi-tab behavior](docs/multitab.md) and [organizer](docs/organizer.md).
 
-Native Windows PDF organizer following [the blueprint](PDF_EDITOR_CODEX_BLUEPRINT.md).
-Current slice: **M3 safe PDF Save As/Extract**, using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
-The first M4 feature is **Split PDF**, under **Lainnya → Split PDF**: split every N
+Native Windows PDF organizer following [the original blueprint](docs/blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md).
+Current slice: **desktop UI and multi-tab**, retaining M3 safe Save As/Extract,
+using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
+The first M4 feature is **Split PDF**, under **Alat → Split PDF**: split every N
 pages or by manual ranges into a new output folder. All parts are validated before
 the folder is published; Split does not mark edits saved. See [Split](docs/split.md).
-**Lainnya → Optimize PDF (lossless)** optimizes the current page plan to a new PDF
+**Alat → Optimize PDF (lossless)** optimizes the current page plan to a new PDF
 and reports before/after sizes. It does not lower image quality or mark edits saved;
 the result may stay the same size or grow. See [Optimize](docs/optimize.md).
 
@@ -29,18 +32,18 @@ Use **Simpan sebagai** or **Ctrl+Shift+S** to save the current page plan to a ne
 In **Atur halaman**, **Ekstrak** saves selected pages in their workspace order.
 Existing files are never overwritten; source PDFs remain untouched. Save As marks the
 exported current revision clean, while Extract keeps the workspace's saved status.
-Opening another PDF or closing asks to save, discard or cancel when virtual edits are
-unsaved. Failed/cancelled Open preserves the current workspace. See
+Opening another PDF creates or focuses a tab. Closing a dirty tab/window asks to save,
+discard or cancel; cancelled/failed Open preserves existing tabs. See
 [unsaved changes](docs/unsaved-changes.md).
 See [organizer controls and limits](docs/organizer.md).
 See [testing](docs/testing.md), [compatibility](docs/compatibility.md) and
 [architecture](docs/architecture.md) for evidence and remaining limits.
 ## Export and conversion direction
 
-The **Konversi** page reserves a home for PDF-to-PNG/JPEG, Word, text, Excel,
+The previous **Konversi** catalog reserves a direction for PDF-to-PNG/JPEG, Word, text, Excel,
 PowerPoint, images-to-PDF and Office-to-PDF. Every card currently says **Akan datang**:
 there is no converter, upload or format-selection execution behind these cards.
-Entering the page preserves the PDF workspace; Kembali membaca returns to the viewer.
+It is excluded from the new desktop navigation; no converter is enabled.
 
 [M3 safe PDF Save As/Extract](docs/m3-safe-export-plan.md) is implemented for ordinary,
 unencrypted PDFs passing conservative structural preflight. Complex documents such as
@@ -111,9 +114,10 @@ To rebuild on this machine:
 ./scripts/run-desktop.ps1 -Pdf ./tests/fixtures/hundred-pages.pdf
 ```
 
-The app opens in **Baca** mode with a compact reading toolbar. Choose **Atur halaman**
-to select, rotate, delete, move or import pages; returning to Baca clears page selection.
-Undo/Redo are available in both modes. Theme choices live under **Lainnya**. The Copy
+The app opens in reading mode with a fixed toolbar. Choose **Alat → Atur halaman**
+or **Panel alat** to select, rotate, delete, move or import pages in the right panel.
+Kembali membaca clears page selection. Undo/Redo are available in both modes.
+Theme choices live under **Tampilan**; Split and Optimize live under **Alat**. The Copy
 icon appears when text is selected. See [organizer controls](docs/organizer.md).
 
 Open with Buka PDF or Ctrl+O. PgUp/PgDn and Left/Right move between pages;
@@ -129,12 +133,11 @@ and stays within 50-400%. Trackpad/driver delivery of native pinch events varies
 The real native smoke verifies QPDF order/rotation and PDFium rendering, then M1
 100-page metadata, mixed geometry, resource limits and changed-source rejection.
 It also exercises production M3 preflight, Save As/Extract and safe-output failures.
-For the native Save As/Extract dialogs and metadata prompt, generate synthetic fixtures
-and run the headed export check:
+For multi-tab, Save As and unsaved-close UI acceptance, run:
 
 ```powershell
 cargo run --locked -p pdf-smoke -- --write-export-fixtures
-./scripts/m3-ui-smoke.ps1 -Profile release
+./scripts/tabs-ui-smoke.ps1 -Profile release
 ```
 
 Original documents are read-only. For interactive Windows GPU acceptance:

@@ -48,9 +48,16 @@ impl SplitDialog {
         self.with_spec(cx, |spec| SplitPlan::preview(self.plan.pages().len(), spec))
     }
 }
-impl Viewer {
+impl DocumentSession {
     pub(super) fn show_split(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.edits_locked() || self.opening || self.export.running {
+        if self.edits_locked()
+            || self.opening
+            || self
+                .resources
+                .export_owner
+                .load(std::sync::atomic::Ordering::SeqCst)
+                != 0
+        {
             return;
         }
         let Some(w) = &self.workspace else {
@@ -95,6 +102,9 @@ impl Viewer {
             error: None,
         });
         self.error_popup = true;
+        self.resources
+            .modal_owner
+            .store(self.tab_id.0, std::sync::atomic::Ordering::SeqCst);
         self.page_dragging = false;
         self.text.dragging = false;
         self.text.pending = None;
@@ -152,7 +162,7 @@ impl Viewer {
     }
     fn close_split(&mut self, cx: &mut Context<Self>) {
         self.split_dialog = None;
-        self.error_popup = false;
+        self.clear_modal();
         cx.notify();
     }
     fn submit_split(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -177,6 +187,9 @@ impl Viewer {
         self.start_split(plan, name, cx);
     }
     fn split_finished(&mut self, result: Result<SplitReceipt, SplitError>, cx: &mut Context<Self>) {
+        self.resources
+            .export_owner
+            .store(0, std::sync::atomic::Ordering::SeqCst);
         self.export.running = false;
         self.export.control = None;
         self.export.completed += 1;
@@ -211,6 +224,14 @@ impl Viewer {
         cx.notify();
     }
     fn start_split(&mut self, plan: SplitPlan, name: String, cx: &mut Context<Self>) {
+        if self
+            .resources
+            .export_owner
+            .load(std::sync::atomic::Ordering::SeqCst)
+            != 0
+        {
+            return;
+        }
         let picker = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: false,
             directories: true,

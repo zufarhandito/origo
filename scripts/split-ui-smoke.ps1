@@ -131,11 +131,11 @@ function Save-Pdf($Name,$Path){
 }
 function Open-Pdf($Path,[int]$ExpectedPages=1){
     $previous=Get-Content -Raw $metrics|ConvertFrom-Json
-    $beforeGeneration=$previous.generation
-    $beforeSource=if($previous.pageCount -gt 0){$previous.pagePlan[0][0]}else{-1}
-    Picker 'Buka PDF';Fill-Picker $Path
+    Invoke 'Berkas';Invoke 'Tutup tab  Ctrl+W'
     if($previous.dirty){$null=Find 'Simpan perubahan sebelum melanjutkan?';Invoke 'Buang perubahan'}
-    $null=Wait-State {param($s) -not $s.opening -and $s.pageCount -eq $ExpectedPages -and $s.generation -gt $beforeGeneration -and $s.pagePlan[0][0] -ne $beforeSource}
+    Start-Sleep -Milliseconds 300
+    Picker 'Buka PDF';Fill-Picker $Path
+    $null=Wait-State {param($s) $s.pageCount -eq $ExpectedPages -and $s.tabId -ne $previous.tabId}
 }
 function Capture-Error([string]$Name='error-popup.png') {
     $rect=New-Object M3Capture+Rect;[M3Capture]::GetWindowRect($app.MainWindowHandle,[ref]$rect)|Out-Null
@@ -171,7 +171,7 @@ function Set-Input([string]$Name,[string]$Value) {
     Start-Sleep -Milliseconds 200
 }
 function Configure-Split([string]$Spec,[string]$Folder,[switch]$Manual) {
-    Invoke 'Lainnya';Invoke 'Split PDF';$null=Find 'Split PDF'
+    Invoke 'Alat';Invoke 'Split PDF…';$null=Find 'Split PDF'
     if($Manual){Invoke 'Rentang manual'}
     Set-Input 'Aturan pembagian' $Spec
     Set-Input 'Nama folder Split' $Folder
@@ -196,7 +196,7 @@ try {
     Start-Sleep -Milliseconds 500;Capture-Error 'split-dialog.png'
     Invoke 'Batal';Assert-SameWorkspace $initial
     # Capture the transformed multi-source plan, then verify PDFs and clean baseline.
-    Invoke 'Atur halaman';Invoke 'Putar kanan'
+    Invoke 'Panel alat';Invoke 'Putar kanan'
     Picker 'Impor PDF';Fill-Picker $b
     $before=Wait-State {param($s) $s.pageCount -eq 8 -and $s.dirty}
     $state=Run-Split '3' 'per-tiga'
@@ -233,7 +233,7 @@ try {
     $tagged=Join-Path $directory 'tagged.pdf';Copy-Item (Join-Path $root '.research/export-fixtures/tagged-ink.pdf') $tagged
     $taggedHash=(Get-FileHash $tagged).Hash
     Open-Pdf $tagged 3
-    Invoke 'Atur halaman';Invoke 'Putar kanan'
+    Invoke 'Panel alat';Invoke 'Putar kanan'
     $taggedBefore=Wait-State {param($s) $s.dirty}
     Configure-Split '1' 'consent-refused'
     Picker 'Pilih folder induk';Fill-Picker $directory

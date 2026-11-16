@@ -165,4 +165,4 @@ References (checked 11 November 2026):
 
 - [Pinned QPDF CLI: job JSON, exit codes, page-selection limitations](https://qpdf.readthedocs.io/en/12.4/cli.html)
 - [QPDF inspection JSON v2](https://qpdf.readthedocs.io/en/12.4/json.html)
-- Existing PDF_EDITOR_CODEX_BLUEPRINT.md and ADR-0003 remain the safety baseline.
+- The [original blueprint](blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md) and [ADR-0003](adr/0003-export-preservation-policy.md) remain the safety baseline.

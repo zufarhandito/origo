@@ -1,7 +1,7 @@
 use crate::*;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme, Icon, Sizable, TitleBar,
+    ActiveTheme, Icon, Sizable,
     button::{Button, ButtonVariants},
     empty::{Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle},
     scroll::Scrollbar,
@@ -11,7 +11,21 @@ use gpui_kit::component::{
 use gpui_kit::{IntoElement, MouseButton, Render, canvas, div, img, list};
 use pdf_application::viewer::RenderKind;
 
-impl Viewer {
+impl DocumentSession {
+    // Canvas listeners are window-global: clipping alone does not exclude the
+    // tool drawer painted over the page, or a modal owned by another document.
+    fn document_input_allowed(&self, position: gpui::Point<gpui::Pixels>, window: &Window) -> bool {
+        self.active
+            && !self.error_popup
+            && self
+                .resources
+                .modal_owner
+                .load(std::sync::atomic::Ordering::SeqCst)
+                == 0
+            && !(self.mode == ViewerMode::Organize
+                && window.viewport_size().width < px(1100.)
+                && position.x >= window.viewport_size().width - px(280.))
+    }
     fn thumbnail_sidebar(
         &mut self,
         dragging_pages: bool,
@@ -25,7 +39,14 @@ impl Viewer {
                 .id("page-organizer")
                 .when(organizing, |el| el.key_context("PageOrganizer"))
                 .on_action(cx.listener(|this, _: &ClearPages, window, cx| {
+                    if this.edits_locked() {
+                        return;
+                    }
                     cx.stop_active_drag(window);
+                    if window.viewport_size().width < px(1100.) {
+                        this.set_mode(ViewerMode::Read, window, cx);
+                        return;
+                    }
                     this.page_dragging = false;
                     if let Some(w) = &mut this.workspace {
                         w.select([]);
@@ -276,7 +297,7 @@ impl Viewer {
                                 && input_clip.contains(&event.position)
                             {
                                 let handled = down.update(cx, |this, cx| {
-                                    if this.error_popup {
+                                    if !this.document_input_allowed(event.position, window) {
                                         return false;
                                     }
                                     this.select_text(
@@ -306,7 +327,7 @@ impl Viewer {
                                     // press on mouse-up, not on synthetic hover updates.
                                     if event.pressed_button == Some(MouseButton::Left)
                                         && this.text.dragging
-                                        && !this.error_popup
+                                        && this.document_input_allowed(event.position, window)
                                     {
                                         this.select_text(
                                             index,
@@ -444,16 +465,16 @@ impl Viewer {
     }
 }
 
-impl Render for Viewer {
+impl Render for DocumentSession {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.theme().colors;
         let has_document = self.workspace.is_some();
         let organizing = self.mode == ViewerMode::Organize;
         let dragging_pages = organizing && self.page_dragging && cx.has_active_drag();
-        let header = self.document_header(cx);
+
         let reading_toolbar =
             (self.mode != ViewerMode::Convert).then(|| self.reading_toolbar(window, cx));
-        let organizer_toolbar = organizing.then(|| self.organizer_toolbar(cx));
+
         let body = if self.mode == ViewerMode::Convert {
             self.conversion_hub(window, cx)
         } else if has_document {
@@ -503,11 +524,17 @@ impl Render for Viewer {
                         {
                             let dy = f32::from(event.delta.pixel_delta(px(20.)).y);
                             let delta = (dy.clamp(-240., 240.) * 0.002).exp() - 1.;
-                            let _ = scroll_weak.update(cx, |this, cx| {
+                            let handled = scroll_weak.update(cx, |this, cx| {
+                                if !this.document_input_allowed(event.position, window) {
+                                    return false;
+                                }
                                 this.gesture_zoom(delta, event.position, event.touch_phase, cx);
+                                true
                             });
-                            window.prevent_default();
-                            cx.stop_propagation();
+                            if handled.unwrap_or(false) {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            }
                         }
                     });
                 },
@@ -525,6 +552,9 @@ impl Render for Viewer {
                 .bg(c.muted)
                 .overflow_hidden()
                 .on_pinch(cx.listener(|this, event: &gpui::PinchEvent, window, cx| {
+                    if !this.document_input_allowed(event.position, window) {
+                        return;
+                    }
                     this.gesture_zoom(event.delta, event.position, event.phase, cx);
                     window.prevent_default();
                     cx.stop_propagation();
@@ -554,12 +584,29 @@ impl Render for Viewer {
                 .child(Scrollbar::vertical(&self.page_list))
                 .child(Scrollbar::horizontal(&self.horizontal));
             let sidebar = self.thumbnail_sidebar(dragging_pages, cx);
+            let panel = organizing.then(|| self.organizer_toolbar(cx));
+            let narrow = window.viewport_size().width < px(1100.);
             div()
                 .flex_1()
                 .min_h_0()
                 .flex()
+                .relative()
                 .child(sidebar)
                 .child(main)
+                .when_some(panel, |el, panel| {
+                    el.child(
+                        div()
+                            .id("tool-panel")
+                            .w(px(280.))
+                            .h_full()
+                            .flex_shrink_0()
+                            .bg(c.background)
+                            .border_l_1()
+                            .border_color(c.border)
+                            .when(narrow, |el| el.absolute().right_0().top_0().shadow_lg())
+                            .child(panel),
+                    )
+                })
                 .into_any_element()
         } else {
             let title = if self.opening {
@@ -624,13 +671,18 @@ impl Render for Viewer {
                 }
             }))
             .on_action(cx.listener(|this, _: &ClearTextSelection, window, cx| {
+                if this.edits_locked() { return; }
                 if this.mode == ViewerMode::Convert {
                     this.set_mode(ViewerMode::Read, window, cx);
                     return;
                 }
                 cx.stop_active_drag(window);
                 this.page_dragging = false;
-                this.clear_selection(cx);
+                if this.mode == ViewerMode::Organize {
+                    this.set_mode(ViewerMode::Read, window, cx);
+                } else {
+                    this.clear_selection(cx);
+                }
             }))
             .on_mouse_up(
                 gpui::MouseButton::Left,
@@ -676,18 +728,6 @@ impl Render for Viewer {
                     state.focus(window, cx);
                 });
             }))
-            .child(
-                TitleBar::new().child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .text_sm()
-                        .child(Icon::new(IconName::FileText).small().text_color(c.primary))
-                        .child("PDF Studio"),
-                ),
-            )
-            .child(header)
             .when(self.export.running && self.export.optimizing, |el| {
                 el.child(div().px_4().py_2().text_sm().child("Optimasi lossless tanpa penurunan kualitas gambar. Ukuran hasil dapat tetap sama atau lebih besar; sumber tetap utuh."))
             })
@@ -696,13 +736,6 @@ impl Render for Viewer {
                     "Split PDF: {} dari {} file selesai divalidasi. Folder diterbitkan setelah seluruh batch berhasil.",
                     self.export.split_done.load(std::sync::atomic::Ordering::SeqCst), self.export.split_total)))
             })
-            .when(
-                matches!(
-                    self.transition.phase,
-                    transitions::Phase::Inspecting | transitions::Phase::Applying
-                ),
-                |el| el.child(div().px_4().py_2().text_sm().child("Memeriksa PDF tujuan…")),
-            )
             .when(
                 self.transition.phase == transitions::Phase::WaitingExport,
                 |el| {
@@ -758,7 +791,7 @@ impl Render for Viewer {
                 )
             })
             .children(reading_toolbar)
-            .children(organizer_toolbar)
+
             .child(body)
             .child(
                 StatusBar::new()

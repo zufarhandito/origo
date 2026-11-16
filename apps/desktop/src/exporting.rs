@@ -19,8 +19,11 @@ pub(super) struct ExportState {
     pub completed: u64,
     pub pages: usize,
 }
-impl Viewer {
+impl DocumentSession {
     pub(super) fn start_export_job(&mut self, control: ExportControl, cx: &mut Context<Self>) {
+        self.resources
+            .export_owner
+            .store(self.tab_id.0, std::sync::atomic::Ordering::SeqCst);
         self.export.optimizing = false;
         self.export.optimization = None;
         self.export.split_total = 0;
@@ -69,6 +72,9 @@ impl Viewer {
         result: Result<ExportReceipt, ExportError>,
         cx: &mut Context<Self>,
     ) {
+        self.resources
+            .export_owner
+            .store(0, std::sync::atomic::Ordering::SeqCst);
         self.export.running = false;
         self.export.control = None;
         self.export.completed += 1;
@@ -129,7 +135,15 @@ impl Viewer {
         self.begin_export(ExportScope::All, cx);
     }
     fn begin_export(&mut self, scope: ExportScope, cx: &mut Context<Self>) {
-        if self.export.running || self.opening || self.error_popup {
+        if self
+            .resources
+            .export_owner
+            .load(std::sync::atomic::Ordering::SeqCst)
+            != 0
+            || self.export.running
+            || self.opening
+            || self.error_popup
+        {
             return;
         }
         let Some(w) = &self.workspace else {
@@ -167,6 +181,13 @@ impl Viewer {
             }
         );
         let dialog = cx.prompt_for_new_path(&parent, Some(&suggested));
+        let document_name = w
+            .source()
+            .path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
         let control = ExportControl::default();
         self.start_export_job(control.clone(), cx);
         self.export.optimizing = scope == ExportScope::Optimized;
@@ -212,7 +233,10 @@ impl Viewer {
                     window.prompt(
                         gpui::PromptLevel::Warning,
                         prepared.report.confirmation_title(),
-                        Some(prepared.report.confirmation_detail()),
+                        Some(&format!(
+                            "{document_name}\n{}",
+                            prepared.report.confirmation_detail()
+                        )),
                         &["Batal", prepared.report.confirmation_action()],
                         cx,
                     )
