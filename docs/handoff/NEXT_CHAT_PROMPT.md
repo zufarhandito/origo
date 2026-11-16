@@ -4,6 +4,8 @@ Salin teks berikut. Ganti baris permintaan terakhir sesuai pekerjaan berikutnya.
 Status dicatat pada 16 November 2026; periksa Git lagi saat melanjutkan.
 **Update:** pengguna telah meminta implementasi rancangan. UI desktop/multi-tab kini
 ada; baca `docs/multitab.md`, bagian update handoff dan testing terbaru.
+Follow-up hardening/profiling dan tab utuh ada di `docs/multitab-hardening.md`;
+baseline Git follow-up b749691, verifikasi terbaru 47 unit tests dan profil 8 buku.
 
 ```text
 Kita lanjut proyek PDF Studio di D:\projects\bpdf. Berkomunikasi bahasa Indonesia.
@@ -33,16 +35,15 @@ cache bersama dengan membersihkan cache tab nonaktif. Maksimal 8 tab termasuk
 loading; panel alat muncul saat dipakai. Minimum window 860 x 500, drawer <1100 px;
 threshold ini default produk awal, belum hasil physical mixed-DPI acceptance.
 
-HEAD saat handoff: 87ba1c8 (Optimize), main ahead 1 dari cache origin/main 5b3fea2.
-Penataan dokumentasi sesi terakhir belum di-commit; periksa dan pertahankan diff.
-Push sebelumnya ditolak automatic approval review: tujuan remote persis belum
-dikonfirmasi pengguna. Remote https://github.com/zufarhandito/origo.git, branch
-main. Konfirmasi tersebut belum dijawab. Jangan bypass/retry atau mengklaim sudah
-push. Tidak ada commit/push/fetch baru pada sesi penataan dokumentasi.
+Baseline follow-up yang diperiksa: b749691 (restyle tab), main sama dengan cache
+origin/main. Perubahan hardening/profiling/tab utuh masih working tree; periksa dan
+pertahankan diff. Tidak ada commit/push/fetch baru pada sesi follow-up; cache upstream
+bukan verifikasi remote terkini. Status push 87ba1c8 dalam snapshot lama bersifat historis.
 
-Verifikasi implementasi sebelum multi-tab: 45 unit tests, fmt/Clippy, native smoke,
-build debug/release, release Optimize/M3/Split UI dan debug M1 UI lulus.
-Untuk hasil baru, baca bagian terbaru docs/testing.md dan update handoff. Suite tabs
+Verifikasi terbaru: 47 unit tests, fmt/Clippy, build debug/release, native smoke,
+release hardening/tab/chrome/text/M1/Split/Optimize UI lulus. Dua profil 3 putaran
+8 buku x 1000 halaman (fit dan tambahan 400%) lulus; baca batas dan angka aktual di
+docs/multitab-hardening.md, bagian terbaru docs/testing.md dan update handoff. Suite tabs
 menguji lifecycle baru; m3-ui-smoke lama masih historis Open-replacement dan belum
 dimigrasikan. Jangan menghapus coverage lama atau mengklaim suite itu lulus.
 run.cmd memilih release. Jangan menutup sesi pengguna untuk rebuild, install

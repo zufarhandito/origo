@@ -162,16 +162,16 @@ try {
     Capture
     Write-Host 'PASS zoom preserves selection and reuses extracted coordinates'
     $beforeMode=Get-Content -Raw $metrics|ConvertFrom-Json
-    Invoke-Control 'Atur halaman';Invoke-Control 'Baca'
+    Invoke-Control 'Panel alat';Invoke-Control 'Kembali membaca'
     $null=Wait-State {param($s) -not $s.organizing -and $s.selectedChars -eq $beforeMode.selectedChars}
     if(-not (Copy-Enabled)){throw 'Mode switch lost text selection'}
     Write-Host 'PASS mode switch preserves text selection'
-    Invoke-Control 'Konversi'
-    if(Copy-Enabled){throw 'Copy control must be hidden on planned conversion page'}
-    Invoke-Control 'Kembali membaca'
+    # The placeholder conversion hub is no longer in desktop navigation.
+    $hiddenConversion=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Konversi'))
+    if($hiddenConversion){throw 'Placeholder conversion hub leaked into desktop navigation'}
     $null=Wait-State {param($s) -not $s.conversionHubVisible -and $s.selectedChars -eq $beforeMode.selectedChars}
-    if(-not (Copy-Enabled)){throw 'Conversion hub lost the text selection'}
-    Write-Host 'PASS conversion hub preserves text selection and hides inactive reader actions'
+    if(-not (Copy-Enabled)){throw 'Desktop navigation lost the text selection'}
+    Write-Host 'PASS desktop navigation keeps reader selection and excludes the conversion placeholder'
 
 
     foreach($page in 2..4){Jump $page;Set-Fit;$null=Wait-State {param($s) $s.activePage -eq $page};Select-Label $page}

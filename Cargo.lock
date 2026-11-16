@@ -4589,6 +4589,7 @@ dependencies = [
  "pdf-engine",
  "pdf-platform",
  "qpdf-adapter",
+ "serde_json",
  "smallvec",
 ]
 

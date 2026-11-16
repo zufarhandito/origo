@@ -37,11 +37,13 @@ impl Default for ResourceLimits {
 struct Counters {
     opens: AtomicU64,
     renders: AtomicU64,
+    active_documents: AtomicU64,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct SessionStats {
     pub document_opens: u64,
     pub renders: u64,
+    pub active_documents: u64,
 }
 #[derive(Clone)]
 pub struct PdfiumRenderer {
@@ -95,6 +97,7 @@ impl PdfiumRenderer {
         SessionStats {
             document_opens: self.counters.opens.load(Ordering::Relaxed),
             renders: self.counters.renders.load(Ordering::Relaxed),
+            active_documents: self.counters.active_documents.load(Ordering::Relaxed),
         }
     }
     fn request(
@@ -168,6 +171,7 @@ fn worker(
                 if let Ok(_guard) = PDFIUM_LIBRARY.lock() {
                     session = None;
                     session_key = None;
+                    counters.active_documents.store(0, Ordering::Relaxed);
                 }
                 continue;
             }
@@ -245,11 +249,15 @@ fn worker(
             session = None;
             session_key = None;
         }
+        counters
+            .active_documents
+            .store(u64::from(session.is_some()), Ordering::Relaxed);
         let _ = job.reply.send(result);
     }
     // Serialize native document destruction with all other adapter operations.
     if let Ok(_guard) = PDFIUM_LIBRARY.lock() {
         drop(session.take());
+        counters.active_documents.store(0, Ordering::Relaxed);
     }
 }
 impl PdfInspector for PdfiumRenderer {

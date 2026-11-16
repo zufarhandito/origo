@@ -1,6 +1,32 @@
 # Handoff terkini — desktop multi-tab, 16 November 2026
 
-## Update implementasi setelah snapshot di bawah
+## Follow-up: hardening, profiling dan tab utuh
+
+Pengguna meminta prioritas 1 (hardening multi-tab) dan 2 (profiling memory), serta
+nama PDF/× menjadi satu tab dan Daftar tab menjadi satu control berlabel/caret.
+Sekarang memakai GPUI Kit TabBar/Tab folder + close suffix, close tab nonaktif
+tidak memindahkan tab aktif, dan copy dapat reload seleksi offscreen secara
+bounded. Diagnostics memproyeksikan seluruh session/empty state; native retained
+document dan Windows GPU process counters diukur, bukan disimpulkan dari cache.
+
+47 unit tests, Clippy/fmt/release build dan native smoke lulus. Release hardening
+termasuk source change/reopen, receipt origin dan race cancel ekspor tab lain saat
+dirty-close menunggu slot lulus. Profil 3 putaran delapan buku 1000 halaman lulus:
+peak working set 209,53 MiB, private maximum terukur 162,81 MiB, GPU shared maximum
+70,50 MiB; warmed endpoint private growth 0,438 MiB dan GPU tetap stabil.
+Lihat [hardening/profile](../multitab-hardening.md) dan [testing terbaru](../testing.md).
+Profil tambahan termasuk fase 400% juga lulus: peak working set 509,99 MiB,
+private maximum terukur 410,25 MiB, GPU shared maximum 185,26 MiB; warmed private
+growth 0,875 MiB dan GPU growth nol. Cache page terukur maksimal 120,31 MiB dari
+budget 128 MiB. Ini bukti workload sintetis tiga putaran, bukan leak-free universal.
+
+Baseline Git yang ditemukan pada sesi ini **b749691** (`restyle tab`), main sama
+dengan cache origin/main; ini menggantikan status HEAD/push lama di snapshot bawah.
+Pekerjaan follow-up ini belum di-commit/push. Tidak ada fetch atau pemeriksaan
+remote pada sesi ini. Proses aplikasi pengguna dipertahankan; jendela lama memakai
+build lama meskipun `run.cmd` sekarang memilih executable release baru.
+
+## Snapshot implementasi awal multi-tab (digantikan follow-up di atas)
 
 Pengguna telah menyetujui rancangan dan meminta **Implement the approved plan**.
 UI desktop dan multi-tab kini diimplementasikan: WindowShell, DocumentSession

@@ -26,6 +26,7 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 |---|---|
 | Konteks aktif | [Handoff](handoff/PROJECT_HANDOFF.md), [prompt chat baru](handoff/NEXT_CHAT_PROMPT.md) |
 | Rencana UI | [Redesain desktop dan multi-tab](plans/UI_REDESIGN_MULTITAB_PLAN.md) |
+| Multi-tab aktif | [Perilaku tab](multitab.md), [hardening dan hasil profil](multitab-hardening.md) |
 | Arsitektur/keputusan | [Arsitektur](architecture.md), [keputusan](decisions.md), [ADR](adr/) |
 | Viewer | [Buku dan benchmark](books.md), [seleksi teks](text-selection.md) |
 | Pengaturan halaman | [Organizer](organizer.md), [perubahan belum disimpan](unsaved-changes.md) |

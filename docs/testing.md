@@ -1,3 +1,78 @@
+# Latest verification - unified tabs, hardening and memory profile, 16 November 2026
+
+- Final hardening re-run also passed after the shared harness was strengthened to
+  identify its own PID by executable path and unique fixture GUID:
+  `.research/tabs-hardening-0d2ae36c34e84b52a6ec5e73e38ed533`.
+- Additional three-round high-zoom profile passed with 8 loaded books, 400% zoom/fit
+  on both source kinds each round, 61 samples and the same resource guards:
+  `.research/tabs-memory-723a63a16ec146108b0826cc2c276314`.
+  Peak working set **509.99 MiB**, sampled private maximum **410.25 MiB**, GPU shared
+  maximum **185.26 MiB**, warmed private growth **0.875 MiB**, GPU growth **0 MiB**.
+  Page-cache sampled maximum **120.31 MiB** stayed below 128 MiB. Inactive residency,
+  GPU release errors and empty-idle native documents remained zero. Driver pools
+  retain a warmed baseline; handle counts 744/758/764 stayed within the documented
+  guard, not claimed perfectly constant or proof against unbounded-session leaks.
+- Final long-filename containment checks passed in both themes/four widths;
+  × stays inside its TabItem: `.research/chrome-ui-1ccd5db683e141a99d4eaafbde08f8d2`.
+  Release M1 empty startup, lazy 100-page startup, boundary navigation, thumbnail,
+  continuous scroll, rapid 50–400% zoom/stale rejection and resize/fit passed:
+  `.research/m1-ui-49d288ac2dc04c3cbdfa1e3589cab7b1`. Its owned window was closed normally.
+- Release Split and Optimize regressions also passed on this implementation:
+  `.research/split-ui-1074a25c42ea4325b5a80c82eea3373a`,
+  `.research/optimize-ui-7654370ba1ff4f29bd57a3680dbc7f29`.
+
+- `scripts/check.ps1` passed fmt, workspace/all-target Clippy with denied warnings,
+  **47 unit tests** and release workspace build. Debug desktop build also passed.
+  New copy-buffer coverage checks Unicode byte limits, separators and rejection
+  without partial append. Full native M1/text/M3/tagged/whole-source/Split/Optimize
+  smoke passed, including source identity, consent/blockers, failure/cancel/races
+  and owned transaction cleanup.
+- Unified GPUI Kit folder tabs put the × suffix inside the TabItem. Release hardening
+  checked actual accessibility bounds and targeted HWND close clicks, including
+  closing an inactive clean tab without switching the active document.
+- Release hardening passed offscreen selected-text copy after cache eviction,
+  repeated fast switch/close, isolated source change/reopen, Save As completion
+  while another tab is active, cancellation and the cross-tab export-slot/dirty-close
+  cancellation race. Clipboard was materialized/restored and fixtures were owned.
+  Evidence: `.research/tabs-hardening-acd78bfb87b146d49bc7612a780f88a3`.
+  The earlier successful debug run was
+  `.research/tabs-hardening-ffa63e19c38f423ea62985ddbcf08f5c`.
+  The integrated tab/list-control screenshot was visually inspected.
+- Release memory profile passed **3 identical rounds / 8 sources x 1000 pages**,
+  four generated vector and four simulated scan books, with two sweeps per round,
+  close-to-empty, native idle timeout and unchanged hashes. 55 samples recorded
+  process private/working set, handles/threads/GDI/User objects and real Windows GPU
+  process-memory counters, filtered to the test PID.
+  Evidence: `.research/tabs-memory-27c7c4d8de0d4a1dab31cbfe93da46cb`.
+  Peak working set **209.53 MiB**, sampled maximum private **162.81 MiB**, GPU shared
+  maximum **70.50 MiB**, dedicated **0 MiB**. Warmed endpoint private growth was
+  **0.438 MiB**, GPU growth **-0.035 MiB**; handles **785 -> 786 -> 792**, GDI/User
+  objects stable **77/37**. CPU caches/GPU residency/native documents were all zero
+  at every empty-idle endpoint; native documents never exceeded one and GPU release
+  errors were zero. Driver/allocator baseline is retained, not claimed as zero.
+  See [protocol and limits](multitab-hardening.md); this is not a universal leak,
+  physical-memory cap or PDFium-only heap measurement.
+- Existing release multi-tab suite passed:
+  `.research/tabs-ui-edd0fd023b424750bb7ecb6363274f7f`.
+  Release light/dark/four-width drawer/Enter/hit-testing/Esc chrome passed:
+  `.research/chrome-ui-6197f6a4142c408ba26eeb3596c2d4f1`.
+- Release text selection passed single/double-click, jitter, forward/reverse drag,
+  zoom coordinate reuse, reader/organizer selection preservation, all four intrinsic
+  rotations, cross-page copy, clear, byte budget and source hashes:
+  `.research/text-ui-27903420cb0249b4996e1959bef876cb`.
+  Its historical mode labels were updated to Panel alat/Kembali membaca; the removed
+  Konversi placeholder is now asserted absent rather than treated as navigable.
+- An intermediate Windows PowerShell run interpreted a BOM-less literal bullet as
+  ANSI in a test selector; the harness now constructs that marker with its Unicode
+  code point. It was a failed intermediate run, not acceptance. The owned pending
+  job was cancelled and its synthetic viewer closed normally before retrying.
+- No user PDF, global input, remote CI/fetch/push or portable release claim. Existing
+  user process was preserved while the old release EXE was renamed within target
+  for rebuilding. Broader corpus/duration, physical mixed-DPI/trackpad and native
+  isolation remain separate gates. The original M3 single-workspace UI suite remains
+  intact and was not claimed as migrated or passing.
+
+---
 # Latest verification - desktop UI and multi-tab, 16 November 2026
 
 - `scripts/check.ps1` passed fmt, denied-warning workspace/all-target Clippy,

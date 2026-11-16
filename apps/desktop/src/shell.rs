@@ -2,9 +2,10 @@
 use crate::*;
 use gpui::assets::IconName;
 use gpui::component::{
-    ActiveTheme, Disableable, Selectable, Theme, ThemeMode, TitleBar, WindowExt,
+    ActiveTheme, Disableable, Theme, ThemeMode, TitleBar, WindowExt,
     button::{Button, ButtonVariants},
     menu::{DropdownMenu, PopupMenuItem},
+    tab::{Tab as DocumentTab, TabBar},
 };
 use gpui::{AnyElement, Render, div};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -20,6 +21,8 @@ pub(super) struct WindowResources {
     pub tab_count: std::sync::atomic::AtomicUsize,
     pub metrics_sequence: Arc<AtomicU64>,
     pub metrics_lock: Arc<std::sync::Mutex<()>>,
+    pub gpu_releases: Arc<AtomicU64>,
+    pub gpu_release_errors: Arc<AtomicU64>,
 }
 struct Tab {
     id: TabId,
@@ -92,6 +95,19 @@ impl WindowShell {
                 notice: None,
             };
             shell.focus.focus(window, cx);
+            if shell.metrics.is_some() {
+                cx.spawn(async move |this, cx| {
+                    loop {
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(500))
+                            .await;
+                        if this.update(cx, |this, cx| this.report(cx)).is_err() {
+                            break;
+                        }
+                    }
+                })
+                .detach();
+            }
             if let Some(path) = initial {
                 shell.open_paths(vec![path], cx);
             }
@@ -103,6 +119,82 @@ impl WindowShell {
             .iter()
             .find(|t| Some(t.id) == self.active)
             .and_then(|t| t.session.clone())
+    }
+    pub(super) fn report(&self, cx: &mut Context<Self>) {
+        let Some(path) = self.metrics.clone() else {
+            return;
+        };
+        let sessions: Vec<_> = self
+            .tabs
+            .iter()
+            .filter_map(|t| t.session.as_ref())
+            .map(|s| s.read(cx).diagnostics())
+            .collect();
+        let mut json = self
+            .session()
+            .map(|s| s.read(cx).diagnostics())
+            .unwrap_or_else(|| {
+                serde_json::json!({
+                    "pageCount": 0, "activePage": 0, "tabId": 0, "queue": 0, "rendering": false,
+                    "opening": false, "textLoading": false, "exporting": false, "dirty": false,
+                    "pageCacheBytes": 0, "thumbnailCacheBytes": 0, "textCacheBytes": 0,
+                    "selectedChars": 0, "copyingText": false, "transition": "Idle",
+                })
+            });
+        let sum = |key: &str| sessions.iter().filter_map(|s| s[key].as_u64()).sum::<u64>();
+        json["tabCount"] = serde_json::json!(self.tabs.len());
+        json["tabsOpening"] = serde_json::json!(self.opening);
+        json["closingTabs"] = serde_json::json!(self.close.is_some());
+        json["windowExportOwner"] =
+            serde_json::json!(self.resources.export_owner.load(Ordering::SeqCst));
+        json["totalPageCacheBytes"] = serde_json::json!(sum("pageCacheBytes"));
+        json["totalThumbnailCacheBytes"] = serde_json::json!(sum("thumbnailCacheBytes"));
+        json["totalTextCacheBytes"] = serde_json::json!(sum("textCacheBytes"));
+        json["totalCopyBufferBytes"] = serde_json::json!(sum("copyBufferBytes"));
+        json["totalGpuImages"] = serde_json::json!(sum("gpuImages"));
+        json["windowGpuReleases"] =
+            serde_json::json!(self.resources.gpu_releases.load(Ordering::SeqCst));
+        json["windowGpuReleaseErrors"] =
+            serde_json::json!(self.resources.gpu_release_errors.load(Ordering::SeqCst));
+        json["inactiveCacheBytes"] = serde_json::json!(
+            sessions
+                .iter()
+                .filter(|s| s["active"] == false)
+                .map(|s| {
+                    [
+                        "pageCacheBytes",
+                        "thumbnailCacheBytes",
+                        "textCacheBytes",
+                        "copyBufferBytes",
+                    ]
+                    .iter()
+                    .filter_map(|key| s[*key].as_u64())
+                    .sum::<u64>()
+                })
+                .sum::<u64>()
+        );
+        json["inactiveGpuImages"] = serde_json::json!(
+            sessions
+                .iter()
+                .filter(|s| s["active"] == false)
+                .filter_map(|s| s["gpuImages"].as_u64())
+                .sum::<u64>()
+        );
+        json["nativeActiveDocuments"] =
+            serde_json::json!(self.renderer.session_stats().active_documents);
+        json["sessions"] = serde_json::json!(sessions);
+        let sequence = self.resources.metrics_sequence.clone();
+        let number = sequence.fetch_add(1, Ordering::SeqCst) + 1;
+        let lock = self.resources.metrics_lock.clone();
+        cx.background_executor()
+            .spawn(async move {
+                if let Ok(_guard) = lock.lock()
+                    && sequence.load(Ordering::SeqCst) == number
+                {
+                    let _ = std::fs::write(path, json.to_string());
+                }
+            })
+            .detach();
     }
     fn modal(&self, cx: &App) -> bool {
         self.tabs
@@ -326,6 +418,7 @@ impl WindowShell {
                     s.text.pages.clear();
                     s.text.dragging = false;
                     s.text.pending = None;
+                    s.text.cancel_copy();
                     s.page_dragging = false;
                 });
             }
@@ -378,6 +471,14 @@ impl WindowShell {
         self.switch(ids[next], cx);
     }
     fn begin_close(&mut self, window: bool, cx: &mut Context<Self>) -> bool {
+        self.begin_close_target(window, None, cx)
+    }
+    fn begin_close_target(
+        &mut self,
+        window: bool,
+        target: Option<TabId>,
+        cx: &mut Context<Self>,
+    ) -> bool {
         if self.close.is_some()
             || self.opening
             || self.modal(cx)
@@ -395,7 +496,11 @@ impl WindowShell {
         let ids = if window {
             self.tabs.iter().map(|t| t.id).collect()
         } else {
-            self.active.into_iter().collect()
+            target
+                .or(self.active)
+                .into_iter()
+                .filter(|id| self.tabs.iter().any(|t| t.id == *id))
+                .collect()
         };
         self.resources.closing.store(true, Ordering::SeqCst);
         self.close = Some(CloseBatch {
@@ -463,14 +568,22 @@ impl WindowShell {
                 self.resources
                     .tab_count
                     .store(self.tabs.len(), Ordering::SeqCst);
-                self.active = None;
+                self.active = self
+                    .active
+                    .filter(|id| self.tabs.iter().any(|t| t.id == *id));
                 self.resources.closing.store(false, Ordering::SeqCst);
                 if batch.window {
                     let handle = self.handle;
                     cx.defer(move |cx| {
                         let _ = handle.update(cx, |_, w, _| w.remove_window());
                     });
-                } else if let Some(id) = self.tabs.first().map(|t| t.id) {
+                } else if let Some(id) = self
+                    .active
+                    .or(batch
+                        .previous
+                        .filter(|id| self.tabs.iter().any(|t| t.id == *id)))
+                    .or_else(|| self.tabs.first().map(|t| t.id))
+                {
                     self.activate(id, cx);
                 }
                 cx.notify();
@@ -751,15 +864,15 @@ impl Render for WindowShell {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use MenuAction::*;
         let colors = cx.theme().colors;
-        let mut strip = div()
-            .id("document-tabs")
-            .flex()
-            .items_center()
-            .gap_1()
+        let mut strip = TabBar::new("document-tabs")
+            .folder()
+            .max_width(px(260.))
+            .track_scroll(&self.tab_scroll)
             .min_w_0()
-            .flex_1()
-            .overflow_x_scroll();
-        strip = strip.track_scroll(&self.tab_scroll);
+            .flex_1();
+        if let Some(index) = self.tabs.iter().position(|t| Some(t.id) == self.active) {
+            strip = strip.selected_index(index);
+        }
         for tab in &self.tabs {
             let id = tab.id;
             let name = tab.path.file_name().unwrap_or_default().to_string_lossy();
@@ -797,31 +910,23 @@ impl Render for WindowShell {
                     ""
                 }
             );
-            let path = tab.path.display().to_string();
             strip = strip.child(
-                div()
-                    .flex()
-                    .items_center()
-                    .flex_shrink_0()
-                    .child(
-                        Button::new(("tab", id.0))
-                            .max_w(px(240.))
-                            .ghost()
-                            .label(label)
-                            .selected(self.active == Some(id))
-                            .disabled(tab.session.is_none())
-                            .tooltip(path)
-                            .on_click(cx.listener(move |this, _, _, cx| this.switch(id, cx))),
-                    )
-                    .child(
+                DocumentTab::new()
+                    .label(label)
+                    .disabled(tab.session.is_none())
+                    .on_click(cx.listener(move |this, _, _, cx| this.switch(id, cx)))
+                    .suffix(
                         Button::new(("close-tab", id.0))
                             .ghost()
                             .icon(IconName::X)
-                            .accessibility_label("Tutup tab")
+                            .w(px(24.))
+                            .h(px(24.))
+                            .accessibility_label(format!("Tutup tab: {name}"))
+                            .tooltip(format!("Tutup {}", tab.path.display()))
                             .disabled(self.opening || self.close.is_some() || self.modal(cx))
                             .on_click(cx.listener(move |this, _, _, cx| {
-                                this.switch(id, cx);
-                                this.begin_close(false, cx);
+                                cx.stop_propagation();
+                                this.begin_close_target(false, Some(id), cx);
                             })),
                     ),
             );
@@ -833,7 +938,8 @@ impl Render for WindowShell {
             .map(|t| (t.id, t.path.display().to_string()))
             .collect();
         let tab_list = Button::new("tab-list")
-            .ghost()
+            .outline()
+            .dropdown_caret(true)
             .label("Daftar tab")
             .dropdown_menu(move |mut menu, _, _| {
                 for (id, name) in &entries {

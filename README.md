@@ -5,6 +5,8 @@ and [current handoff](docs/handoff/PROJECT_HANDOFF.md). A [ready-to-copy prompt]
 records progress, verification, toolchain precautions and the pending push status.
 The [desktop UI and multi-tab design](docs/plans/UI_REDESIGN_MULTITAB_PLAN.md) is implemented;
 see [current multi-tab behavior](docs/multitab.md) and [organizer](docs/organizer.md).
+Unified document tabs, offscreen-copy hardening and the measured eight-book process/
+GPU profile are documented in [multi-tab hardening](docs/multitab-hardening.md).
 
 Native Windows PDF organizer following [the original blueprint](docs/blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md).
 Current slice: **desktop UI and multi-tab**, retaining M3 safe Save As/Extract,

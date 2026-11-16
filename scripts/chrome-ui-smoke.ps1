@@ -80,6 +80,11 @@ try {
                 if($mode -eq 'Baca' -and $panel){Invoke 'Kembali membaca'}
                 if($mode -eq 'Atur halaman' -and -not $panel){Invoke 'Panel alat'}
                 Wait-Mode ($mode -eq 'Atur halaman')
+                $tab=Find ([IO.Path]::GetFileName($fixture))
+                $close=Find ('Tutup tab: '+[IO.Path]::GetFileName($fixture))
+                if(-not $tab -or -not $close){throw 'Integrated long-name tab/close missing'}
+                $tabBox=$tab.Current.BoundingRectangle;$closeBox=$close.Current.BoundingRectangle
+                if($closeBox.Left -lt $tabBox.Left -or $closeBox.Right -gt $tabBox.Right+1 -or $closeBox.Top -lt $tabBox.Top -or $closeBox.Bottom -gt $tabBox.Bottom+1){throw 'Long filename pushed close outside the tab'}
                 $previous=(Find 'Halaman sebelumnya').Current.BoundingRectangle
                 $next=(Find 'Halaman berikutnya').Current.BoundingRectangle
                 $zoom=(Find 'Zoom').Current.BoundingRectangle

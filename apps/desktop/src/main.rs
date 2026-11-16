@@ -1,4 +1,5 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+#![recursion_limit = "256"]
 
 extern crate gpui_kit as gpui;
 use gpui_kit::component::input::{InputEvent, InputState};
@@ -15,6 +16,7 @@ use std::{collections::HashMap, ops::Range, path::PathBuf, sync::Arc};
 mod chrome;
 mod controller;
 mod conversion;
+mod diagnostics;
 mod exporting;
 mod feedback;
 mod shell;
@@ -123,8 +125,6 @@ struct DocumentSession {
     visible: Range<usize>,
     stats: RenderStats,
     metrics: Option<PathBuf>,
-    metrics_sequence: Arc<std::sync::atomic::AtomicU64>,
-    metrics_lock: Arc<std::sync::Mutex<()>>,
     gpu_releases: Arc<std::sync::atomic::AtomicU64>,
     gpu_release_errors: Arc<std::sync::atomic::AtomicU64>,
 }
@@ -351,10 +351,8 @@ impl DocumentSession {
                 visible: 0..0,
                 stats: RenderStats::default(),
                 metrics,
-                metrics_sequence: resources.metrics_sequence.clone(),
-                metrics_lock: resources.metrics_lock.clone(),
-                gpu_releases: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-                gpu_release_errors: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+                gpu_releases: resources.gpu_releases.clone(),
+                gpu_release_errors: resources.gpu_release_errors.clone(),
             }
         })
     }

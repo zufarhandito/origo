@@ -15,6 +15,9 @@ toolbar baca tetap satu baris. Konversi placeholder tidak masuk navigasi utama.
   slot; file gagal melepas slot. Daftar tab dan strip yang dapat discroll menangani overflow.
 - Ctrl+Tab/Ctrl+Shift+Tab berpindah; Ctrl+W atau tombol × menutup tab. Tab terakhir
   yang ditutup menampilkan empty state di jendela yang sama.
+- Nama PDF dan × berada dalam satu komponen tab; × tetap aksi tutup tersendiri.
+  Menutup tab clean nonaktif tidak memindahkan tab aktif. Daftar tab memakai satu
+  tombol berlabel dengan caret.
 
 History, dirty revision, seleksi, halaman, zoom, scroll/pan, dan mode alat milik
 masing-masing dokumen. Tema berlaku untuk jendela. Save As mempertahankan sumber,
@@ -61,7 +64,8 @@ melepas tekstur melalui deferred window GPU release. Edit/history/seleksi/viewpo
 tetap disimpan. Hanya tab aktif mempertahankan cache; default window tetap page
 128 MiB, thumbnail 16 MiB dan text 16 MiB, dengan override raster yang sudah ada.
 Budget cache bukan batas seluruh process memory. Reload teks setelah switch bersifat
-async; copy tetap membutuhkan halaman seleksi tersedia di cache.
+async. Copy dapat memuat ulang halaman seleksi yang keluar dari cache secara bertahap
+dengan buffer hasil maksimal 1 MiB; pindah tab membatalkan job copy yang belum selesai.
 
 Batas sumber 1024 halaman/128 MiB berlaku per workspace. PDFium tetap in-process,
 tanpa hard native timeout/sandbox. Tidak ada session restore, detach/multi-window,
@@ -78,4 +82,7 @@ native smoke tetap melengkapi regresi. Lihat [testing](testing.md) untuk hasil a
 Suite `m3-ui-smoke.ps1` lama dipertahankan sebagai coverage historis single-workspace;
 skenario Open-replacement-nya belum sesuai multi-tab. Gunakan suite tabs untuk lifecycle
 baru, bukan mengklaim suite lama lulus pada layout ini. Physical mixed-DPI/trackpad,
-profiling total process/native/GPU memory dan clean-machine portable tetap release gates.
+profiling corpus/durasi yang lebih luas dan clean-machine portable tetap release gates.
+
+Follow-up hardening, diagnostics seluruh jendela dan protokol hasil profil delapan
+PDF besar dijelaskan di [hardening dan profiling](multitab-hardening.md).

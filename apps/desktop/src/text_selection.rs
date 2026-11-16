@@ -10,6 +10,47 @@ pub(super) struct TextState {
     pub busy: bool,
     pub errors: HashMap<usize, String>,
     pub loads: u64,
+    copy: Option<CopyJob>,
+}
+const COPY_LIMIT: usize = 1024 * 1024;
+struct CopyJob {
+    selection: TextSelection,
+    token: u64,
+    next: usize,
+    last: usize,
+    result: String,
+}
+impl CopyJob {
+    fn append(&mut self, page: &TextPage) -> bool {
+        let part = page.copy_range(self.selection.range(self.next, page.chars.len()));
+        let separator = usize::from(!self.result.is_empty());
+        if self
+            .result
+            .len()
+            .saturating_add(separator)
+            .saturating_add(part.len())
+            > COPY_LIMIT
+        {
+            return false;
+        }
+        if separator != 0 {
+            self.result.push('\n');
+        }
+        self.result.push_str(&part);
+        self.next += 1;
+        true
+    }
+}
+impl TextState {
+    pub(super) fn copying(&self) -> bool {
+        self.copy.is_some()
+    }
+    pub(super) fn copy_bytes(&self) -> usize {
+        self.copy.as_ref().map_or(0, |j| j.result.len())
+    }
+    pub(super) fn cancel_copy(&mut self) {
+        self.copy = None;
+    }
 }
 impl Default for TextState {
     fn default() -> Self {
@@ -22,6 +63,7 @@ impl Default for TextState {
             busy: false,
             errors: HashMap::new(),
             loads: 0,
+            copy: None,
         }
     }
 }
@@ -86,6 +128,7 @@ impl DocumentSession {
                         }
                     }
                 }
+                this.resume_copy(cx);
                 let next = this.visible.clone().find(|index| {
                     !this.text.pages.contains(index) && !this.text.errors.contains_key(index)
                 });
@@ -109,6 +152,7 @@ impl DocumentSession {
     ) {
         let start = clicks > 0;
         if start {
+            self.text.cancel_copy();
             self.text.selection = None;
             self.text.dragging = false;
             self.text.pending = None;
@@ -194,38 +238,68 @@ impl DocumentSession {
         cx.notify();
     }
     pub(super) fn copy_text(&mut self, cx: &mut Context<Self>) {
+        if !self.active || self.edits_locked() || self.text.copy.is_some() {
+            return;
+        }
         let Some(selection) = self.text.selection else {
             return;
         };
         let first = selection.anchor.page.min(selection.focus.page);
         let last = selection.anchor.page.max(selection.focus.page);
-        let mut result = String::new();
-        for index in first..=last {
+        self.text.copy = Some(CopyJob {
+            selection,
+            token: self.source_sequence,
+            next: first,
+            last,
+            result: String::new(),
+        });
+        self.resume_copy(cx);
+    }
+    fn resume_copy(&mut self, cx: &mut Context<Self>) {
+        let Some(mut job) = self.text.copy.take() else {
+            return;
+        };
+        if !self.active
+            || self.edits_locked()
+            || job.token != self.source_sequence
+            || !self
+                .text
+                .selection
+                .is_some_and(|s| s.anchor == job.selection.anchor && s.focus == job.selection.focus)
+        {
+            return;
+        }
+        while job.next <= job.last {
+            let index = job.next;
             let Some(page) = self.text.pages.get(&index) else {
-                self.status =
-                    "Sebagian teks seleksi tidak ada di cache. Pilih rentang yang lebih kecil."
-                        .into();
+                if let Some(error) = self.text.errors.get(&index) {
+                    self.status = error.clone();
+                    cx.notify();
+                    return;
+                }
+                self.text.copy = Some(job);
+                self.status = "Menyiapkan teks untuk disalin…".into();
+                self.request_text(index, cx);
+                self.report(cx);
                 cx.notify();
                 return;
             };
-            if !result.is_empty() {
-                result.push('\n');
-            }
-            result.push_str(&page.copy_range(selection.range(index, page.chars.len())));
-            if result.len() > 1024 * 1024 {
+            if !job.append(&page) {
                 self.status =
                     "Seleksi terlalu besar. Salin kurang dari 1 MiB teks sekaligus.".into();
                 cx.notify();
                 return;
             }
         }
-        if !result.is_empty() {
-            cx.write_to_clipboard(gpui::ClipboardItem::new_string(result));
+        if !job.result.is_empty() {
+            cx.write_to_clipboard(gpui::ClipboardItem::new_string(job.result));
             self.status = "Teks disalin ke clipboard".into();
-            cx.notify();
         }
+        self.report(cx);
+        cx.notify();
     }
     pub(super) fn clear_selection(&mut self, cx: &mut Context<Self>) {
+        self.text.cancel_copy();
         self.text.selection = None;
         self.text.dragging = false;
         self.text.pending = None;
@@ -233,5 +307,59 @@ impl DocumentSession {
         self.update_status();
         self.report(cx);
         cx.notify();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdf_application::text::TextChar;
+    fn page(text: &str) -> TextPage {
+        TextPage {
+            chars: text
+                .chars()
+                .map(|unicode| TextChar {
+                    unicode,
+                    bounds: None,
+                })
+                .collect(),
+        }
+    }
+    fn job() -> CopyJob {
+        CopyJob {
+            selection: TextSelection {
+                anchor: TextPosition {
+                    page: 0,
+                    character: 0,
+                },
+                focus: TextPosition {
+                    page: 2,
+                    character: 0,
+                },
+            },
+            token: 1,
+            next: 0,
+            last: 2,
+            result: String::new(),
+        }
+    }
+    #[test]
+    fn streaming_copy_preserves_unicode_order_and_bounds_bytes_including_separators() {
+        let mut copy = job();
+        assert!(copy.append(&page("é")));
+        assert!(copy.append(&page("界")));
+        assert!(copy.append(&page("!")));
+        assert_eq!(copy.result, "é\n界\n!");
+        let mut exact = job();
+        exact.next = 1;
+        exact.result = "x".repeat(COPY_LIMIT - 3);
+        assert!(exact.append(&page("é")));
+        assert_eq!(exact.result.len(), COPY_LIMIT);
+        let mut overflow = job();
+        overflow.next = 1;
+        overflow.result = "x".repeat(COPY_LIMIT - 2);
+        assert!(!overflow.append(&page("é")));
+        assert_eq!(overflow.result.len(), COPY_LIMIT - 2);
+        assert_eq!(overflow.next, 1);
     }
 }
