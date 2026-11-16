@@ -1,0 +1,3 @@
+# Supplemental notices are hash-pinned upstream bytes, including line endings and
+# trailing spaces. Preserve them on Windows checkouts and keep other files checked.
+LICENSES/supplemental/*.txt -text whitespace=-blank-at-eol

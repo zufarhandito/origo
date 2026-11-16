@@ -114,7 +114,9 @@ are not implemented. See ADR-0003 and m3-safe-export-plan.md.
 DPR layout/raster math and actual connected-display DPI 96/100% with UIAutomation/
 targeted input checks are tested. Physical 150/200%, mixed-monitor, trackpad and
 screen-reader/modifier-key acceptance remain pending; see [device matrix](device-acceptance.md).
-Broader complex-PDF/accessibility tests, runtime/license audit and clean-machine
-portable packaging remain release gates. A successful optimized build is not a packaged
+An internal portable candidate and runtime/notice inventory are now available; see
+[distribution audit](distribution-audit.md). Broader complex-PDF/accessibility tests,
+license/security review and clean-machine portable acceptance remain release gates.
+A successful candidate build is not a published
 product release. No new toolchain installation was required for M1.
 

@@ -89,6 +89,12 @@ function Invoke($Name) {
 
 Add-Type 'using System;using System.Text;using System.Runtime.InteropServices;public static class OutputDialog{public delegate bool EnumProc(IntPtr h,IntPtr l);[DllImport("user32.dll")]public static extern bool EnumChildWindows(IntPtr h,EnumProc p,IntPtr l);[DllImport("user32.dll")]public static extern int GetDlgCtrlID(IntPtr h);[DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern int GetClassName(IntPtr h,StringBuilder s,int n);[DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,string l);[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);}'
 function Picker($Name){
+    if(-not ('M3WindowStatus' -as [type])){
+        Add-Type 'using System;using System.Runtime.InteropServices;public static class M3WindowStatus{[DllImport("user32.dll")]public static extern bool IsWindow(IntPtr h);[DllImport("user32.dll")]public static extern bool IsWindowEnabled(IntPtr h);}'
+    }
+    $deadline=(Get-Date).AddSeconds(5)
+    while(-not [M3WindowStatus]::IsWindowEnabled($app.MainWindowHandle) -and (Get-Date) -lt $deadline){Start-Sleep -Milliseconds 100}
+    if(-not [M3WindowStatus]::IsWindowEnabled($app.MainWindowHandle)){throw 'Owned window still disabled by native dialog'}
     $n=Find $Name;$r=$n.Current.BoundingRectangle
     $point=New-Object OrganizerClick+Point;$point.X=[int]($r.X+$r.Width/2);$point.Y=[int]($r.Y+$r.Height/2)
     [OrganizerClick]::ScreenToClient($app.MainWindowHandle,[ref]$point)|Out-Null
@@ -111,7 +117,11 @@ function Fill-Picker([string]$Path,[switch]$Cancel){
             $dialog=[Windows.Automation.AutomationElement]::RootElement.FindFirst([Windows.Automation.TreeScope]::Children,$condition)
         }
     }while(-not $dialog -and (Get-Date) -lt $deadline)
-    if(-not $dialog){throw 'Native output/input picker missing'}
+    if(-not $dialog){
+        Capture-Error 'missing-picker.png'
+        Read-M3Metrics|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 (Join-Path $directory 'missing-picker-state.json')
+        throw "Native output/input picker missing: $Path. Evidence: $directory"
+    }
     $script:filename=[IntPtr]::Zero;$script:accept=[IntPtr]::Zero;$script:cancel=[IntPtr]::Zero
     [OutputDialog]::EnumChildWindows([IntPtr]$dialog.Current.NativeWindowHandle,{
         param($h,$l)
@@ -123,7 +133,14 @@ function Fill-Picker([string]$Path,[switch]$Cancel){
         if($id -eq 2 -and $cls.ToString() -eq 'Button'){$script:cancel=$h}
         return $true
     },[IntPtr]::Zero)|Out-Null
-    if($Cancel){[OutputDialog]::PostMessage($script:cancel,0xF5,[IntPtr]::Zero,[IntPtr]::Zero)|Out-Null;return}
+    if($Cancel){
+        $pickerHandle=[IntPtr]$dialog.Current.NativeWindowHandle
+        [OutputDialog]::PostMessage($script:cancel,0xF5,[IntPtr]::Zero,[IntPtr]::Zero)|Out-Null
+        $deadline=(Get-Date).AddSeconds(5)
+        while([M3WindowStatus]::IsWindow($pickerHandle) -and (Get-Date) -lt $deadline){Start-Sleep -Milliseconds 100}
+        if([M3WindowStatus]::IsWindow($pickerHandle)){throw 'Cancelled owned picker did not close'}
+        return
+    }
     if($script:filename -eq [IntPtr]::Zero){throw 'Native filename field missing'}
     [OutputDialog]::SendMessage($script:filename,0xC,[IntPtr]::Zero,$Path)|Out-Null
     Start-Sleep -Milliseconds 200
@@ -448,7 +465,13 @@ try {
     Capture-Error
     [Windows.Forms.Clipboard]::SetText('NO_ERROR_MESSAGE_COPY')
     Invoke 'Salin pesan'
-    if([Windows.Forms.Clipboard]::GetText() -ne ("form.pdf`n"+$reason)){throw 'Error message copy mismatch'}
+    $expectedMessage="form.pdf`n"+$reason
+    $deadline=(Get-Date).AddSeconds(5);$copiedMessage=$null
+    do {
+        Start-Sleep -Milliseconds 100
+        try{$copiedMessage=[Windows.Forms.Clipboard]::GetText()}catch [Runtime.InteropServices.ExternalException] {continue}
+    }while($copiedMessage -ne $expectedMessage -and (Get-Date) -lt $deadline)
+    if($copiedMessage -ne $expectedMessage){throw 'Error message copy mismatch after clipboard delivery timeout'}
     $null=Find 'PDF belum dapat diekspor'
     Invoke 'Tutup'
     Pass-Case 'blocked-form-selectable-modal-error-and-complete-message-copy'

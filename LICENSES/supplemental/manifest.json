@@ -1,0 +1,146 @@
+[
+    {
+        "Name":  "accesskit",
+        "Version":  "0.24.1",
+        "File":  "accesskit-0.24.1-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-MIT",
+        "Commit":  "a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969",
+        "Sha256":  "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+        "Name":  "accesskit_consumer",
+        "Version":  "0.38.0",
+        "File":  "accesskit_consumer-0.38.0-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-MIT",
+        "Commit":  "c88605b96d04431f9c3c792464a0f2f253480e94",
+        "Sha256":  "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+        "Name":  "accesskit_windows",
+        "Version":  "0.34.0",
+        "File":  "accesskit_windows-0.34.0-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-MIT",
+        "Commit":  "c88605b96d04431f9c3c792464a0f2f253480e94",
+        "Sha256":  "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+        "Name":  "gpui-kit",
+        "Version":  "0.9.1",
+        "File":  "gpui-kit-0.9.1-LICENSE-APACHE.txt",
+        "Url":  "https://raw.githubusercontent.com/longbridge/gpui-kit/39ab849a93b5f15507b969164d49891db8d5b470/LICENSE-APACHE",
+        "Commit":  "39ab849a93b5f15507b969164d49891db8d5b470",
+        "Sha256":  "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811"
+    },
+    {
+        "Name":  "lyon",
+        "Version":  "1.0.19",
+        "File":  "lyon-1.0.19-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-MIT",
+        "Commit":  "56219c95c658d4f39de7b190d98e57d5773ba241",
+        "Sha256":  "80f275e90d799911ed3830a7f242a2ef5a4ade2092fe0aa07bfb2d2cf2f2b95e"
+    },
+    {
+        "Name":  "lyon_algorithms",
+        "Version":  "1.0.22",
+        "File":  "lyon_algorithms-1.0.22-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/nical/lyon/db98d26a1a90076a7a894262dcb51117eef643c8/LICENSE-MIT",
+        "Commit":  "db98d26a1a90076a7a894262dcb51117eef643c8",
+        "Sha256":  "80f275e90d799911ed3830a7f242a2ef5a4ade2092fe0aa07bfb2d2cf2f2b95e"
+    },
+    {
+        "Name":  "lyon_geom",
+        "Version":  "1.0.20",
+        "File":  "lyon_geom-1.0.20-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/nical/lyon/db98d26a1a90076a7a894262dcb51117eef643c8/LICENSE-MIT",
+        "Commit":  "db98d26a1a90076a7a894262dcb51117eef643c8",
+        "Sha256":  "80f275e90d799911ed3830a7f242a2ef5a4ade2092fe0aa07bfb2d2cf2f2b95e"
+    },
+    {
+        "Name":  "lyon_path",
+        "Version":  "1.0.19",
+        "File":  "lyon_path-1.0.19-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-MIT",
+        "Commit":  "56219c95c658d4f39de7b190d98e57d5773ba241",
+        "Sha256":  "80f275e90d799911ed3830a7f242a2ef5a4ade2092fe0aa07bfb2d2cf2f2b95e"
+    },
+    {
+        "Name":  "lyon_tessellation",
+        "Version":  "1.0.23",
+        "File":  "lyon_tessellation-1.0.23-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/nical/lyon/db98d26a1a90076a7a894262dcb51117eef643c8/LICENSE-MIT",
+        "Commit":  "db98d26a1a90076a7a894262dcb51117eef643c8",
+        "Sha256":  "80f275e90d799911ed3830a7f242a2ef5a4ade2092fe0aa07bfb2d2cf2f2b95e"
+    },
+    {
+        "Name":  "profiling",
+        "Version":  "1.0.18",
+        "File":  "profiling-1.0.18-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT",
+        "Commit":  "8271551172eb6fa4cba47369aedd93790c623df9",
+        "Sha256":  "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333"
+    },
+    {
+        "Name":  "profiling-procmacros",
+        "Version":  "1.0.18",
+        "File":  "profiling-procmacros-1.0.18-LICENSE-MIT.txt",
+        "Url":  "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT",
+        "Commit":  "8271551172eb6fa4cba47369aedd93790c623df9",
+        "Sha256":  "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333"
+    },
+    {
+        "Name":  "rust-i18n-macro",
+        "Version":  "4.2.4",
+        "File":  "rust-i18n-macro-4.2.4-LICENSE.txt",
+        "Url":  "https://raw.githubusercontent.com/longbridge/rust-i18n/5f3ea5ba03395f2f2908e3587e01788cfdfd3555/LICENSE",
+        "Commit":  "5f3ea5ba03395f2f2908e3587e01788cfdfd3555",
+        "Sha256":  "d6fde6c28ecbccfc7f6d97c0badbb14bbea2cc8f5e81a8c1537204bdfed9a6d5"
+    },
+    {
+        "Name":  "rust-i18n-support",
+        "Version":  "4.2.4",
+        "File":  "rust-i18n-support-4.2.4-LICENSE.txt",
+        "Url":  "https://raw.githubusercontent.com/longbridge/rust-i18n/5f3ea5ba03395f2f2908e3587e01788cfdfd3555/LICENSE",
+        "Commit":  "5f3ea5ba03395f2f2908e3587e01788cfdfd3555",
+        "Sha256":  "d6fde6c28ecbccfc7f6d97c0badbb14bbea2cc8f5e81a8c1537204bdfed9a6d5"
+    },
+    {
+        "Name":  "svg_fmt",
+        "Version":  "0.4.5",
+        "File":  "svg_fmt-0.4.5-LICENSE.txt",
+        "Url":  "https://raw.githubusercontent.com/nical/rust_debug/93f414cd572b5c2781df93dbdc068ed13443d05a/LICENSE",
+        "Commit":  "93f414cd572b5c2781df93dbdc068ed13443d05a",
+        "Sha256":  "7e98bed7f100747aaae7d82ab94fbe6b76fd6b84b09a3aaa413bff8196d0fbb1"
+    },
+    {
+        "Name":  "taffy",
+        "Version":  "0.15.0",
+        "File":  "taffy-0.15.0-LICENSE.txt",
+        "Url":  "https://raw.githubusercontent.com/DioxusLabs/taffy/eb6450694f33e2b7413e40677f230ff63f0fc194/LICENSE",
+        "Commit":  "eb6450694f33e2b7413e40677f230ff63f0fc194",
+        "Sha256":  "f97daf1a0124413dccf399a4e6626b4b74acd05282f80b6d64ac82225650b77a"
+    },
+    {
+        "Name":  "zune-core",
+        "Version":  "0.4.12",
+        "File":  "zune-core-0.4.12-LICENSE-md.txt",
+        "Url":  "https://raw.githubusercontent.com/etemesi254/zune-image/f8fbb123d5ed04441e8324a555bfcda0cb1bd28f/LICENSE.md",
+        "Commit":  "f8fbb123d5ed04441e8324a555bfcda0cb1bd28f",
+        "Sha256":  "c6dff146a9f31848ac296faa5a08a4253caf2c384c86f906dc99e7fc0a39cc8c"
+    },
+    {
+        "Name":  "zune-inflate",
+        "Version":  "0.2.54",
+        "File":  "zune-inflate-0.2.54-LICENSE-md.txt",
+        "Url":  "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE.md",
+        "Commit":  "69502ce83fdfecdd0beefd677e2abb3781b29d98",
+        "Sha256":  "e870d7fd7819a9f0453c62798cb52ae95d148a8c91dc2de1d983f997143c72de"
+    },
+    {
+        "Name":  "zune-jpeg",
+        "Version":  "0.4.21",
+        "File":  "zune-jpeg-0.4.21-LICENSE-md.txt",
+        "Url":  "https://raw.githubusercontent.com/etemesi254/zune-image/fa2c767a01d7d9373911d0bf63e0588553d67e0e/LICENSE.md",
+        "Commit":  "fa2c767a01d7d9373911d0bf63e0588553d67e0e",
+        "Sha256":  "c6dff146a9f31848ac296faa5a08a4253caf2c384c86f906dc99e7fc0a39cc8c"
+    }
+]

@@ -27,5 +27,6 @@ Command untuk fixture manual siap pakai:
 ```
 
 Checkpoint ini tidak mengerjakan portable ZIP, packaging, converter, OCR, migrasi
-milestone lain, atau publikasi remote. Prioritas 6/7 menunggu arahan berikutnya;
+milestone lain, atau publikasi remote. Follow-up P6/7 kini tercatat di
+[distribution audit](distribution-audit.md) setelah arahan lanjutan pengguna;
 gate fisik prioritas 4 tetap terlihat agar tidak terlewati saat rilis.

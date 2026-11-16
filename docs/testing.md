@@ -1,3 +1,57 @@
+# Latest verification - distribution candidate and final regression, 16 November 2026
+
+Baseline `06c2a39`. Follow-up runtime/notice inventory, internal portable ZIP and
+package verification are implemented; public release remains gated. See
+[distribution audit](distribution-audit.md) and [release checklist](release-checklist.md).
+
+- Exact `anyhow` pin/lock upgraded from 1.0.100 to 1.0.103 for
+  [RUSTSEC-2026-0190](https://rustsec.org/advisories/RUSTSEC-2026-0190.html).
+  `scripts/check.ps1` passed fmt, denied-warning all-target Clippy, **47 unit tests**
+  and optimized workspace build after the dependency change.
+- Full native smoke passed pinned engines, M1, text/rotations, tagged/whole-source
+  preservation, M3 consent/blockers/order, Split and Optimize, including failure,
+  cancellation, collision/race, source hashes and staging cleanup.
+- Release tabs UI passed: `.research/tabs-ui-3a16a718227d44839daa8e0becb8975b`.
+- Final release M3 passed **25 unique named cases**, all passed and none omitted:
+  `.research/m3-ui-c207be7c0bf14866be3d5ab609d83a4f`. Intermediate rechecks exposed
+  native picker teardown timing and premature clipboard reads. The harness now
+  waits for its owned window/dialog lifecycle and exact clipboard message with
+  bounded timeouts; existing behavioral assertions remain mandatory. A missing
+  picker also captures its screenshot/state before cleanup. Failed attempts are
+  not counted as final acceptance; the complete suite was rerun after these changes.
+- Final candidate: `dist/pdf-studio-windows-x64-candidate-06c2a39-d88070f1.zip`.
+  Build info honestly records the pre-commit revision and dirty state. The ZIP and
+  its adjacent checksum were verified, then extracted/relocated to
+  `.research/portable-ed8cb41bc495428f93adf525aa32d985/PDF Studio 日本 & test`.
+  **1103 manifest entries** matched actual paths, sizes and SHA-256. Standard/delay
+  x64 import closure and pinned QPDF under restricted PATH passed.
+- Package negative checks passed independently: unexpected file, modified contents,
+  missing app-local runtime import, runtime membership/hash mismatch and ZIP checksum
+  mismatch. Owned test edits were restored and the original package passed again.
+- Final extracted-package UI passed:
+  `.research/portable-ui-de017dec506b49e5bdd44e94526d6c51`.
+  Restricted-PATH launch, local PDFium/MSVC modules, rendering/text, edit/Save As/reopen,
+  exact page count/rotation, Unicode/space/ampersand output path, source hash and staging
+  cleanup passed. The reopened rotated PDF screenshot was visually inspected.
+- Final inventory: `.research/distribution-audit-c576e07ce22d407b9d67cb2f004554c5`.
+  469 desktop normal/build records: 459 notice-collected, three missing-evidence,
+  one MPL source-review, six project-license-unset. Eighteen supplemental notice
+  texts have exact upstream-commit URL and SHA-256 provenance; hashes were checked.
+- OSV rescan queried all **463 registry versions**, validating batch counts and
+  pagination. Anyhow's match is gone; four unmaintained notices remain (instant,
+  paste, rustybuzz, ttf-parser). Native-engine/security disposition and redistribution
+  review remain open, as do clean Windows and physical-device acceptance.
+- First candidate ZIP attempt rejected upstream Unix-epoch timestamps; only owned
+  package timestamps are now normalized. Initial hidden test-window launch was
+  corrected to an interactive window. One cleanup/test command's automatic review
+  timed out; the narrower retry targeted only the verified owned fixture process.
+- Source/docs/notice diff, local Markdown links, all 29 PowerShell script parses,
+  supplemental hashes and final per-case manifests were reviewed before commit.
+  CI now builds/verifies an internal candidate without uploading binaries. No remote
+  CI result is claimed. The ignored ZIP is not part of Git commit/push.
+
+---
+
 # Latest verification - M3 migration and device/checkpoint gates, 16 November 2026
 
 Baseline `582cd67` (`feat: tab`), clean main/cache origin/main at start. Rechecks were

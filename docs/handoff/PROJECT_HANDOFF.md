@@ -1,5 +1,24 @@
 # Handoff terkini — desktop multi-tab, 16 November 2026
 
+## Follow-up distribusi dan verifikasi akhir
+
+Setelah checkpoint `06c2a39`, pengguna meminta prioritas berikutnya sampai terakhir,
+lalu commit/push hasilnya. Judul P6/7 tidak tersimpan di checklist; cakupan yang dipakai
+adalah audit runtime/notice, kandidat ZIP portable dan verifikasi/readiness. Detail:
+[distribution audit](../distribution-audit.md), [release checklist](../release-checklist.md).
+
+Builder/verifier/integrity negative tests dan UI smoke paket tersedia di scripts.
+Runtime MSVC app-local, sidecars dari arsip hash-verified, inventory Cargo/notices,
+manifest file dan checksum ZIP ikut kandidat. ZIP lokal tetap ignored di `dist/`;
+Git push hanya source/docs/notice, tanpa publikasi binary atau release tag.
+
+`anyhow` dipin ke 1.0.103 untuk RUSTSEC-2026-0190. Scan OSV ulang 463 versi registry
+menyisakan empat pemberitahuan unmaintained pada dependency GPUI; bukan diabaikan.
+18 notice tambahan punya provenance commit/SHA; tiga gap notice, lisensi proyek/
+review distribusi, native security, clean Windows serta tes fisik P4 masih gate rilis.
+Jangan menyebut production release atau P4 selesai. Bukti aktual di [testing](../testing.md).
+Gunakan `git log/status` dan hasil push yang benar-benar teramati untuk status Git terkini.
+
 ## Checkpoint terbaru: prioritas 3–5
 
 Pengguna meminta lanjut sampai prioritas 5 dan **recheck satu per satu**. Baseline

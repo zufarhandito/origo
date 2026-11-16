@@ -2,6 +2,12 @@
 
 Salin teks berikut. Ganti baris permintaan terakhir sesuai pekerjaan berikutnya.
 Status dicatat pada 16 November 2026; periksa Git lagi saat melanjutkan.
+
+Update distribusi: setelah `06c2a39`, workflow kandidat portable + inventory runtime/
+notice, verifikasi negatif dan UI paket ditambahkan. `anyhow` kini 1.0.103; empat
+unmaintained advisory tetap tercatat. Baca `docs/distribution-audit.md` dan
+`docs/release-checklist.md`. ZIP lokal bukan public release; gate fisik/clean-machine/
+lisensi/security masih terbuka. Status commit/push aktual dilihat dari Git, bukan snapshot.
 **Update:** pengguna telah meminta implementasi rancangan. UI desktop/multi-tab kini
 ada; baca `docs/multitab.md`, bagian update handoff dan testing terbaru.
 Follow-up hardening/profiling dan tab utuh ada di `docs/multitab-hardening.md`;
@@ -16,6 +22,7 @@ Baca berurutan:
 3. docs/plans/UI_REDESIGN_MULTITAB_PLAN.md
 4. docs/multitab.md dan bagian terbaru docs/testing.md
 5. docs/checkpoint-priorities-3-5.md, docs/m3-ui-coverage.md, docs/device-acceptance.md
+6. docs/distribution-audit.md dan docs/release-checklist.md
 Lalu baca dokumen fitur/arsitektur dan kode yang relevan. Blueprint awal ada di
 docs/blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md; snapshot lama dipertahankan di
 docs/archive/PROJECT_HANDOFF_HISTORY.md, bukan instruksi eksekusi terkini.

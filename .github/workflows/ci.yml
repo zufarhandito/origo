@@ -11,7 +11,7 @@ jobs:
           $vs = & "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if (-not $vs) { throw 'MSVC tools missing' }
           & "$vs/Common7/Tools/Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
-          foreach ($name in @('PATH', 'INCLUDE', 'LIB', 'LIBPATH', 'VCToolsInstallDir', 'WindowsSdkDir', 'WindowsSDKVersion')) {
+          foreach ($name in @('PATH', 'INCLUDE', 'LIB', 'LIBPATH', 'VCToolsInstallDir', 'VCToolsRedistDir', 'VSINSTALLDIR', 'WindowsSdkDir', 'WindowsSDKVersion')) {
             $value = [Environment]::GetEnvironmentVariable($name)
             if ($value) { "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
           }
@@ -33,4 +33,9 @@ jobs:
       - name: Generated book sessions (native, no GPU)
         shell: pwsh
         run: cargo run --release --locked -p pdf-smoke -- --benchmark-books
+      - name: Internal portable candidate integrity and negative checks
+        shell: pwsh
+        run: |
+          $zip = ./scripts/package-portable.ps1 -SkipBuild | Select-Object -Last 1
+          ./scripts/test-portable.ps1 -ZipPath $zip
 

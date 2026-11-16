@@ -34,6 +34,7 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 | Dukungan/pengujian | [Kompatibilitas](compatibility.md), [hasil pengujian](testing.md) |
 | Acceptance aktif | [Pemetaan migrasi M3](m3-ui-coverage.md), [perangkat/input/aksesibilitas](device-acceptance.md) |
 | Checkpoint kerja | [Recheck prioritas 3–5](checkpoint-priorities-3-5.md) |
+| Distribusi Windows | [Audit dan kandidat portable](distribution-audit.md), [gate rilis](release-checklist.md) |
 | Arah konversi | [Roadmap konversi](conversion-roadmap.md), belum ada converter aktif |
 | Kontrak awal | [Blueprint Level 1](blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md), memuat status historis |
 | Sejarah sesi | [Arsip handoff](archive/PROJECT_HANDOFF_HISTORY.md), bukan titik mulai kerja |
