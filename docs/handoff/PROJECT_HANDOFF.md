@@ -1,6 +1,31 @@
 # Handoff terkini — desktop multi-tab, 16 November 2026
 
-## Follow-up: hardening, profiling dan tab utuh
+## Checkpoint terbaru: prioritas 3–5
+
+Pengguna meminta lanjut sampai prioritas 5 dan **recheck satu per satu**. Baseline
+Git sesi ini `582cd67` (`feat: tab`), working tree bersih dan sama dengan cache
+origin/main saat mulai. Checkpoint lokal terbaru dilihat melalui `git log`; sesi
+ini tidak melakukan fetch/push atau mengklaim hasil remote CI.
+
+- **P3:** M3 UI dimigrasikan dengan 25 kasus bernama yang lulus per-kasus, termasuk
+  consent/tag/Ink/bookmark, native output checks, existing-file no-overwrite,
+  failed/cancelled Save, source/hash dan cleanup. Snapshot asli tetap byte-identical
+  di `scripts/archive/m3-single-workspace-ui.ps1.txt`, cocok dengan blob baseline.
+  Lihat [coverage map](../m3-ui-coverage.md).
+- **P4:** audit otomatis pada display nyata yang terhubung lulus: DPI 96 (100%),
+  skala GPUI/viewport, UIA roles/names/ValuePattern/focus serta targeted HWND
+  Enter/PageUp/PageDown/Tab/Esc. Baru satu display 1920 × 1200; 150/200% fisik,
+  mixed-monitor, pinch trackpad, physical modifier shortcuts dan Narrator masih
+  pending hardware/human. **Jangan menyebut P4 selesai penuh.**
+- **P5:** docs aktif/entrypoint/handoff diselaraskan, coverage historis tetap ada,
+  syntax/link/diff dan quality/native/UI gates direcheck sebelum checkpoint lokal.
+
+Detail status dan langkah manual: [checkpoint 3–5](../checkpoint-priorities-3-5.md),
+[device acceptance](../device-acceptance.md), dan [testing terbaru](../testing.md).
+Untuk fixture manual: `scripts/device-acceptance.ps1 -Profile release -LeaveOpen`.
+Tidak ada perubahan policy ekspor atau milestone portable/converter pada pekerjaan ini.
+
+## Snapshot prioritas 1–2: hardening, profiling dan tab utuh
 
 Pengguna meminta prioritas 1 (hardening multi-tab) dan 2 (profiling memory), serta
 nama PDF/× menjadi satu tab dan Daftar tab menjadi satu control berlabel/caret.

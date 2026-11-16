@@ -9,26 +9,19 @@ Tab close and normal window close (X/Alt+F4) protect virtual page edits. The exi
 revision/clean-baseline model is authoritative; navigation, zoom, text/page selection
 and mode changes do not dirty a document. Undo to the saved revision is clean.
 
-## Open (historical replacement flow)
+## Open
 
-The following describes the older single-workspace implementation. The current
-shell instead inspects new files off-thread, reserves up to eight loading/loaded
-tabs, rechecks fingerprints and publishes successful DocumentSessions. Existing tabs
-survive partial failure/cancellation. Duplicate primary paths focus the existing tab.
-
-Choose the replacement PDF first. Inspect it in the background as a candidate,
-without clearing the current workspace or advancing its identity. Cancelling the
-picker or failing inspection preserves the current page plan, history and reading
-state. Errors use the existing selectable GPUI Kit error popup.
-
-Before installing the candidate, recheck its size/mtime in the background. If it has
-changed or disappeared, keep the old workspace and ask the user to choose again.
-Successful replacement resets the view and invalidates old asynchronous results once.
-This is ordinary source-change detection, not cryptographic identity protection.
+The shell inspects selected files off-thread, reserves up to eight loading/loaded
+tabs, rechecks fingerprints and publishes successful DocumentSessions. Existing
+tabs survive partial failure/cancellation. Duplicate primary paths focus the
+existing tab without resetting its history or edits; Open never asks to discard it.
+Failures are summarized in the shell. Source changes invalidate only the affected
+session when a fresh native read detects them; cached pages are not live-watched.
+Fingerprints use size/mtime and are not cryptographic identity protection.
 
 ## Unsaved decision
 
-If the old workspace is dirty, show **Simpan perubahan sebelum melanjutkan?**:
+If a tab being closed is dirty, show **Simpan perubahan sebelum melanjutkan?**:
 
 - **Simpan sebagai** exports the full current plan to a new PDF. Continue only when
   the committed receipt matches the workspace instance and revision. Native save
@@ -45,11 +38,12 @@ that at least one page is required. Cancel allows Undo/import to restore pages.
 Only one close batch exists per window. Repeated Open/Close requests do not stack
 dialogs or replace an in-flight intent. Page mutations, import, history and additional
 exports are blocked during the transition, including keyboard and drag handlers.
-Reading/zoom remain available outside the modal. An active import must finish before
-another Open/Close request is accepted.
+Reading/zoom remain available outside the modal. Active imports must finish before
+a close batch is accepted. Open can add independent sessions without replacing the
+session that owns a background operation.
 
 If export is already running, wait for completion without cancelling it. **Tetap di
-aplikasi** cancels only the pending Open/Close; **Batal ekspor** still cancels the job.
+aplikasi** cancels only the pending Close batch; **Batal ekspor** still cancels the job.
 After success, recheck dirty: Extract, Split, Optimize and stale snapshots cannot mark current edits
 saved. Failed/cancelled jobs never close the viewer or replace its workspace.
 
@@ -57,7 +51,7 @@ The GPUI Kit alert shares the operational-modal guard, including global text-can
 listeners. Successful Save As keeps original source references and Undo/Redo history.
 Sources and existing destinations remain protected by the existing export policy.
 
-This feature covers ordinary Open/window close, not autosave, crash recovery,
+This feature covers ordinary tab/window close, not autosave, crash recovery,
 forced process termination, OS shutdown or recovery after external source changes.
 It adds no dependencies, format converters or broader PDF export compatibility.
 
@@ -66,5 +60,7 @@ It adds no dependencies, format converters or broader PDF export compatibility.
 Transition unit tests cover successful/current receipts, failed/cancelled jobs and
 async token invalidation. `scripts/tabs-ui-smoke.ps1 -Profile release` covers the
 current multi-document lifecycle using owned synthetic fixtures and test HWNDs.
-The older `m3-ui-smoke.ps1` Open-replacement scenarios remain historical and need migration.
+`scripts/m3-ui-smoke.ps1` now checks Open isolation, tab/window Close, failed/cancelled
+saves, receipt-gated continuation and the existing native export/consent assertions.
+The original single-workspace script is archived; see [coverage map](m3-ui-coverage.md).
 See testing.md for actual executions and evidence.

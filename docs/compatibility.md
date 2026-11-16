@@ -111,8 +111,10 @@ non-clobber commit. Source size/mtime is rechecked, including before publication
 Failure/cancel cleans owned staging; crash-orphan recovery and universal crash durability
 are not implemented. See ADR-0003 and m3-safe-export-plan.md.
 
-DPR layout/raster math is tested; physical mixed-monitor 100/150/200% acceptance is
-pending. Broader complex-PDF/accessibility tests, runtime/license audit and clean-machine
+DPR layout/raster math and actual connected-display DPI 96/100% with UIAutomation/
+targeted input checks are tested. Physical 150/200%, mixed-monitor, trackpad and
+screen-reader/modifier-key acceptance remain pending; see [device matrix](device-acceptance.md).
+Broader complex-PDF/accessibility tests, runtime/license audit and clean-machine
 portable packaging remain release gates. A successful optimized build is not a packaged
 product release. No new toolchain installation was required for M1.
 

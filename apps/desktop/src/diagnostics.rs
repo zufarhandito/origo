@@ -27,6 +27,8 @@ impl DocumentSession {
             "pageCacheBytes": self.pages.bytes(), "thumbnailCacheBytes": self.thumbnails.bytes(),
             "peakCacheBytes": self.stats.peak_cache_bytes, "maxBitmapBytes": self.stats.max_bitmap_bytes,
             "generation": self.generation, "gpuReleases": self.gpu_releases.load(Ordering::SeqCst),
+            "deviceScaleMilli": (self.dpr * 1000.).round() as u32,
+            "viewportWidth": self.viewport.0, "viewportHeight": self.viewport.1,
             "gpuReleaseErrors": self.gpu_release_errors.load(Ordering::SeqCst),
             "gpuImages": self.gpu_images.len(),
             "documentOpens": native.document_opens, "nativeRenders": native.renders,

@@ -1,3 +1,56 @@
+# Latest verification - M3 migration and device/checkpoint gates, 16 November 2026
+
+Baseline `582cd67` (`feat: tab`), clean main/cache origin/main at start. Rechecks were
+performed per stage/case; this checkpoint does not claim completion of hardware
+acceptance that the agent cannot physically perform.
+
+- `scripts/check.ps1` passed fmt, denied-warning workspace/all-target Clippy,
+  **47 unit tests** and release workspace build after adding numeric DPR/viewport
+  diagnostics. No PDF engine/export policy changed.
+- Final full native smoke passed M1/text/M3/tagged/whole-source/Split/Optimize,
+  including order/raster/text/source identity, consent/blockers, failure/cancel,
+  output collisions/races and owned cleanup.
+- Migrated release `scripts/m3-ui-smoke.ps1` passed **25 distinct named cases**:
+  `.research/m3-ui-84af4549a79a49538215f5dd9ce695f3`.
+  The saved `cases.json` was rechecked against the explicit 25-case manifest with
+  no missing, duplicated or non-passed case. This includes a real native existing-file
+  selection/overwrite confirmation followed by application refusal and unchanged hash.
+  [Coverage map](m3-ui-coverage.md) maps replacement-era transitions to Open/tab/window
+  behavior while retaining native output/consent, error copy, hashes and staging checks.
+- The historical script was copied before migration and verified byte-identical;
+  its Git-filtered blob equals `582cd67:scripts/m3-ui-smoke.ps1`.
+  `scripts/archive/m3-single-workspace-ui.ps1.txt` is intentionally non-runnable.
+  Automatic review initially rejected broad rewrite without a backup; the safe
+  migration preserved this verified snapshot and used targeted edits plus a coverage map.
+- Final release device audit passed four automated checks:
+  `.research/device-acceptance-2e02b16c1741410684633492f73f15e8`.
+  One connected display was observed (1920x1200, Windows DPI 96); GPUI scale/viewport
+  agrees, required controls are visible, TabItem/close roles and ValuePattern work,
+  targeted Enter/PageUp/PageDown navigate correctly, Tab reaches a named control,
+  and Escape returns from the narrow drawer. The 100% screenshot was visually inspected.
+- **Six device/human cases remain pending**, not counted as pass: actual 150%, actual
+  200%, mixed-monitor transition, physical modifier shortcuts, physical trackpad
+  pinch/scroll/pan and screen-reader announcements. No global DPI setting or global
+  keyboard input was changed/injected. [Manual matrix](device-acceptance.md) and the
+  `-LeaveOpen` fixture command make the remaining acceptance actionable.
+- Release general multi-tab and hardening regressions passed:
+  `.research/tabs-ui-ada8dcd591ab4dc99e9a9e5483c54ea0`,
+  `.research/tabs-hardening-3f1081877b4d457ab077839874d135d5`.
+- Intermediate existing-file attempts exposed transient native IFileDialog UIA
+  invalidation. Native Button enumeration restricted to the owned PID replaced that
+  fragile lookup; the actual no-overwrite/hash check remains mandatory. A subsequent
+  device attempt read accessibility focus before projection settled; the final audit
+  waits for input focus and a named target rather than relaxing its focus assertion.
+  Failed intermediate attempts are not acceptance; owned failed windows were closed.
+- Final review passed all 132 local Markdown links across 31 documents, syntax of
+  all 22 current PowerShell scripts, diff whitespace and historical snapshot fidelity.
+  Per-case evidence was independently rechecked: 25 distinct expected M3 passes,
+  four automated device passes and six explicitly pending hardware/human cases.
+  These checks precede the authorized local checkpoint commit.
+  No remote CI/fetch/push, package publication, user PDF or private research note was used.
+  Physical priority 4 remains open even after the priority 5 local checkpoint.
+
+---
 # Latest verification - unified tabs, hardening and memory profile, 16 November 2026
 
 - Final hardening re-run also passed after the shared harness was strengthened to

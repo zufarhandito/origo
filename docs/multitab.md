@@ -79,9 +79,10 @@ bounds dan hash sumber dengan fixture/window sendiri. `chrome-ui-smoke.ps1` meng
 dua tema, empat lebar, panel dan input halaman; `m2-ui-smoke.ps1`, Split, Optimize dan
 native smoke tetap melengkapi regresi. Lihat [testing](testing.md) untuk hasil aktual.
 
-Suite `m3-ui-smoke.ps1` lama dipertahankan sebagai coverage historis single-workspace;
-skenario Open-replacement-nya belum sesuai multi-tab. Gunakan suite tabs untuk lifecycle
-baru, bukan mengklaim suite lama lulus pada layout ini. Physical mixed-DPI/trackpad,
+Suite `m3-ui-smoke.ps1` sudah dimigrasikan ke Open/tab-close/window-close dan tetap
+memeriksa ekspor/consent, failure, output identity, hash sumber dan cleanup. Snapshot
+single-workspace disimpan sebagai `.ps1.txt` di `scripts/archive/`; padanan kasus ada
+di [coverage map](m3-ui-coverage.md). Physical mixed-DPI/trackpad,
 profiling corpus/durasi yang lebih luas dan clean-machine portable tetap release gates.
 
 Follow-up hardening, diagnostics seluruh jendela dan protokol hasil profil delapan

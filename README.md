@@ -140,7 +140,12 @@ For multi-tab, Save As and unsaved-close UI acceptance, run:
 ```powershell
 cargo run --locked -p pdf-smoke -- --write-export-fixtures
 ./scripts/tabs-ui-smoke.ps1 -Profile release
+./scripts/m3-ui-smoke.ps1 -Profile release
 ```
+
+M3's original single-workspace assertions are archived and mapped to current tab/
+window behavior in [the coverage map](docs/m3-ui-coverage.md). Device/input acceptance
+and the remaining human hardware checks are tracked in [the device matrix](docs/device-acceptance.md).
 
 Original documents are read-only. For interactive Windows GPU acceptance:
 

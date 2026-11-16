@@ -32,12 +32,16 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 | Pengaturan halaman | [Organizer](organizer.md), [perubahan belum disimpan](unsaved-changes.md) |
 | Output PDF | [Save As/Extract](m3-safe-export-plan.md), [Split](split.md), [Optimize](optimize.md) |
 | Dukungan/pengujian | [Kompatibilitas](compatibility.md), [hasil pengujian](testing.md) |
+| Acceptance aktif | [Pemetaan migrasi M3](m3-ui-coverage.md), [perangkat/input/aksesibilitas](device-acceptance.md) |
+| Checkpoint kerja | [Recheck prioritas 3–5](checkpoint-priorities-3-5.md) |
 | Arah konversi | [Roadmap konversi](conversion-roadmap.md), belum ada converter aktif |
 | Kontrak awal | [Blueprint Level 1](blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md), memuat status historis |
 | Sejarah sesi | [Arsip handoff](archive/PROJECT_HANDOFF_HISTORY.md), bukan titik mulai kerja |
 
-Dokumen multi-tab menjelaskan perilaku shell baru. Catatan pengujian/blueprint lama
-tetap historis; khususnya suite M3 Open-replacement belum dimigrasikan ke multi-tab.
+Dokumen multi-tab menjelaskan perilaku shell baru. Suite M3 sudah dimigrasikan;
+[coverage map](m3-ui-coverage.md) menjelaskan padanan kasus dan snapshot historisnya.
+Catatan pengujian/blueprint lama tetap historis. Gate fisik yang belum dijalankan
+tetap terlihat pada [matriks perangkat](device-acceptance.md).
 
 ## Konvensi path dan privasi
 
