@@ -615,8 +615,9 @@ impl Viewer {
         ));
         json.pop();
         json.push_str(&format!(
-            ",\"transition\":\"{:?}\",\"workspaceInstance\":{},\"splitFiles\":{},\"splitDone\":{}}}",
-            self.transition.phase, self.workspace_instance, self.export.split_total, self.export.split_done.load(Ordering::SeqCst)
+            ",\"transition\":\"{:?}\",\"workspaceInstance\":{},\"splitFiles\":{},\"splitDone\":{},\"optimizing\":{},\"optimizeBeforeBytes\":{},\"optimizeAfterBytes\":{}}}",
+            self.transition.phase, self.workspace_instance, self.export.split_total, self.export.split_done.load(Ordering::SeqCst), self.export.optimizing,
+            self.export.optimization.map_or(0, |s| s.baseline_bytes), self.export.optimization.map_or(0, |s| s.output_bytes)
         ));
         cx.background_executor()
             .spawn(async move {

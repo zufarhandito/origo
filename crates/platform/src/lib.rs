@@ -150,6 +150,16 @@ impl OutputTransaction for SafeOutput {
         }
         Ok(())
     }
+    fn artifact_size(&self, path: &Path) -> Result<u64, ExportError> {
+        if !path.starts_with(self.dir.path()) {
+            return Err(ExportError::InvalidPlan);
+        }
+        let metadata = fs::metadata(path).map_err(|_| ExportError::Io)?;
+        if !metadata.is_file() {
+            return Err(ExportError::Validation);
+        }
+        Ok(metadata.len())
+    }
     fn commit(self, control: &ExportControl) -> Result<PathBuf, ExportError> {
         self.verify_sources()?;
         control.checkpoint()?;

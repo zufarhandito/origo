@@ -37,6 +37,23 @@ fn stream(attributes: &str, bytes: &[u8]) -> Vec<u8> {
     object.extend_from_slice(b"\nendstream");
     object
 }
+pub fn jpeg_pdf() -> Vec<u8> {
+    assemble(&[
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 320 240] /Resources << /XObject << /Photo 5 0 R >> >> /Contents 4 0 R >>".to_vec(),
+        stream("", b"q 320 0 0 240 0 0 cm /Photo Do Q\n"),
+        stream("/Type /XObject /Subtype /Image /Width 32 /Height 24 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode",
+            include_bytes!("../../../tests/fixtures/optimize-photo.jpg")),
+    ])
+}
+pub fn blank_pdf() -> Vec<u8> {
+    assemble(&[
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Resources << >> >>".to_vec(),
+    ])
+}
 pub fn tagged_ink_pdf() -> Vec<u8> {
     let mut objects = vec![
         b"<< /Type /Catalog /Pages 2 0 R /StructTreeRoot 10 0 R /MarkInfo << /Marked true >> /ViewerPreferences << /DisplayDocTitle true >> /Metadata 16 0 R >>".to_vec(),

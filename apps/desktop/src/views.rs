@@ -688,6 +688,9 @@ impl Render for Viewer {
                 ),
             )
             .child(header)
+            .when(self.export.running && self.export.optimizing, |el| {
+                el.child(div().px_4().py_2().text_sm().child("Optimasi lossless tanpa penurunan kualitas gambar. Ukuran hasil dapat tetap sama atau lebih besar; sumber tetap utuh."))
+            })
             .when(self.export.running && self.export.split_total > 0, |el| {
                 el.child(div().id("split-progress").px_4().py_2().text_sm().child(format!(
                     "Split PDF: {} dari {} file selesai divalidasi. Folder diterbitkan setelah seluruh batch berhasil.",
@@ -732,6 +735,8 @@ impl Render for Viewer {
                 el.child(
                     div()
                         .id("export-notice")
+                        .role(gpui::Role::Group)
+                        .aria_label(notice.clone())
                         .px_4()
                         .py_2()
                         .flex()

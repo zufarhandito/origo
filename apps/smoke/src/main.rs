@@ -7,6 +7,7 @@ use qpdf_adapter::QpdfProbe;
 use std::path::PathBuf;
 mod books;
 mod exporting;
+mod optimizing;
 mod splitting;
 mod synthetic;
 mod text;
@@ -117,6 +118,8 @@ fn main() -> Result<()> {
         let dir = root.join(".research/export-fixtures");
         std::fs::create_dir_all(&dir)?;
         std::fs::write(dir.join("tagged-ink.pdf"), synthetic::tagged_ink_pdf())?;
+        std::fs::write(dir.join("optimize-jpeg.pdf"), synthetic::jpeg_pdf())?;
+        std::fs::write(dir.join("optimize-blank.pdf"), synthetic::blank_pdf())?;
         for feature in [
             "plain",
             "info",
@@ -213,5 +216,6 @@ fn main() -> Result<()> {
     text::run(&root, &renderer)?;
     exporting::run(&root, &renderer)?;
     splitting::run(&root, &renderer)?;
+    optimizing::run(&root, &renderer)?;
     Ok(())
 }

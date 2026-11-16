@@ -9,6 +9,9 @@ Current slice: **M3 safe PDF Save As/Extract**, using GPUI Kit 0.9.1 and pinned 
 The first M4 feature is **Split PDF**, under **Lainnya → Split PDF**: split every N
 pages or by manual ranges into a new output folder. All parts are validated before
 the folder is published; Split does not mark edits saved. See [Split](docs/split.md).
+**Lainnya → Optimize PDF (lossless)** optimizes the current page plan to a new PDF
+and reports before/after sizes. It does not lower image quality or mark edits saved;
+the result may stay the same size or grow. See [Optimize](docs/optimize.md).
 
 - Continuous virtualized scrolling and clickable thumbnail sidebar.
 - First/previous/next/last navigation and direct page-number entry.

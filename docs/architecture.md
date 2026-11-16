@@ -1,5 +1,13 @@
 # Architecture - M3
 
+Optimize adds ExportScope::Optimized and optional OptimizationSizes on the receipt.
+QPDF builds an ordinary current-plan baseline in staging, then applies lossless
+object/stream compression in a second pinned JSON job. OutputTransaction exposes
+owned artifact sizes; the application reads them after validation and before commit.
+The optimized receipt cannot advance the clean revision. Desktop exporting.rs reuses
+the existing picker, consent, export slot, cancellation and Open/Close guard. See
+optimize.md for comparison semantics and preservation limits.
+
 The first M4 slice adds application/split: immutable per-N/manual plans, aggregate
 consent and a distinct receipt that cannot advance the PDF clean revision.
 platform/split owns one shared source snapshot and a ready directory. Parts reuse

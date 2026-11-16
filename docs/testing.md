@@ -1,3 +1,40 @@
+# Latest verification - lossless Optimize, 16 November 2026
+
+- scripts/check.ps1 passed formatting, workspace/all-target denied-warning Clippy,
+  **45 unit tests** and release workspace build. Workspace debug build also passed.
+  New tests cover optimized capture/receipt never marking saved, smaller/equal/larger
+  results and zero-size rejection before commit, plus exact lossless-only QPDF options.
+- Full debug native smoke passed existing M1/text/M3/Split and new Optimize checks:
+  multi-source edited order/rotations/deletion, exact same-plan before/after byte sizes,
+  source text and exact 512px RGBA versus an ordinary export of the same plan; blank,
+  simulated scan and JPEG cases; original JPEG encoded bytes retained; unchanged
+  dirty revision; metadata/bookmark consent and blocked forms/signatures/tags/active
+  content; cancellation/failure after writing; destination race and changed sources;
+  owned baseline/staging cleanup. No new general performance/fidelity claim.
+- Release Optimize UI passed cancelled picker, transformed multi-source page plan,
+  exact size receipt and accessible result text, Undo/Redo, metadata refusal/acceptance,
+  Close waiting then retaining unsaved edits, conservative blockers, blank/JPEG output,
+  unchanged source hashes and cleanup. Evidence:
+  .research/optimize-ui-5b6e871cd8b14f77bdbb69626adf3a7a.
+  optimize-result.png was visually inspected. A valid tiny blank PDF grew from its
+  431-byte ordinary-export baseline to 521 bytes; the UI correctly reported growth.
+  Small JPEG output also grew (1571 -> 1615 bytes), while the edited multi-source case
+  shrank (3019 -> 1892 bytes). These are generated fixtures, not reduction guarantees.
+- An intermediate blank fixture lacked a Resources dictionary, so clean QPDF preflight
+  correctly blocked repair warnings. The fixture was corrected; production preflight
+  was not loosened. The earlier interrupted suite is not counted as acceptance.
+- Final regressions passed on the Optimize build: release M3/unsaved guard
+  (.research/m3-ui-612af32f2ad1469cbf4aef08de67390b), release Split
+  (.research/split-ui-1fc72d1242b74d978835dd0613cab04a), and debug M1 empty startup,
+  100-page navigation/thumbnail/scroll, rapid 50-400% zoom and resize
+  (.research/m1-ui-93de63cbfd69453991750c92596dc122). The owned final viewer was
+  closed normally afterward; existing user sessions were preserved.
+- No new dependency/runtime/sidecar or real user PDF. The tiny JPEG is a generated
+  color pattern (scripts/new-optimize-fixture.ps1), committed for repeatable tests.
+  No portable release, remote CI result, overwrite, image downsampling, OCR or broader
+  form/tag/signature preservation is claimed. See optimize.md for current limits.
+
+---
 # Latest verification - Split PDF, 15 November 2026
 
 - Final scripts/check.ps1 passed formatting, workspace/all-target Clippy with denied

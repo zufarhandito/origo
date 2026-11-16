@@ -1,12 +1,14 @@
 //! Native dialogs and async composition of the safe export use case.
 use crate::*;
 use pdf_application::export::{
-    ExportControl, ExportError, ExportPlan, ExportReceipt, ExportScope, finish_export,
-    prepare_export,
+    ExportControl, ExportError, ExportPlan, ExportReceipt, ExportScope, OptimizationSizes,
+    finish_export, prepare_export,
 };
 use pdf_platform::LocalOutput;
 #[derive(Default)]
 pub(super) struct ExportState {
+    pub optimizing: bool,
+    pub optimization: Option<OptimizationSizes>,
     pub split_total: usize,
     pub split_done: Arc<std::sync::atomic::AtomicUsize>,
     pub running: bool,
@@ -19,6 +21,8 @@ pub(super) struct ExportState {
 }
 impl Viewer {
     pub(super) fn start_export_job(&mut self, control: ExportControl, cx: &mut Context<Self>) {
+        self.export.optimizing = false;
+        self.export.optimization = None;
         self.export.split_total = 0;
         self.export
             .split_done
@@ -78,20 +82,27 @@ impl Viewer {
                     .is_some_and(|w| receipt.apply(self.workspace_instance, w));
                 self.export.success = true;
                 self.export.pages = receipt.page_count;
+                self.export.optimization = receipt.optimization;
                 let name = receipt
                     .destination
                     .file_name()
                     .map(|s| s.to_string_lossy().into_owned())
                     .unwrap_or_default();
-                self.export.notice = Some(if receipt.scope == ExportScope::Selected {
-                    format!("Halaman terpilih tersimpan: {name}")
-                } else if current {
-                    format!("PDF baru tersimpan: {name}")
-                } else {
-                    format!(
-                        "Snapshot sebelumnya tersimpan: {name}. Workspace saat ini tidak ditandai tersimpan."
-                    )
-                });
+                self.export.notice = Some(
+                    if let (ExportScope::Optimized, Some(sizes)) =
+                        (receipt.scope, receipt.optimization)
+                    {
+                        optimization_notice(&name, sizes)
+                    } else if receipt.scope == ExportScope::Selected {
+                        format!("Halaman terpilih tersimpan: {name}")
+                    } else if current {
+                        format!("PDF baru tersimpan: {name}")
+                    } else {
+                        format!(
+                            "Snapshot sebelumnya tersimpan: {name}. Workspace saat ini tidak ditandai tersimpan."
+                        )
+                    },
+                );
             }
             Err(e) => {
                 self.export.success = false;
@@ -149,15 +160,18 @@ impl Viewer {
             .unwrap_or_else(|| "document".into());
         let suggested = format!(
             "{stem}-{}.pdf",
-            if scope == ExportScope::All {
-                "edited"
-            } else {
-                "pages"
+            match scope {
+                ExportScope::All => "edited",
+                ExportScope::Selected => "pages",
+                ExportScope::Optimized => "optimized",
             }
         );
         let dialog = cx.prompt_for_new_path(&parent, Some(&suggested));
         let control = ExportControl::default();
         self.start_export_job(control.clone(), cx);
+        self.export.optimizing = scope == ExportScope::Optimized;
+        self.report(cx);
+        cx.notify();
         let exporter = self.exporter.clone();
         let renderer = self.renderer.clone();
         let handle = self.window_handle;
@@ -225,4 +239,35 @@ impl Viewer {
         })
         .detach();
     }
+}
+fn format_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KiB ({bytes} B)", bytes as f64 / 1024.)
+    } else {
+        format!("{:.2} MiB ({bytes} B)", bytes as f64 / (1024. * 1024.))
+    }
+}
+fn optimization_notice(name: &str, sizes: OptimizationSizes) -> String {
+    let before = sizes.baseline_bytes;
+    let after = sizes.output_bytes;
+    let change = if after < before {
+        format!(
+            "Ukuran berkurang {:.1}%.",
+            (before - after) as f64 * 100. / before as f64
+        )
+    } else if after > before {
+        format!(
+            "Ukuran bertambah {:.1}%.",
+            (after - before) as f64 * 100. / before as f64
+        )
+    } else {
+        "Ukuran tetap sama.".into()
+    };
+    format!(
+        "Optimize selesai: {name}. Susunan sebelum optimasi: {}; hasil: {}. {change} Status tersimpan workspace tidak berubah.",
+        format_size(before),
+        format_size(after)
+    )
 }

@@ -55,6 +55,8 @@ pub enum ExportError {
 pub enum ExportScope {
     All,
     Selected,
+    /// All pages as a derived optimized PDF; never advances the clean baseline.
+    Optimized,
 }
 #[derive(Clone)]
 pub struct ExportPage {
@@ -116,6 +118,9 @@ impl ExportPlan {
     }
     pub fn sources(&self) -> &[SourceDocument] {
         &self.sources
+    }
+    pub fn scope(&self) -> ExportScope {
+        self.scope
     }
     pub(crate) fn subset(&self, indices: &[usize]) -> Result<Self, ExportError> {
         if indices.is_empty() {
@@ -334,6 +339,10 @@ pub trait OutputTransaction: Send {
     fn output(&self) -> &Path;
     fn directory(&self) -> &Path;
     fn verify_sources(&self) -> Result<(), ExportError>;
+    /// Byte size of an artifact owned by this transaction, before publication.
+    fn artifact_size(&self, _path: &Path) -> Result<u64, ExportError> {
+        Err(ExportError::Io)
+    }
     fn commit(self, control: &ExportControl) -> Result<PathBuf, ExportError>;
 }
 pub trait AtomicOutput {
@@ -350,12 +359,19 @@ pub struct PreparedExport<T> {
     pub report: PreflightReport,
     pub(crate) transaction: T,
 }
+pub const OPTIMIZE_BASELINE_FILE: &str = "before-optimize.pdf";
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OptimizationSizes {
+    pub baseline_bytes: u64,
+    pub output_bytes: u64,
+}
 pub struct ExportReceipt {
     pub instance: u64,
     pub revision: u64,
     pub scope: ExportScope,
     pub destination: PathBuf,
     pub page_count: usize,
+    pub optimization: Option<OptimizationSizes>,
 }
 impl ExportReceipt {
     pub fn apply(&self, instance: u64, workspace: &mut Workspace) -> bool {
@@ -425,6 +441,20 @@ pub fn finish_export<T: OutputTransaction>(
         return Err(ExportError::Validation);
     }
     transaction.verify_sources()?;
+    let optimization = if plan.scope == ExportScope::Optimized {
+        let baseline_bytes =
+            transaction.artifact_size(&transaction.directory().join(OPTIMIZE_BASELINE_FILE))?;
+        let output_bytes = transaction.artifact_size(transaction.output())?;
+        if baseline_bytes == 0 || output_bytes == 0 {
+            return Err(ExportError::Validation);
+        }
+        Some(OptimizationSizes {
+            baseline_bytes,
+            output_bytes,
+        })
+    } else {
+        None
+    };
     control.set_phase(ExportPhase::Commit);
     let destination = transaction.commit(control)?;
     control.set_phase(ExportPhase::Finished);
@@ -434,6 +464,7 @@ pub fn finish_export<T: OutputTransaction>(
         scope: plan.scope,
         destination,
         page_count: plan.pages.len(),
+        optimization,
     })
 }
 /// Resolve sources by identity, never by a workspace position or PageId serial.
@@ -502,6 +533,7 @@ mod tests {
             scope: ExportScope::Selected,
             destination: "out.pdf".into(),
             page_count: 2,
+            optimization: None,
         };
         assert!(!receipt.apply(7, &mut w));
         assert!(w.is_dirty());
@@ -555,9 +587,38 @@ mod tests {
         assert!(!ExportPlan::capture(&w, 1, ExportScope::Selected)?.is_whole_source_extract());
         Ok(())
     }
+    #[test]
+    fn optimized_plan_captures_all_pages_but_cannot_mark_workspace_saved()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut w = workspace()?;
+        let id = w.pages()[0].id;
+        w.select([id]);
+        w.execute(pdf_domain::Command::Rotate {
+            ids: vec![id],
+            turns: 1,
+        })?;
+        let plan = ExportPlan::capture(&w, 9, ExportScope::Optimized)?;
+        assert_eq!(plan.pages().len(), w.pages().len());
+        assert!(!plan.is_whole_source_extract() && !plan.is_single_source_extract());
+        let receipt = ExportReceipt {
+            instance: 9,
+            revision: w.revision(),
+            scope: ExportScope::Optimized,
+            destination: "optimized.pdf".into(),
+            page_count: plan.pages().len(),
+            optimization: Some(OptimizationSizes {
+                baseline_bytes: 100,
+                output_bytes: 150,
+            }),
+        };
+        assert!(!receipt.apply(9, &mut w));
+        assert!(w.is_dirty());
+        Ok(())
+    }
     struct Transaction {
         sources: Vec<SourceDocument>,
         commits: Arc<AtomicUsize>,
+        sizes: (u64, u64),
     }
     impl OutputTransaction for Transaction {
         fn sources(&self) -> &[SourceDocument] {
@@ -571,6 +632,15 @@ mod tests {
         }
         fn verify_sources(&self) -> Result<(), ExportError> {
             Ok(())
+        }
+        fn artifact_size(&self, path: &Path) -> Result<u64, ExportError> {
+            if path == self.directory().join(OPTIMIZE_BASELINE_FILE) {
+                Ok(self.sizes.0)
+            } else if path == self.output() {
+                Ok(self.sizes.1)
+            } else {
+                Err(ExportError::InvalidPlan)
+            }
         }
         fn commit(self, control: &ExportControl) -> Result<PathBuf, ExportError> {
             control.checkpoint()?;
@@ -591,6 +661,7 @@ mod tests {
             Ok(Transaction {
                 sources: plan.sources.clone(),
                 commits: self.0.clone(),
+                sizes: (100, 150),
             })
         }
     }
@@ -655,6 +726,49 @@ mod tests {
                 ],
             })
         }
+    }
+    #[test]
+    fn optimization_reports_smaller_equal_larger_and_rejects_empty_artifacts()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let plan = ExportPlan::capture(&workspace()?, 1, ExportScope::Optimized)?;
+        let engine = Engine {
+            metadata: false,
+            bookmarks: false,
+            fail: false,
+            cancel_on_write: false,
+        };
+        for (before, after, success) in [
+            (100, 50, true),
+            (100, 100, true),
+            (100, 150, true),
+            (0, 50, false),
+            (100, 0, false),
+        ] {
+            let commits = Arc::new(AtomicUsize::new(0));
+            let control = ExportControl::default();
+            let prepared = PreparedExport {
+                plan: plan.clone(),
+                report: engine.preflight(&[], &control)?,
+                transaction: Transaction {
+                    sources: plan.sources.clone(),
+                    commits: commits.clone(),
+                    sizes: (before, after),
+                },
+            };
+            let result = finish_export(prepared, false, &engine, &Inspector(true), &control);
+            assert_eq!(result.is_ok(), success);
+            assert_eq!(commits.load(Ordering::SeqCst), usize::from(success));
+            if let Ok(receipt) = result {
+                assert_eq!(
+                    receipt.optimization,
+                    Some(OptimizationSizes {
+                        baseline_bytes: before,
+                        output_bytes: after
+                    })
+                );
+            }
+        }
+        Ok(())
     }
     #[test]
     fn commit_is_after_acknowledgement_engine_validation_and_cancellation()

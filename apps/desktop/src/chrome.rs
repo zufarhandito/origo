@@ -113,6 +113,7 @@ impl Viewer {
             icon("more", IconName::Ellipsis, "Lainnya", "").dropdown_menu(move |menu, _, _| {
                 let weak = weak.clone();
                 let split_view = weak.clone();
+                let optimize_view = weak.clone();
                 menu.item(PopupMenuItem::new("Impor PDF").disabled(disabled).on_click(
                     move |_, _, cx| {
                         let _ = weak.update(cx, |this, cx| this.import_pdf(cx));
@@ -123,6 +124,19 @@ impl Viewer {
                         .disabled(split_disabled)
                         .on_click(move |_, window, cx| {
                             let _ = split_view.update(cx, |this, cx| this.show_split(window, cx));
+                        }),
+                )
+                .separator()
+                .item(
+                    PopupMenuItem::new("Optimize PDF (lossless)")
+                        .disabled(split_disabled)
+                        .on_click(move |_, _, cx| {
+                            let _ = optimize_view.update(cx, |this, cx| {
+                                this.start_export(
+                                    pdf_application::export::ExportScope::Optimized,
+                                    cx,
+                                )
+                            });
                         }),
                 )
                 .separator()

@@ -2,8 +2,8 @@
 use pdf_application::{
     SourceDocument,
     export::{
-        ExportControl, ExportError, ExportPlan, ExportPreflight, PdfExporter, PreflightReport,
-        resolve_source,
+        ExportControl, ExportError, ExportPlan, ExportPreflight, ExportScope,
+        OPTIMIZE_BASELINE_FILE, PdfExporter, PreflightReport, resolve_source,
     },
 };
 use pdf_platform::{fingerprint, run};
@@ -193,6 +193,14 @@ fn job(plan: &ExportPlan, sources: &[SourceDocument], output: &Path) -> Result<V
     }
     Ok(job)
 }
+fn optimization_job(input: &Path, output: &Path) -> Result<Value, ExportError> {
+    Ok(json!({
+        "inputFile": input.to_str().ok_or(ExportError::InvalidPlan)?,
+        "outputFile": output.to_str().ok_or(ExportError::InvalidPlan)?,
+        "objectStreams": "generate", "streamData": "compress",
+        "recompressFlate": "", "compressionLevel": "9"
+    }))
+}
 impl PdfExporter for QpdfExporter {
     fn write(
         &self,
@@ -230,17 +238,21 @@ impl PdfExporter for QpdfExporter {
             return Ok(());
         }
         self.version(control)?;
-        let bytes = serde_json::to_vec(&job(plan, sources, output)?)
-            .map_err(|_| ExportError::InvalidPlan)?;
-        if bytes.len() > JSON_LIMIT {
-            return Err(ExportError::ResourceLimit);
-        }
-        let job_path = work.join("job.json");
-        std::fs::write(&job_path, bytes).map_err(|_| ExportError::Io)?;
-        let mut argument = OsString::from("--job-json-file=");
-        argument.push(job_path);
-        if self.invoke(&[argument], 65536, control)?.code != Some(0) {
-            return Err(ExportError::Engine);
+        let baseline = work.join(OPTIMIZE_BASELINE_FILE);
+        let target = if plan.scope() == ExportScope::Optimized {
+            baseline.as_path()
+        } else {
+            output
+        };
+        self.write_job(&job(plan, sources, target)?, work, "job.json", control)?;
+        if plan.scope() == ExportScope::Optimized {
+            self.check(&baseline, control)?;
+            self.write_job(
+                &optimization_job(&baseline, output)?,
+                work,
+                "optimize-job.json",
+                control,
+            )?;
         }
         if plan.is_single_source_extract() {
             self.remove_structure_references(output, work, control)?;
@@ -263,6 +275,27 @@ impl PdfExporter for QpdfExporter {
     }
 }
 impl QpdfExporter {
+    fn write_job(
+        &self,
+        job: &Value,
+        work: &Path,
+        name: &str,
+        control: &ExportControl,
+    ) -> Result<(), ExportError> {
+        control.checkpoint()?;
+        let bytes = serde_json::to_vec(job).map_err(|_| ExportError::InvalidPlan)?;
+        if bytes.len() > JSON_LIMIT {
+            return Err(ExportError::ResourceLimit);
+        }
+        let path = work.join(name);
+        std::fs::write(&path, bytes).map_err(|_| ExportError::Io)?;
+        let mut argument = OsString::from("--job-json-file=");
+        argument.push(path);
+        if self.invoke(&[argument], 65536, control)?.code != Some(0) {
+            return Err(ExportError::Engine);
+        }
+        control.checkpoint()
+    }
     fn output_json(&self, path: &Path, control: &ExportControl) -> Result<Value, ExportError> {
         let result = self.invoke(
             &[
@@ -343,5 +376,14 @@ mod tests {
     #[test]
     fn range_compilation_never_sorts_or_deduplicates() {
         assert_eq!(ranges(&[2, 1, 4, 5, 6, 3]), "2,1,4-6,3");
+    }
+    #[test]
+    fn optimization_uses_only_lossless_compression_options() -> Result<(), ExportError> {
+        let job = optimization_job(Path::new("baseline.pdf"), Path::new("optimized.pdf"))?;
+        assert_eq!(
+            job,
+            json!({"inputFile":"baseline.pdf", "outputFile":"optimized.pdf", "objectStreams":"generate", "streamData":"compress", "recompressFlate":"", "compressionLevel":"9"})
+        );
+        Ok(())
     }
 }

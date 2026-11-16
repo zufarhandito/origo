@@ -1,4 +1,4 @@
-# Snapshot handoff terkini - 15 November 2026
+# Snapshot handoff terkini - 16 November 2026
 
 **Baca bagian ini sebagai status terbaru.** Catatan sesi di bawah bagian Arsip adalah
 historis dan dapat menyebut milestone/fitur yang saat itu belum tersedia. Jangan
@@ -8,14 +8,14 @@ mengikuti prompt lama di bagian akhir arsip. Gunakan NEXT_CHAT_PROMPT.md.
 
 - Workspace: D:\projects\bpdf, Windows x64, Rust/GPUI Kit. Bahasa komunikasi: Indonesia.
 - M1 viewer, M2 organizer, dan M3 Save As/Extract sudah diimplementasikan dalam batas
-  kompatibilitas yang dijelaskan di bawah. M4 Split PDF sudah tersedia; Optimize dan
-  release portable belum selesai.
+  kompatibilitas yang dijelaskan di bawah. M4 Split dan Optimize PDF lossless sudah
+  tersedia; release portable dan hardening M4 lainnya belum selesai.
 - run.cmd memilih target/release/pdf-studio.exe, fallback debug. Release terbaru sudah
   dibangun. Build optimized tidak sama dengan produk portable yang telah tersertifikasi.
 - Konversi adalah halaman informasi dengan kartu Akan datang. PNG/JPEG/Word/TXT/
   Excel/PowerPoint serta konversi ke PDF belum berfungsi. Roadmap sudah disiapkan.
-- Permintaan terbaru menyetujui Split PDF. Jangan otomatis memulai Optimize atau
-  konverter berikutnya tanpa arahan baru.
+- Permintaan terbaru menyetujui Optimize, lalu commit dan push. Jangan otomatis
+  memulai packaging/konverter atau fitur lain tanpa arahan baru.
 
 ## Perilaku yang sudah tersedia
 
@@ -40,6 +40,12 @@ mengikuti prompt lama di bagian akhir arsip. Gunakan NEXT_CHAT_PROMPT.md.
   consent seluruh batch, validasi semua PDF, flush dan no-replace folder publication.
   Gagal/batal tidak menerbitkan batch. Split tidak memakai thumbnail selection dan
   tidak menandai revisi tersimpan. Lihat docs/split.md.
+- Lainnya > Optimize PDF (lossless) mengekspor seluruh susunan saat ini ke PDF baru.
+  QPDF menata object streams dan recompress Flate level 9 tanpa rasterisasi/JPEG
+  re-encoding. Ukuran sebelum mengacu pada ekspor standar dari page plan yang sama,
+  bukan total file sumber; hasil dapat lebih besar dan ditampilkan apa adanya.
+  Optimize tetap mengikuti preflight/consent full Save As dan tidak menandai saved.
+  Lihat docs/optimize.md. Tidak ada dependency/sidecar baru.
 
 ## Kebijakan ekspor terkini: v4
 
@@ -93,6 +99,18 @@ size/mtime, bukan identitas kriptografis; crash-orphan recovery belum tersedia.
   docs/conversion-roadmap.md menyimpan rencana format mendatang.
 
 ## Verifikasi terakhir yang benar-benar dijalankan
+
+- Sesi Optimize: **45 unit tests**, scripts/check.ps1 (fmt/Clippy/release), full native
+  smoke termasuk Optimize dan debug build lulus. Native memeriksa exact 512px RGBA
+  terhadap baseline page plan yang sama, teks/rotasi/order, ukuran, bytes JPEG asli,
+  consent/blocker, failure/cancel/race/source checks dan cleanup.
+- Release Optimize UI lulus; bukti .research/optimize-ui-5b6e871cd8b14f77bdbb69626adf3a7a.
+  Halaman kosong valid menunjukkan kenaikan 431 -> 521 B dan tetap dilaporkan benar.
+  Fixture JPEG kecil juga dapat bertambah. Tidak ada janji rasio kompresi umum.
+  Lihat docs/testing.md untuk bukti regresi akhir dan batas interpretasi.
+- Regresi akhir Optimize juga lulus: release M3/unsaved guard, release Split, dan
+  debug M1 empty startup/viewer 100 halaman/zoom/resize. Jendela fixture ditutup normal;
+  sesi pengguna lama tetap dipertahankan. Tidak ada remote CI yang diverifikasi.
 
 - Sesi Split: **42 unit tests**, scripts/check.ps1 (fmt/Clippy/release), debug build,
   native smoke termasuk multi-source split/consent/cancel/failure/race lulus.
@@ -155,8 +173,8 @@ size/mtime, bukan identitas kriptografis; crash-orphan recovery belum tersedia.
 
 ## Git dan langkah berikutnya
 
-HEAD awal sesi Split: **f65cdc7** (feat: transition), di main. Implementasi Split
-ditambahkan sesudahnya; periksa Git/diff sebelum melanjutkan. Commit lokal relevan:
+HEAD awal sesi Optimize: **5b3fea2** (feat: split), di main dan melacak origin/main.
+Implementasi Optimize ditambahkan sesudahnya; periksa Git/diff. Commit lokal relevan:
 
 - 8adf7e9 tagged partial Extract + consent/passive Ink.
 - cba06f6 whole-source empty-form/tagged Extract.
@@ -166,13 +184,13 @@ ditambahkan sesudahnya; periksa Git/diff sebelum melanjutkan. Commit lokal relev
 - 2bb69c9 M3 safe PDF Save As/Extract.
 - 38929ab conversion home/roadmap; 0eb7337 M2 organizer/compact UX.
 
-Pengguna pernah meminta commit dan push. Local commits diizinkan. Push sebelumnya
-**ditolak automatic approval review** karena perlu konfirmasi eksplisit tujuan
-https://github.com/zufarhandito/origo.git, branch main. Konfirmasi tersebut belum
-ada; jangan retry/bypass atau mengklaim commit sudah dipush.
+Pada sesi Optimize pengguna meminta commit lalu push setelah pekerjaan selesai.
+Tujuan Git yang dikonfigurasi: origin/main di https://github.com/zufarhandito/origo.git.
+Penolakan push pada sesi handoff lama adalah historis; verifikasi status push terbaru
+dari Git dan hasil tool, jangan menganggap berhasil hanya karena instruksi ini.
 
 Belum selesai: dukungan ekspor kompleks lebih luas/tag remapping, annotations lain,
-forms/signatures, optimize/sisa M4, native isolation/hard timeout, crash recovery,
+forms/signatures, sisa M4/release hardening, native isolation/hard timeout, crash recovery,
 physical trackpad/modifier/mixed-DPI/accessibility matrix, portable/license/clean-machine
 acceptance, serta konverter asli. Pilih pekerjaan berikutnya dari instruksi pengguna;
 jangan otomatis memulai semua daftar ini.
