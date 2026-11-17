@@ -1,3 +1,49 @@
+# Verification — multi-tab tahap 4B, 17 November 2026
+
+- Final `scripts/check.ps1` passed: fmt, denied-warning Clippy, **57 unit tests**
+  and release workspace build. The shared-model test checks one history/selection,
+  unique import IDs, cross-view busy state and shared invalidation without cloning
+  Workspace/history. No engine or export-preservation policy change.
+- Debug same-document suite passed 7 cases at
+  `.research/same-document-ui-e057a4dfe82a4707afa540ed7d01ae56`.
+- Final release same-document suite passed **9 named cases** at
+  `.research/same-document-ui-11845abf68784585b3e9d7b47e1bcb43`: independent reading/
+  zoom/Find/text selection, shared selection/edit/Undo and deleted-page fallback,
+  imports from both views with unique IDs and search invalidation, PNG/Split dialog
+  routing, secondary Save As while closing the actor's view, duplicate Open/reuse,
+  preferred-view session metadata, document-close cancel/Discard/Save with only the
+  secondary visible, metadata-only reopen and source-change invalidation of both.
+  Source bytes stayed unchanged. Initial harness trials were corrected for virtual
+  thumbnail realization, completion of duplicate Open and the unsaved-dialog button's
+  explicit accessibility label before this successful run.
+- Release two-document comparison regression passed all 10 cases at
+  `.research/comparison-ui-979321e5a5fd431ab6de1315784094d3`.
+  Final splitter-hover hardening also passed all 10 cases at
+  `.research/comparison-ui-5fa8d8f85c3445538c3ed1650443ed24`: a hover move without
+  a pressed-button flag during a held drag cannot release the minimum-width guard.
+  Fmt/workspace Clippy, the 10 desktop unit tests and release build passed again
+  after this focused change; no resource-policy change followed the profile.
+- Release existing tabs passed at `.research/tabs-ui-787dbdea328048b8959664106bf88821`;
+  search passed 14 cases at `.research/search-ui-01091d02874a4c8fb226b7816ce1216e`.
+- Session restore passed 8 cases at
+  `.research/session-restore-ui-d17e5cc02d9c4ec9b88788a950649502`; organizer/M2 passed
+  at `.research/m2-ui-c3a472c58b6e4722b846c9fb336c7670`. The session fault-injection
+  harness now waits for the background failure notice before requesting exit,
+  avoiding a race where that Close was already the permitted retry. The product
+  failure/close policy was unchanged.
+- Same-document memory trial (8 open PDFs, 1,000 pages each, 3 rounds, two views of
+  the vector PDF at 400% simultaneously) passed at
+  `.research/same-document-memory-cbb1098da0d74b69a3b68705aafb9854`: 31 samples,
+  maximum private bytes 333,180,928, warmed growth 569,344 bytes, handle growth 9.
+  The rerun after preserving pan across shared edits passed at
+  `.research/same-document-memory-f5c14c5bbdac4dc9bccc0501df005bfd`: **31 samples**,
+  maximum private bytes **330,465,280**, warmed growth **679,936 bytes**, handle
+  growth **10**, GPU growth **−36,864 bytes**. Idle caches/native residency returned
+  to zero and corpus hashes stayed unchanged. This corpus differs from the two-document profile;
+  these numbers are not a direct performance comparison.
+- No new physical mixed-DPI, clean-machine, hostile-native isolation, remote CI or
+  public binary-release claim. Group tabs/vertical tabs remain backlog.
+
 # Verification — multi-tab tahap 4A, 17 November 2026
 
 - Two different PDFs use the native GPUI Kit 0.9.1 Dock and real splitter; one

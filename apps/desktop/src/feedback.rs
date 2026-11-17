@@ -105,6 +105,7 @@ impl DocumentSession {
                                             window.close_dialog(cx);
                                             let _ = close_view.update(cx, |this, cx| {
                                                 this.clear_modal();
+                                                this.restore_visible_focus(cx);
                                                 cx.notify();
                                             });
                                         }),
@@ -113,6 +114,7 @@ impl DocumentSession {
                         .on_close(move |_, _, cx| {
                             let _ = weak.update(cx, |this, cx| {
                                 this.clear_modal();
+                                this.restore_visible_focus(cx);
                                 cx.notify();
                             });
                         })

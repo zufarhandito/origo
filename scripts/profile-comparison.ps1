@@ -1,6 +1,9 @@
 ﻿# Generated-book profiling for the two visible Dock panels. Owned fixture only.
-param([ValidateSet('debug','release')][string]$Profile='release',[ValidateRange(2,5)][int]$Rounds=3,[switch]$HighZoom)
-. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -TestName 'comparison-memory' -Fixture '.research/book-benchmark/vector-1000.pdf' -IsolatedState
+param([ValidateSet('debug','release')][string]$Profile='release',[ValidateRange(2,5)][int]$Rounds=3,[switch]$HighZoom,[switch]$SameDocument)
+$profileTestName=if($SameDocument){'same-document-memory'}else{'comparison-memory'}
+. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -TestName $profileTestName -Fixture '.research/book-benchmark/vector-1000.pdf' -IsolatedState
+$leftPane=if($SameDocument){'A.pdf (kiri)'}else{'A.pdf'}
+$rightPane=if($SameDocument){'A.pdf (kanan)'}else{'B.pdf'}
 Add-Type 'using System;using System.Runtime.InteropServices;public static class TabGuiMemory{[DllImport("user32.dll")]public static extern uint GetGuiResources(IntPtr process,uint flag);}'
 $samples=New-Object Collections.Generic.List[object]
 $gpuAvailable=$false
@@ -15,7 +18,7 @@ function Sample([string]$Phase,[int]$Round=0) {
     $shared=if($valid){[long](($gpu|Measure-Object SharedUsage -Sum).Sum)}else{$null}
     $dedicated=if($valid){[long](($gpu|Measure-Object DedicatedUsage -Sum).Sum)}else{$null}
     $row=[pscustomobject]@{
-        Phase=$Phase;Round=$Round;Utc=[DateTime]::UtcNow.ToString('o');TabCount=$s.tabCount;VisibleTabs=$s.visibleTabIds.Count;SplitView=$s.splitView
+        Phase=$Phase;Round=$Round;Utc=[DateTime]::UtcNow.ToString('o');TabCount=$s.tabCount;VisibleTabs=$s.visibleTabIds.Count;VisibleViews=$s.visibleViewIds.Count;RetainedViews=$s.sessions.Count;SplitView=$s.splitView
         PrivateBytes=$app.PrivateMemorySize64;WorkingSetBytes=$app.WorkingSet64;PeakWorkingSetBytes=$app.PeakWorkingSet64
         Handles=$app.HandleCount;Threads=$app.Threads.Count;GdiObjects=[TabGuiMemory]::GetGuiResources($app.Handle,0);UserObjects=[TabGuiMemory]::GetGuiResources($app.Handle,1)
         GpuCountersAvailable=$valid;GpuSharedBytes=$shared;GpuDedicatedBytes=$dedicated
@@ -48,8 +51,8 @@ function Page([string]$Number){
 }
 function Open-Comparison {
     Switch-Tab $a
-    Menu-Action 'Tampilan' 'Bandingkan dua PDF…';Invoke $b
-    $null=Wait-State {param($s) $s.splitView -and $s.visibleTabIds.Count -eq 2}
+    if($SameDocument){Menu-Action 'Tampilan' 'Tampilan kedua PDF ini'}else{Menu-Action 'Tampilan' 'Bandingkan dua PDF…';Invoke $b}
+    $null=Wait-State {param($s) $s.splitView -and $s.visibleViewIds.Count -eq 2 -and $s.visibleTabIds.Count -eq $(if($SameDocument){1}else{2})}
 }
 try {
     $null=Wait-State {param($s) $s.pageCount -eq 1000 -and $s.sessionReady}
@@ -70,20 +73,20 @@ try {
         $null=Sample 'eight-loaded' $round
         Open-Comparison
         foreach($page in @('20','500','999')){
-            Focus-Pdf 'A.pdf';Page $page
+            Focus-Pdf $leftPane;Page $page
             $null=Wait-State {param($s) $s.activePage -eq [int]$page}
-            Focus-Pdf 'B.pdf';Page $page
+            Focus-Pdf $rightPane;Page $page
             $null=Wait-State {param($s) $s.activePage -eq [int]$page}
             $null=Sample ('split-page-'+$page) $round
         }
         if($HighZoom){
-            foreach($name in @('A.pdf','B.pdf')){
+            foreach($name in @($leftPane,$rightPane)){
                 Focus-Pdf $name;Invoke 'Zoom';Invoke '400%'
                 $null=Wait-State {param($s) $s.zoomPercent -eq 400}
                 $null=Sample ('zoom-400-'+$name) $round
             }
             $null=Sample 'both-views-400' $round
-            foreach($name in @('A.pdf','B.pdf')){
+            foreach($name in @($leftPane,$rightPane)){
                 Focus-Pdf $name
                 Menu-Action 'Tampilan' 'Sesuaikan halaman'
                 $null=Wait-State {param($s) $s.zoomPercent -ne 400}
@@ -109,7 +112,7 @@ try {
     $gpuGrowth=if($endpoints[-1].GpuCountersAvailable -and $endpoints[0].GpuCountersAvailable){$endpoints[-1].GpuSharedBytes+$endpoints[-1].GpuDedicatedBytes-$endpoints[0].GpuSharedBytes-$endpoints[0].GpuDedicatedBytes}else{$null}
     if($privateGrowth -gt 64MB -or $handleGrowth -gt 32 -or ($null -ne $gpuGrowth -and $gpuGrowth -gt 64MB)){throw 'Warmed endpoint growth exceeded profiling guard'}
     foreach($path in $paths){if((Get-FileHash $path).Hash -ne $hashes[$path]){throw 'Corpus source changed'}}
-    [pscustomobject]@{Rounds=$Rounds;HighZoom=[bool]$HighZoom;Samples=$samples.Count;MaxPrivateBytes=($samples|Measure-Object PrivateBytes -Maximum).Maximum;MaxWorkingSetBytes=($samples|Measure-Object WorkingSetBytes -Maximum).Maximum;MaxGpuSharedBytes=($samples|Measure-Object GpuSharedBytes -Maximum).Maximum;PrivateGrowth=$privateGrowth;HandleGrowth=$handleGrowth;GpuCountersAvailable=$gpuAvailable;GpuGrowth=$gpuGrowth;Endpoints=$endpoints;Status='passed'}|ConvertTo-Json -Depth 5|Set-Content -Encoding UTF8 (Join-Path $directory 'summary.json')
+    [pscustomobject]@{Rounds=$Rounds;HighZoom=[bool]$HighZoom;SameDocument=[bool]$SameDocument;Samples=$samples.Count;MaxPrivateBytes=($samples|Measure-Object PrivateBytes -Maximum).Maximum;MaxWorkingSetBytes=($samples|Measure-Object WorkingSetBytes -Maximum).Maximum;MaxGpuSharedBytes=($samples|Measure-Object GpuSharedBytes -Maximum).Maximum;PrivateGrowth=$privateGrowth;HandleGrowth=$handleGrowth;GpuCountersAvailable=$gpuAvailable;GpuGrowth=$gpuGrowth;Endpoints=$endpoints;Status='passed'}|ConvertTo-Json -Depth 5|Set-Content -Encoding UTF8 (Join-Path $directory 'summary.json')
     Close-Window
     if(-not $app.WaitForExit(15000)){throw 'Profiling fixture did not close'}
     Write-Host "PASS comparison memory: $directory"

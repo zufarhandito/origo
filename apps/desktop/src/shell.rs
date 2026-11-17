@@ -13,6 +13,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 const MAX_TABS: usize = 8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct TabId(pub u64);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct ViewId(pub u64);
 #[derive(Default)]
 pub(super) struct WindowResources {
     pub export_owner: AtomicU64,
@@ -30,6 +32,8 @@ struct Tab {
     id: TabId,
     path: PathBuf,
     session: Option<Entity<DocumentSession>>,
+    secondary: Option<Entity<DocumentSession>>,
+    preferred_secondary: bool,
 }
 struct CloseBatch {
     ids: Vec<TabId>,
@@ -175,7 +179,7 @@ impl WindowShell {
         self.tabs
             .iter()
             .find(|t| Some(t.id) == self.active)
-            .and_then(|t| t.session.clone())
+            .and_then(Tab::preferred_session)
     }
     pub(super) fn report(&self, cx: &mut Context<Self>) {
         let Some(path) = self.metrics.clone() else {
@@ -184,7 +188,7 @@ impl WindowShell {
         let sessions: Vec<_> = self
             .tabs
             .iter()
-            .filter_map(|t| t.session.as_ref())
+            .flat_map(Tab::views)
             .map(|s| s.read(cx).diagnostics())
             .collect();
         let mut json = self
@@ -216,6 +220,13 @@ impl WindowShell {
         json["sessionRestoreOffered"] = serde_json::json!(self.session_offer.is_some());
         json["sessionRecording"] = serde_json::json!(!self.session_cleared && self.session_ready);
         json["splitView"] = serde_json::json!(self.split_view.is_some());
+        json["visibleViewIds"] = serde_json::json!(
+            sessions
+                .iter()
+                .filter(|s| s["visible"] == true)
+                .map(|s| s["viewId"].clone())
+                .collect::<Vec<_>>()
+        );
         json["splitGeometry"] = serde_json::json!(self.split_view.as_ref().map(|s| (
             s.origin_x,
             s.divider_x,
@@ -225,10 +236,7 @@ impl WindowShell {
         json["visibleTabIds"] = serde_json::json!(
             self.tabs
                 .iter()
-                .filter(|t| t
-                    .session
-                    .as_ref()
-                    .is_some_and(|s| s.read(cx).visible_for_render))
+                .filter(|t| t.views().any(|s| s.read(cx).visible_for_render))
                 .map(|t| t.id.0)
                 .collect::<Vec<_>>()
         );
@@ -286,10 +294,8 @@ impl WindowShell {
             .detach();
     }
     fn modal(&self, cx: &App) -> bool {
-        self.tabs
-            .iter()
-            .filter_map(|t| t.session.as_ref())
-            .any(|s| {
+        self.resources.modal_owner.load(Ordering::SeqCst) != 0
+            || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
                 s.error_popup || s.split_dialog.is_some() || s.transition.active()
             })
@@ -415,6 +421,8 @@ impl WindowShell {
                 id,
                 path: path.clone(),
                 session: None,
+                secondary: None,
+                preferred_secondary: false,
             });
             jobs.push((id, path));
         }
@@ -464,20 +472,12 @@ impl WindowShell {
                                     owner,
                                     this.resources.clone(),
                                     id,
+                                    ViewId(id.0 * 2),
                                 );
                                 session.update(cx, |s, cx| s.install_workspace(workspace, cx));
                                 this.finish_reopen(id, &session, cx);
                                 this.apply_session_position(id, &session, cx);
-                                cx.observe(&session, |_, _, cx| {
-                                    let weak = cx.weak_entity();
-                                    cx.defer(move |cx| {
-                                        let _ = weak.update(cx, |this, cx| {
-                                            this.advance_close(cx);
-                                            cx.notify();
-                                        });
-                                    });
-                                })
-                                .detach();
+                                this.observe_document_view(&session, id, true, cx);
                                 if let Some(tab) = this.tabs.iter_mut().find(|t| t.id == id) {
                                     tab.session = Some(session);
                                 }
@@ -583,8 +583,8 @@ impl WindowShell {
             || self
                 .tabs
                 .iter()
-                .filter_map(|t| t.session.as_ref())
-                .any(|s| s.read(cx).opening)
+                .flat_map(Tab::views)
+                .any(|s| s.read(cx).opening || s.read(cx).workspace.importing())
         {
             return false;
         }
@@ -671,15 +671,15 @@ impl WindowShell {
                     self.split_view = None;
                 }
                 for tab in &self.tabs {
-                    if batch.ids.contains(&tab.id)
-                        && let Some(s) = &tab.session
-                    {
-                        s.update(cx, |s, cx| {
-                            s.active = false;
-                            s.visible_for_render = false;
-                            s.invalidate_work();
-                            s.clear_bitmaps(cx);
-                        });
+                    if batch.ids.contains(&tab.id) {
+                        for s in tab.views() {
+                            s.update(cx, |s, cx| {
+                                s.active = false;
+                                s.visible_for_render = false;
+                                s.invalidate_work();
+                                s.clear_bitmaps(cx);
+                            });
+                        }
                     }
                 }
                 self.tabs.retain(|t| !batch.ids.contains(&t.id));
@@ -769,8 +769,7 @@ impl WindowShell {
             }
             let s = session.read(cx);
             let owner = self.resources.export_owner.load(Ordering::SeqCst);
-            if owner != 0 && owner != id.0 && s.workspace.as_ref().is_some_and(Workspace::is_dirty)
-            {
+            if owner != 0 && owner != id.0 && s.workspace.as_ref().is_some_and(|w| w.is_dirty()) {
                 let completed = self
                     .tabs
                     .iter()
@@ -788,7 +787,7 @@ impl WindowShell {
             if self.resources.modal_owner.load(Ordering::SeqCst) != 0 {
                 return;
             }
-            if s.export.running || s.workspace.as_ref().is_some_and(Workspace::is_dirty) {
+            if s.export.running || s.workspace.as_ref().is_some_and(|w| w.is_dirty()) {
                 self.activate(id, cx);
             }
             let ready = session.update(cx, |s, cx| {
@@ -822,6 +821,7 @@ enum MenuAction {
     ClearSession,
     Compare,
     ExitCompare,
+    DuplicateView,
     Save,
     Close,
     Quit,
@@ -861,6 +861,7 @@ impl WindowShell {
             ClearSession => self.clear_session_history(cx),
             Compare => self.choose_comparison(window, cx),
             ExitCompare => self.exit_comparison(cx),
+            DuplicateView => self.duplicate_view(window, cx),
             Open => self.choose_open(cx),
             Close => {
                 self.begin_close(false, cx);
@@ -964,6 +965,12 @@ impl WindowShell {
         if matches!(action, ExitCompare) {
             return self.split_view.is_some();
         }
+        if matches!(action, DuplicateView) {
+            return !self.opening
+                && self
+                    .session()
+                    .is_some_and(|s| s.read(cx).workspace.is_some());
+        }
         if matches!(action, Compare) {
             return !self.opening
                 && self
@@ -983,7 +990,7 @@ impl WindowShell {
             return false;
         };
         let s = s.read(cx);
-        let content = s.workspace.is_some() && !s.opening;
+        let content = s.workspace.is_some() && !s.opening && !s.workspace.importing();
         match action {
             Close => !self.opening,
             Undo => content && s.workspace.as_ref().is_some_and(|w| w.can_undo()),
@@ -1040,6 +1047,8 @@ mod tab_recovery;
 use tab_recovery::ClosedTab;
 #[path = "session_restore.rs"]
 mod session_restore;
+#[path = "shared_views.rs"]
+mod shared_views;
 #[path = "split_view.rs"]
 mod split_view;
 
@@ -1095,12 +1104,10 @@ impl Render for WindowShell {
                 .filter(|t| t.path.file_name() == tab.path.file_name())
                 .count()
                 > 1;
-            let dirty = tab.session.as_ref().is_some_and(|s| {
-                s.read(cx)
-                    .workspace
-                    .as_ref()
-                    .is_some_and(Workspace::is_dirty)
-            });
+            let dirty = tab
+                .session
+                .as_ref()
+                .is_some_and(|s| s.read(cx).workspace.as_ref().is_some_and(|w| w.is_dirty()));
             let label = format!(
                 "{}{}{}",
                 name,
@@ -1256,6 +1263,7 @@ impl Render for WindowShell {
                     ("Thumbnail", Sidebar),
                     ("Panel alat", Panel),
                     ("Bandingkan dua PDF…", Compare),
+                    ("Tampilan kedua PDF ini", DuplicateView),
                     ("Keluar tampilan berdampingan", ExitCompare),
                     ("Halaman pertama", First),
                     ("Halaman sebelumnya", Previous),

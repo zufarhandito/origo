@@ -18,11 +18,11 @@ impl WindowShell {
             .enumerate()
             .filter(|(_, t)| ids.contains(&t.id))
         {
-            let Some(session) = &tab.session else {
+            let Some(session) = tab.preferred_session() else {
                 continue;
             };
             let session = session.read(cx);
-            let Some(workspace) = &session.workspace else {
+            let Some(workspace) = session.workspace.as_ref() else {
                 continue;
             };
             self.closed_tabs.push_back(ClosedTab {
@@ -195,10 +195,7 @@ impl WindowShell {
                         let tab = self.tabs.iter().find(|t| t.id == *id)?;
                         let id = *id;
                         let dirty = tab.session.as_ref().is_some_and(|s| {
-                            s.read(cx)
-                                .workspace
-                                .as_ref()
-                                .is_some_and(Workspace::is_dirty)
+                            s.read(cx).workspace.as_ref().is_some_and(|w| w.is_dirty())
                         });
                         let status = format!(
                             "{}{}{}{}",

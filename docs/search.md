@@ -5,7 +5,8 @@ Find interaction and distinguish verified product behavior from local adaptation
 
 Open **Cari teks** in the reading toolbar, **Edit → Cari teks…**, or **Ctrl+F**.
 The compact bar sits below the reading toolbar, inside the active document tab.
-Each tab keeps its own query, options and current occurrence during the session.
+Each reading view keeps its own query, options and current occurrence during the
+session, including two views of the same PDF.
 
 - Default matching is **case-insensitive**. `hasil penelitian` matches the entire
   contiguous phrase, including `Hasil PENELITIAN`, but not `hasil lain penelitian`.
@@ -25,6 +26,8 @@ Each tab keeps its own query, options and current occurrence during the session.
 Search follows the current workspace order and includes imported pages. Rotate,
 reorder, delete, import and Undo/Redo invalidate old results and rescan the current
 plan. Search never changes content revisions, Undo history, saved status or PDF bytes.
+Rescanning after edits preserves each view's reading position; Enter/F3 still reveals
+the chosen occurrence. Two visible views share the existing window text budget.
 
 ## Execution and limits
 

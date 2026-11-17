@@ -23,7 +23,7 @@ impl DocumentSession {
         if let Some(position) = &self.pending_reading {
             return position.clone();
         }
-        let Some(workspace) = &self.workspace else {
+        let Some(workspace) = self.workspace.as_ref() else {
             return ReadingPosition::default();
         };
         let top = self.page_list.logical_scroll_top();
@@ -57,6 +57,7 @@ impl DocumentSession {
     ) {
         self.zoom = position.zoom;
         self.navigation.current = position.page.min(self.navigation.count.saturating_sub(1));
+        self.remember_view_page();
         self.pending_reading = Some(position);
         self.reset_layout();
         cx.notify();

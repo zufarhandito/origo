@@ -5,7 +5,7 @@ use pdf_application::export::{
     finish_export, prepare_export,
 };
 use pdf_platform::LocalOutput;
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct ExportState {
     pub png: bool,
     pub png_total: usize,
@@ -112,7 +112,7 @@ impl DocumentSession {
                 current = self
                     .workspace
                     .as_mut()
-                    .is_some_and(|w| receipt.apply(self.workspace_instance, w));
+                    .is_some_and(|mut w| receipt.apply(self.workspace_instance, &mut w));
                 self.export.success = true;
                 self.export.pages = receipt.page_count;
                 self.export.optimization = receipt.optimization;
@@ -153,6 +153,10 @@ impl DocumentSession {
         self.transition_export_finished(success, current, cx);
     }
     pub(super) fn start_export(&mut self, scope: ExportScope, cx: &mut Context<Self>) {
+        if let Some(owner) = &self.document_owner {
+            let _ = owner.update(cx, |s, cx| s.start_export(scope, cx));
+            return;
+        }
         if self.edits_locked() {
             return;
         }
@@ -173,15 +177,16 @@ impl DocumentSession {
         {
             return;
         }
-        let Some(w) = &self.workspace else {
+        let Some(w) = self.workspace.as_ref() else {
             // A source-change result may have invalidated the workspace while
             // an unsaved-change dialog was open. Never strand its saving intent.
             self.cancel_transition(cx);
             return;
         };
-        let plan = match ExportPlan::capture(w, self.workspace_instance, scope) {
+        let plan = match ExportPlan::capture(&w, self.workspace_instance, scope) {
             Ok(p) => p,
             Err(e) => {
+                drop(w);
                 self.cancel_transition(cx);
                 self.show_error_popup("PDF belum dapat diekspor", e.to_string(), cx);
                 return;
@@ -215,6 +220,7 @@ impl DocumentSession {
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned();
+        drop(w);
         let control = ExportControl::default();
         self.start_export_job(control.clone(), cx);
         self.export.optimizing = scope == ExportScope::Optimized;

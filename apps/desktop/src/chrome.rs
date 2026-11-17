@@ -64,7 +64,7 @@ impl DocumentSession {
             self.page_focus.focus(window, cx);
         } else {
             self.page_anchor = None;
-            if let Some(w) = &mut self.workspace {
+            if let Some(mut w) = self.workspace.as_mut() {
                 w.select([]);
             }
             self.focus.focus(window, cx);
@@ -83,7 +83,7 @@ impl DocumentSession {
         if self.edits_locked() || self.mode != ViewerMode::Organize || self.opening {
             return;
         }
-        if let Some(w) = &mut self.workspace {
+        if let Some(mut w) = self.workspace.as_mut() {
             let ids = if all {
                 w.pages().iter().map(|p| p.id).collect::<Vec<_>>()
             } else {

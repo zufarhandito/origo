@@ -50,11 +50,11 @@ impl WindowShell {
         }
         let mut snapshot = SessionSnapshot::default();
         for tab in &self.tabs {
-            let Some(session) = &tab.session else {
+            let Some(session) = tab.preferred_session() else {
                 continue;
             };
             let session = session.read(cx);
-            let Some(workspace) = &session.workspace else {
+            let Some(workspace) = session.workspace.as_ref() else {
                 continue;
             };
             if Some(tab.id) == self.active {

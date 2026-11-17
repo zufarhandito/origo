@@ -85,6 +85,7 @@ try {
     function Mouse($message,$flags,$x,$y){$packed=[IntPtr](([int]$y -shl 16) -bor ([int]$x -band 0xffff));[OutputDialog]::PostMessage($app.MainWindowHandle,$message,[IntPtr]$flags,$packed)|Out-Null;Start-Sleep -Milliseconds 50}
     Mouse 0x200 0 $originX $originY;Mouse 0x201 1 $originX $originY
     Add-Content (Join-Path $directory 'coordinates.txt') ('Resize start '+$originX+' '+((Read-Metrics).splitGeometry|ConvertTo-Json -Compress))
+    Mouse 0x200 0 ($originX-5) $originY
     1..8|ForEach-Object {Mouse 0x200 1 ($originX-$_*35) $originY}
     Start-Sleep -Milliseconds 600
     Add-Content (Join-Path $directory 'coordinates.txt') ('Resize held '+((Read-Metrics).splitGeometry|ConvertTo-Json -Compress)+' '+(Find 'Panel PDF: A.pdf').Current.BoundingRectangle.ToString())

@@ -18,12 +18,14 @@ mod controller;
 mod conversion;
 mod diagnostics;
 mod document_actions;
+mod document_model;
 mod exporting;
 mod feedback;
 mod local_state;
 mod png_export;
 mod reading_position;
 mod search;
+mod shared_workspace;
 mod shell;
 mod splitting;
 mod transitions;
@@ -90,6 +92,10 @@ struct RenderStats {
 }
 struct DocumentSession {
     tab_id: shell::TabId,
+    view_id: shell::ViewId,
+    document_owner: Option<gpui::WeakEntity<DocumentSession>>,
+    observed_model: shared_workspace::ModelSignature,
+    current_page_id: Option<pdf_domain::PageId>,
     owner: gpui::WeakEntity<shell::WindowShell>,
     resources: Arc<shell::WindowResources>,
     active: bool,
@@ -113,7 +119,7 @@ struct DocumentSession {
     page_focus: FocusHandle,
     focus: FocusHandle,
     renderer: PdfiumRenderer,
-    workspace: Option<Workspace>,
+    workspace: shared_workspace::SharedWorkspace,
     navigation: Navigation,
     opening: bool,
     error: Option<String>,
@@ -289,19 +295,33 @@ impl DocumentSession {
         owner: gpui::WeakEntity<shell::WindowShell>,
         resources: Arc<shell::WindowResources>,
         tab_id: shell::TabId,
+        view_id: shell::ViewId,
     ) -> Entity<Self> {
         cx.new(|cx| {
             let focus = cx.focus_handle();
             let focus_owner = owner.clone();
-            cx.on_focus_in(&focus, window, move |this: &mut DocumentSession, _, cx| {
-                let owner = focus_owner.clone();
-                let id = this.tab_id;
-                cx.defer(move |cx| {
-                    let _ = owner.update(cx, |shell, cx| {
-                        shell.focus_visible_tab(id, cx);
+            cx.on_focus_in(
+                &focus,
+                window,
+                move |this: &mut DocumentSession, window, cx| {
+                    let owner = focus_owner.clone();
+                    let id = this.view_id;
+                    let view = cx.weak_entity();
+                    let handle = window.window_handle();
+                    cx.defer(move |cx| {
+                        let _ = handle.update(cx, |_, window, cx| {
+                            if view
+                                .upgrade()
+                                .is_some_and(|v| v.read(cx).focus.contains_focused(window, cx))
+                            {
+                                let _ = owner.update(cx, |shell, cx| {
+                                    shell.focus_visible_view(id, cx);
+                                });
+                            }
+                        });
                     });
-                });
-            })
+                },
+            )
             .detach();
             cx.observe_window_activation(window, |this: &mut DocumentSession, window, _| {
                 if !window.is_window_active() {
@@ -363,6 +383,10 @@ impl DocumentSession {
             });
             DocumentSession {
                 tab_id,
+                view_id,
+                document_owner: None,
+                observed_model: Default::default(),
+                current_page_id: None,
                 owner,
                 resources: resources.clone(),
                 active: false,
@@ -386,7 +410,7 @@ impl DocumentSession {
                 page_focus: cx.focus_handle(),
                 focus,
                 renderer,
-                workspace: None,
+                workspace: Default::default(),
                 navigation: Navigation::default(),
                 opening: false,
                 error: None,

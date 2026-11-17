@@ -4,9 +4,9 @@ Tanggal riset/keputusan: **17 November 2026**. Baseline dokumentasi: `9478ddc`.
 Audiens: pemilik, pengembang, dan agen yang melanjutkan PDF Studio di Windows.
 
 Dokumen ini menjadi sumber tunggal riset dan TODO multi-tab berikutnya. Status
-tahap 1–3 dan 4A: **sudah diimplementasikan**; tahap 4B dikerjakan berikutnya. Persetujuan urutan
-dan perilaku di sini tidak berarti implementasi fitur sudah dimulai. Pekerjaan yang
-menghasilkan dokumen ini hanya dokumentasi.
+tahap 1–4B: **sudah diimplementasikan**. Lihat [perilaku aktual](../multitab.md) dan
+[bukti pengujian](../testing.md). Riset awal hanya dokumentasi; implementasi bertahap
+kemudian diotorisasi pemilik. Group tab dan tab vertikal tetap backlog.
 
 ## 1. Metode, status, dan kondisi saat ini
 
@@ -55,7 +55,7 @@ berlaku. Rekomendasi historis di bawah bukan klaim semua tahap sudah selesai.
 | 2 — Navigasi/pemulihan tab | Buka ulang tab tertutup, pencarian dalam Daftar tab | Diimplementasikan; lihat multitab.md/testing.md |
 | 3 — Melanjutkan pekerjaan | Pemulihan sesi terakhir dan posisi baca | Diimplementasikan; lihat multitab.md/testing.md |
 | 4A — Dua dokumen | Dua PDF berdampingan dengan Dock GPUI Kit dan pembatas resize | Diimplementasikan; lihat multitab.md/testing.md |
-| 4B — Satu dokumen, dua tampilan | Posisi baca terpisah pada workspace dokumen yang sama | Disetujui; belum dikerjakan |
+| 4B — Satu dokumen, dua tampilan | Posisi baca terpisah pada workspace dokumen yang sama | Diimplementasikan; lihat multitab.md/testing.md |
 | Backlog | Group tab dan tab vertikal | Dicatat untuk nanti; tanpa jadwal |
 
 - [x] 1.1 Drag untuk mengubah urutan tab.
@@ -67,7 +67,7 @@ berlaku. Rekomendasi historis di bawah bukan klaim semua tahap sudah selesai.
 - [x] 3.1 Pulihkan sesi dan posisi baca.
 - [x] 4A.1 Dua PDF berdampingan memakai Dock GPUI Kit.
 - [x] 4A.2 Organizer, seleksi, fokus, ekspor dan resource bounds saat split.
-- [ ] 4B.1 Dua tampilan PDF yang sama.
+- [x] 4B.1 Dua tampilan PDF yang sama.
 
 Pin tab, hover preview, urutan recently used/MRU, dan multi-window dievaluasi dari
 pemakaian berikutnya; tidak otomatis masuk tahap 1–4. Tidak ada penambahan batas
@@ -318,7 +318,7 @@ Tambahkan regresi sumber berubah pada satu panel tanpa merusak dokumen lain.
 
 ### 3.9 Dua tampilan PDF yang sama
 
-**Rancangan integrasi lokal untuk tahap 4B (belum diimplementasikan pada checkpoint 4A):**
+**Integrasi lokal tahap 4B (diimplementasikan setelah checkpoint 4A):**
 
 - Satu model `Workspace` dalam shared handle, termasuk history/revisi/seleksi halaman.
   Shared handle juga mengoordinasikan identitas sumber impor dan status inspeksi impor.
@@ -342,8 +342,8 @@ Tambahkan regresi sumber berubah pada satu panel tanpa merusak dokumen lain.
 - Tambahkan aksi eksplisit membuka view kedua dan menutup view. Tab ×/Ctrl+W menutup
   dokumen dengan guard; menutup salah satu view mempertahankan dokumen dan edit bersama.
 
-Ini keputusan implementasi internal, bukan bukti perilaku kompetitor atau klaim bahwa
-tahap 4B sudah selesai. Verifikasi harus mencakup import dari kedua view, Undo/Redo,
+Ini keputusan implementasi internal, bukan bukti perilaku kompetitor. Hasil aktual
+ada di [testing](../testing.md). Verifikasi mencakup import dari kedua view, Undo/Redo,
 search invalidation, halaman terhapus, ekspor setelah view asal ditutup, close batch
 cancel/save/discard, source changed, serta profil resource dua view.
 
@@ -361,10 +361,11 @@ dirty state bersama; dua state tampilan untuk viewport/fokus. Jangan menggandaka
 workspace menjadi salinan edit yang dapat bertentangan. Registry duplicate Open
 tetap mempertahankan makna yang jelas; membuka tampilan kedua harus aksi eksplisit.
 
-**Keputusan lanjutan:** kepemilikan seleksi halaman/pencarian, mode organizer tiap
-tampilan, cara memilih tampilan kedua, serta close view versus close dokumen terakhir.
-Saat ini seleksi halaman berada di Workspace dan banyak state tampilan ada dalam
-DocumentSession; perlu pemisahan yang disengaja, bukan menduplikasi entity begitu saja.
+**Keputusan implementasi:** seleksi halaman/history/revisi satu workspace, pencarian
+dan seleksi teks per view, organizer bersama mengikuti fokus. Aksi **Tampilan kedua
+PDF ini** eksplisit; header × menutup view, tab ×/Ctrl+W menutup dokumen dengan guard.
+View tambahan disimpan maksimal satu per tab dan dipakai kembali. Posisi baca
+metadata sesi/reopen berasal dari view terakhir yang dipilih; layout tidak dipersist.
 
 **Acceptance:** edit tercermin pada dua tampilan, navigasi independen, invalidasi
 pencarian, Undo/Redo konsisten, halaman yang sedang dibaca dihapus dari tampilan lain,

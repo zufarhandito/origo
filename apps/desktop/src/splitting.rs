@@ -50,6 +50,10 @@ impl SplitDialog {
 }
 impl DocumentSession {
     pub(super) fn show_split(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(owner) = &self.document_owner {
+            let _ = owner.update(cx, |s, cx| s.show_split(window, cx));
+            return;
+        }
         if self.edits_locked()
             || self.opening
             || self
@@ -60,16 +64,18 @@ impl DocumentSession {
         {
             return;
         }
-        let Some(w) = &self.workspace else {
+        let Some(w) = self.workspace.as_ref() else {
             return;
         };
-        let plan = match ExportPlan::capture(w, self.workspace_instance, ExportScope::All) {
+        let plan = match ExportPlan::capture(&w, self.workspace_instance, ExportScope::All) {
             Ok(p) => p,
             Err(e) => {
+                drop(w);
                 self.show_error_popup("PDF belum dapat dibagi", e.to_string(), cx);
                 return;
             }
         };
+        drop(w);
         let count = plan.pages().len();
         let spec = cx.new(|cx| {
             let mut s = InputState::new(window, cx);
@@ -163,6 +169,7 @@ impl DocumentSession {
     fn close_split(&mut self, cx: &mut Context<Self>) {
         self.split_dialog = None;
         self.clear_modal();
+        self.restore_visible_focus(cx);
         cx.notify();
     }
     fn submit_split(&mut self, window: &mut Window, cx: &mut Context<Self>) {

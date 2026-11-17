@@ -53,7 +53,8 @@ impl Transition {
 }
 impl DocumentSession {
     pub(super) fn edits_locked(&self) -> bool {
-        self.transition.active()
+        self.workspace.importing()
+            || self.transition.active()
             || self.error_popup
             || self
                 .resources
@@ -75,7 +76,7 @@ impl DocumentSession {
         if self.transition.active() || self.error_popup || self.opening {
             return false;
         }
-        if !self.export.running && !self.workspace.as_ref().is_some_and(Workspace::is_dirty) {
+        if !self.export.running && !self.workspace.as_ref().is_some_and(|w| w.is_dirty()) {
             return true;
         }
         self.transition.begin(Phase::WaitingExport);
@@ -106,7 +107,7 @@ impl DocumentSession {
             self.transition.phase = Phase::WaitingExport;
             self.report(cx);
             cx.notify();
-        } else if self.workspace.as_ref().is_some_and(Workspace::is_dirty) {
+        } else if self.workspace.as_ref().is_some_and(|w| w.is_dirty()) {
             self.prompt_unsaved(cx);
         } else {
             self.apply_transition(cx);

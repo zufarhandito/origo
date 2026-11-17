@@ -21,6 +21,9 @@ using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
 **Tampilan → Bandingkan dua PDF…** shows two open PDFs in a resizable Dock layout,
 with one focused toolbar/organizer and shared window resource budgets. See
 [multi-tab behavior](docs/multitab.md); reading-session restore is also available.
+**Tampilan → Tampilan kedua PDF ini** opens two reading views of one shared document,
+with independent navigation/search and shared page edits/history. Closing a pane keeps
+the document; closing its tab retains the unsaved/export guard.
 The first M4 feature is **Split PDF**, under **Alat → Split PDF**: split every N
 pages or by manual ranges into a new output folder. All parts are validated before
 the folder is published; Split does not mark edits saved. See [Split](docs/split.md).

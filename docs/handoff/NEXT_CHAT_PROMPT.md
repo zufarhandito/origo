@@ -13,8 +13,10 @@ Pemilik mengotorisasi seluruh tahap pematangan multi-tab, satu per satu:
 4A dua PDF berdampingan → 4B dua view dokumen yang sama.
 Tahap 1 sudah di commit 615e57e. Tahap 2 di commit 7c9db9a; tahap 3 diimplementasikan pada checkpoint ini;
 lihat log dan testing untuk commit/verifikasi terbaru. Tahap 4A dua PDF berdampingan
-sudah diimplementasikan dan comparison release lulus 10 kasus. Lanjutkan 4B dua
-tampilan satu workspace; cocokkan checkpoint paling atas handoff dengan Git aktual.
+sudah diimplementasikan dan comparison release lulus 10 kasus. Tahap 4B juga sudah
+diimplementasikan: dua view satu workspace, guard/ekspor bersama dan posisi baca
+terpisah. Check terakhir lulus 57 unit tests/fmt/Clippy/release build. Cocokkan bukti
+UI/profile di testing dan checkpoint paling atas handoff dengan Git aktual.
 
 Keputusan: bintang permanen lokal berdasarkan path; reopen maksimal 20 entri
 selama proses berjalan tanpa edit yang dibuang; tawarkan restore sesi baca saat

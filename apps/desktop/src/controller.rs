@@ -86,7 +86,8 @@ impl DocumentSession {
         self.workspace_instance += 1;
         self.page_anchor = None;
         self.opening = false;
-        self.workspace = Some(workspace);
+        self.workspace.install(workspace);
+        self.observed_model = self.workspace.signature();
         self.restart_search(cx);
         self.navigation = Navigation::default();
         self.clear_bitmaps(cx);
@@ -98,6 +99,7 @@ impl DocumentSession {
             .workspace
             .as_ref()
             .map_or(0, |w| w.pages().len() as u16);
+        self.remember_view_page();
         self.visible = 0..1;
         self.reset_layout();
         self.schedule_current(cx);
@@ -131,6 +133,7 @@ impl DocumentSession {
             return;
         }
         self.navigation.current = index;
+        self.remember_view_page();
         self.visible = usize::from(index)..usize::from(index) + 1;
         self.trim_gpu(cx);
         self.invalidate_work();
@@ -351,6 +354,7 @@ impl DocumentSession {
         self.visible = range.clone();
         self.trim_gpu(cx);
         self.navigation.current = range.start.min(usize::from(self.navigation.count) - 1) as u16;
+        self.remember_view_page();
         self.thumbnail_list
             .scroll_to_reveal_item(usize::from(self.navigation.current));
         self.invalidate_work();
@@ -535,7 +539,7 @@ impl DocumentSession {
                                 this.text = text_selection::TextState::new(this.text_budget);
                                 this.invalidate_work();
                                 this.clear_bitmaps(cx);
-                                this.workspace = None;
+                                this.workspace.clear();
                                 this.navigation = Navigation::default();
                                 this.error = Some(error.to_string());
                                 this.status = error.to_string();

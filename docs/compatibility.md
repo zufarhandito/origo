@@ -4,6 +4,9 @@ Two different open PDFs can be shown side by side with the GPUI Kit Dock splitte
 Both visible panes render; focus selects the shared toolbar/organizer target.
 Hidden documents retain edits and reading state while releasing caches. The window
 cache budgets and safe-export policies remain unchanged. See [multi-tab](multitab.md).
+One PDF can also have two views with independent reading/search/text selection and
+a shared page plan, selection, edit history and export actor. Tab capacity still
+counts documents; session restore/reopen stores one preferred reading position per PDF.
 
 Ctrl+F searches the active workspace with a compact in-tab bar, counts, highlights
 and next/previous navigation. Default matching is case-insensitive and treats a phrase

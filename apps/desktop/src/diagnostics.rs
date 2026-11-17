@@ -44,6 +44,7 @@ impl DocumentSession {
                 .map_or(0, |s| s.anchor.character.abs_diff(s.focus.character) + 1),
             "organizing": self.mode == ViewerMode::Organize, "pageDragging": self.page_dragging,
             "navCommands": self.stats.navigation_commands, "tabId": self.tab_id.0, "active": self.active, "visible": self.visible_for_render,
+            "viewId": self.view_id.0, "documentActor": self.document_owner.is_none(),
             "conversionHubVisible": self.mode == ViewerMode::Convert,
             "exporting": self.export.running, "exportsCompleted": self.export.completed,
             "exportSuccess": self.export.success, "exportPages": self.export.pages,
@@ -55,7 +56,7 @@ impl DocumentSession {
             "optimizeBeforeBytes": self.export.optimization.map_or(0, |s| s.baseline_bytes),
             "optimizeAfterBytes": self.export.optimization.map_or(0, |s| s.output_bytes),
         });
-        if let Some(w) = &self.workspace {
+        if let Some(w) = self.workspace.as_ref() {
             result["sourceCount"] = json!(w.sources().len());
             result["selectedPages"] = json!(w.selected().len());
             result["dirty"] = json!(w.is_dirty());

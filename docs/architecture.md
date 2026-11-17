@@ -1,5 +1,20 @@
 # Architecture - desktop multi-tab
 
+One tab can retain two reading entities with distinct ViewIds and one shared
+UI-thread Workspace handle. Cloning that handle does not clone document history.
+The model also owns the monotonic import-source allocator and inspection busy flag.
+Observers compare revision/dirty/selection/import signatures; sibling views refresh
+their caches, text tokens and Find without clearing shared page selection. Each
+view retains its PageId anchor and independent viewport/search/text selection.
+Deleting that anchor falls back to the nearest surviving index.
+
+The primary entity remains the canonical export/PNG/Split/close actor until the
+document tab closes, even while its reading view is hidden. Secondary actions
+forward before plan capture; only progress/control/notice are mirrored. The shared
+model receives one receipt. Closing a pane hides its reading entity and releases
+caches, while tab/window Close uses one transactional document guard. Session/reopen
+metadata comes from the preferred reading view and still records one document.
+
 Split comparison uses GPUI Kit DockArea/DockLayout with a locked two-panel layout;
 resizing stays enabled and Dock's close/zoom controls cannot remove PDF sessions.
 Uncached panel rendering preserves the native accessibility tree after modal/focus
@@ -42,7 +57,7 @@ converter; see [PNG](png.md).
 
 WindowShell owns stable TabIds, active-tab/menu state, transactional multi-document
 close and window-wide export/modal coordination. Each DocumentSession is a separate
-GPUI entity, preserving its workspace, history, input and viewport. Async completions
+GPUI reading entity; views of one tab share workspace/history and retain separate input/viewport. Async completions
 target their originating weak entity; removed tabs cannot be confused with new indices.
 Sessions share a cloned PDFium renderer/worker. Hidden sessions stop scheduling,
 clear CPU raster/text caches and defer GPU release through the actual Window. Thus

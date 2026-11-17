@@ -132,7 +132,7 @@ impl DocumentSession {
                             this.invalidate_work();
                             this.clear_bitmaps(cx);
                             this.text = TextState::new(this.text_budget);
-                            this.workspace = None;
+                            this.workspace.clear();
                             this.navigation = Navigation::default();
                             this.error = Some(error.to_string());
                             this.status = error.to_string();

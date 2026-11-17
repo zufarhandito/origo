@@ -35,24 +35,30 @@ impl PngDialog {
 }
 impl DocumentSession {
     pub(super) fn show_png(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(owner) = &self.document_owner {
+            let _ = owner.update(cx, |s, cx| s.show_png(window, cx));
+            return;
+        }
         if self.edits_locked()
             || self.opening
             || self.resources.export_owner.load(Ordering::SeqCst) != 0
         {
             return;
         }
-        let Some(workspace) = &self.workspace else {
+        let Some(workspace) = self.workspace.as_ref() else {
             return;
         };
-        let all = match ExportPlan::capture(workspace, self.workspace_instance, ExportScope::All) {
+        let all = match ExportPlan::capture(&workspace, self.workspace_instance, ExportScope::All) {
             Ok(plan) => plan,
             Err(error) => {
+                drop(workspace);
                 self.show_error_popup("PNG belum dapat diekspor", error.to_string(), cx);
                 return;
             }
         };
         let selected =
-            ExportPlan::capture(workspace, self.workspace_instance, ExportScope::Selected).ok();
+            ExportPlan::capture(&workspace, self.workspace_instance, ExportScope::Selected).ok();
+        drop(workspace);
         let folder = cx.new(|cx| {
             let mut input = InputState::new(window, cx);
             input.set_value("hasil-png", window, cx);
@@ -148,6 +154,7 @@ impl DocumentSession {
     fn close_png(&mut self, cx: &mut Context<Self>) {
         self.png_dialog = None;
         self.clear_modal();
+        self.restore_visible_focus(cx);
         cx.notify();
     }
     fn submit_png(&mut self, window: &mut Window, cx: &mut Context<Self>) {

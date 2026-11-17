@@ -10,6 +10,7 @@ use gpui::{EventEmitter, Focusable};
 #[derive(Clone)]
 pub(super) struct SplitView {
     pub ids: [TabId; 2],
+    pub views: [ViewId; 2],
     area: Entity<DockArea>,
     pub(super) width: f32,
     organizer_open: bool,
@@ -19,7 +20,7 @@ pub(super) struct SplitView {
 }
 
 struct PdfPane {
-    id: TabId,
+    id: ViewId,
     name: String,
     session: Entity<DocumentSession>,
     owner: gpui::WeakEntity<WindowShell>,
@@ -93,7 +94,7 @@ impl Render for PdfPane {
             .capture_any_mouse_down(cx.listener(|this, _, window, cx| {
                 let focused = this
                     .owner
-                    .update(cx, |shell, cx| shell.focus_visible_tab(this.id, cx))
+                    .update(cx, |shell, cx| shell.focus_visible_view(this.id, cx))
                     .unwrap_or(false);
                 if focused {
                     this.session.read(cx).focus.clone().focus(window, cx);
@@ -118,10 +119,21 @@ impl Render for PdfPane {
                             .accessibility_label(format!("Tampilan tunggal: {}", self.name))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 let _ = this.owner.update(cx, |shell, cx| {
-                                    if shell.focus_visible_tab(this.id, cx) {
+                                    if shell.focus_visible_view(this.id, cx) {
                                         shell.exit_comparison(cx);
                                     }
                                 });
+                            })),
+                    )
+                    .child(
+                        Button::new(("close-reading-view", self.id.0))
+                            .ghost()
+                            .icon(IconName::X)
+                            .accessibility_label(format!("Tutup tampilan: {}", self.name))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                let _ = this
+                                    .owner
+                                    .update(cx, |shell, cx| shell.close_reading_view(this.id, cx));
                             })),
                     ),
             )
@@ -164,34 +176,49 @@ impl WindowShell {
             self.switch(id, cx);
         }
     }
-    fn enter_comparison(
+    pub(super) fn enter_comparison(
         &mut self,
         left: TabId,
         right: TabId,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if left == right || self.close.is_some() || self.modal(cx) || self.opening {
+        if self.close.is_some() || self.modal(cx) || self.opening {
             return;
         }
         let mut panes = Vec::new();
+        let mut views = Vec::new();
         for (pane_index, id) in [left, right].into_iter().enumerate() {
             let Some(tab) = self.tabs.iter().find(|t| t.id == id) else {
                 return;
             };
-            let Some(session) = tab
-                .session
-                .clone()
-                .filter(|s| s.read(cx).workspace.is_some())
-            else {
+            let Some(session) = (if left == right {
+                if pane_index == 0 {
+                    tab.session.clone()
+                } else {
+                    tab.secondary.clone()
+                }
+            } else {
+                tab.preferred_session()
+            })
+            .filter(|s| s.read(cx).workspace.is_some()) else {
                 return;
             };
-            let name = tab
+            let mut name = tab
                 .path
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
                 .into_owned();
+            if left == right {
+                name.push_str(if pane_index == 0 {
+                    " (kiri)"
+                } else {
+                    " (kanan)"
+                });
+            }
+            let id = session.read(cx).view_id;
+            views.push(id);
             let owner = cx.weak_entity();
             panes.push(cx.new(|cx| {
                 let focus = cx.focus_handle();
@@ -215,7 +242,7 @@ impl WindowShell {
             .tabs
             .iter()
             .find(|t| t.id == left)
-            .and_then(|t| t.session.as_ref())
+            .and_then(Tab::preferred_session)
             .is_some_and(|s| s.read(cx).mode == ViewerMode::Organize);
         let width = f32::from(window.viewport_size().width)
             - if organizer_open && window.viewport_size().width >= px(1100.) {
@@ -242,6 +269,7 @@ impl WindowShell {
         });
         self.split_view = Some(SplitView {
             ids: [left, right],
+            views: [views[0], views[1]],
             area: area.clone(),
             width,
             organizer_open,
@@ -256,6 +284,11 @@ impl WindowShell {
         })
         .detach();
         self.set_comparison_organizer(organizer_open, cx);
+        if left == right
+            && let Some(tab) = self.tabs.iter_mut().find(|t| t.id == left)
+        {
+            tab.preferred_secondary = false;
+        }
         self.activate(left, cx);
     }
     pub(super) fn exit_comparison(&mut self, cx: &mut Context<Self>) {
@@ -272,22 +305,43 @@ impl WindowShell {
         }
         cx.notify();
     }
-    pub(crate) fn focus_visible_tab(&mut self, id: TabId, cx: &mut Context<Self>) -> bool {
+    pub(crate) fn focus_visible_view(&mut self, id: ViewId, cx: &mut Context<Self>) -> bool {
         if self.close.is_some()
             || self.modal(cx)
             || !self
                 .split_view
                 .as_ref()
-                .is_some_and(|s| s.ids.contains(&id))
+                .is_some_and(|s| s.views.contains(&id))
         {
             return false;
         }
-        if self.active != Some(id) {
-            self.active = Some(id);
+        let Some(tab) = self
+            .tabs
+            .iter_mut()
+            .find(|t| t.views().any(|s| s.read(cx).view_id == id))
+        else {
+            return false;
+        };
+        let doc = tab.id;
+        let secondary = id.0 % 2 == 1;
+        if self.active != Some(doc) || tab.preferred_secondary != secondary {
+            tab.preferred_secondary = secondary;
+            self.active = Some(doc);
             self.sync_visible_sessions(cx);
             cx.notify();
         }
         true
+    }
+    fn close_reading_view(&mut self, id: ViewId, cx: &mut Context<Self>) {
+        let other = self
+            .split_view
+            .as_ref()
+            .and_then(|s| s.views.iter().copied().find(|view| *view != id));
+        if let Some(other) = other
+            && self.focus_visible_view(other, cx)
+        {
+            self.exit_comparison(cx);
+        }
     }
     pub(crate) fn set_comparison_organizer(&mut self, open: bool, cx: &mut Context<Self>) {
         let Some(split) = &mut self.split_view else {
@@ -299,7 +353,7 @@ impl WindowShell {
             .tabs
             .iter()
             .filter(|t| ids.contains(&t.id))
-            .filter_map(|t| t.session.clone())
+            .flat_map(Tab::views)
         {
             session.update(cx, |s, cx| {
                 s.mode = if open {
@@ -316,60 +370,62 @@ impl WindowShell {
         cx.notify();
     }
     pub(super) fn sync_visible_sessions(&mut self, cx: &mut Context<Self>) {
-        let ids = self.split_view.as_ref().map(|s| s.ids);
+        let ids = self.split_view.as_ref().map(|s| s.views);
+        let focused_entity = self.session();
         for tab in &self.tabs {
-            let Some(session) = &tab.session else {
-                continue;
-            };
-            let visible = ids.map_or(Some(tab.id) == self.active, |ids| ids.contains(&tab.id));
-            let focused = Some(tab.id) == self.active;
-            let split = ids.is_some_and(|ids| ids.contains(&tab.id));
-            let divided = if split { 2 } else { 1 };
-            session.update(cx, |s, cx| {
-                let was_visible = s.visible_for_render;
-                let changed =
-                    s.active != focused || was_visible != visible || s.split_presentation != split;
-                if !changed {
-                    return;
-                }
-                if !focused && s.active {
-                    s.text.cancel_copy();
-                    s.text.dragging = false;
-                    s.text.pending = None;
-                    s.page_dragging = false;
-                }
-                if s.split_presentation != split {
-                    s.invalidate_work();
-                    s.clear_bitmaps(cx);
-                    s.pages = ByteCache::new(self.page_budget / divided);
-                    s.thumbnails = ByteCache::new(self.thumbnail_budget / divided);
-                    s.text_budget = 16 * 1024 * 1024 / divided;
-                    s.text.pages = ByteCache::new(s.text_budget);
-                    s.queue = RenderQueue::new(32 / divided);
-                    s.queue.reset(s.generation);
-                }
-                s.active = focused;
-                s.visible_for_render = visible;
-                s.split_presentation = split;
-                if !visible {
-                    s.search.pause();
-                    s.invalidate_work();
-                    s.clear_bitmaps(cx);
-                    s.text.pages.clear();
-                    s.text.pending = None;
-                    s.text.cancel_copy();
-                    s.page_dragging = false;
-                } else if !was_visible {
-                    if s.search.running {
-                        s.restart_search(cx);
+            for session in tab.views() {
+                let view = session.read(cx).view_id;
+                let focused = focused_entity.as_ref() == Some(session);
+                let visible = ids.map_or(focused, |ids| ids.contains(&view));
+                let split = ids.is_some_and(|ids| ids.contains(&view));
+                let divided = if split { 2 } else { 1 };
+                session.update(cx, |s, cx| {
+                    let was_visible = s.visible_for_render;
+                    let changed = s.active != focused
+                        || was_visible != visible
+                        || s.split_presentation != split;
+                    if !changed {
+                        return;
                     }
-                    s.schedule_current(cx);
-                } else {
-                    s.schedule_current(cx);
-                }
-                s.report(cx);
-                cx.notify();
-            });
+                    if !focused && s.active {
+                        s.text.cancel_copy();
+                        s.text.dragging = false;
+                        s.text.pending = None;
+                        s.page_dragging = false;
+                    }
+                    if s.split_presentation != split {
+                        s.invalidate_work();
+                        s.clear_bitmaps(cx);
+                        s.pages = ByteCache::new(self.page_budget / divided);
+                        s.thumbnails = ByteCache::new(self.thumbnail_budget / divided);
+                        s.text_budget = 16 * 1024 * 1024 / divided;
+                        s.text.pages = ByteCache::new(s.text_budget);
+                        s.queue = RenderQueue::new(32 / divided);
+                        s.queue.reset(s.generation);
+                    }
+                    s.active = focused;
+                    s.visible_for_render = visible;
+                    s.split_presentation = split;
+                    if !visible {
+                        s.search.pause();
+                        s.invalidate_work();
+                        s.clear_bitmaps(cx);
+                        s.text.pages.clear();
+                        s.text.pending = None;
+                        s.text.cancel_copy();
+                        s.page_dragging = false;
+                    } else if !was_visible {
+                        if s.search.running {
+                            s.restart_search(cx);
+                        }
+                        s.schedule_current(cx);
+                    } else {
+                        s.schedule_current(cx);
+                    }
+                    s.report(cx);
+                    cx.notify();
+                });
+            }
         }
     }
     fn clamp_comparison(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -545,12 +601,8 @@ impl WindowShell {
                                                         if !split.dragging {
                                                             return false;
                                                         }
-                                                        if event.pressed_button
-                                                            != Some(gpui::MouseButton::Left)
-                                                        {
-                                                            split.dragging = false;
-                                                            return false;
-                                                        }
+                                                        // Dock continues resizing until MouseUp,
+                                                        // including hover/repaint move events.
                                                         let left = f32::from(event.position.x)
                                                             - split.origin_x;
                                                         left < 320. || left > split.width - 320.

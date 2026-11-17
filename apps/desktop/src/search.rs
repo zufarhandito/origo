@@ -30,6 +30,7 @@ pub(super) struct SearchState {
     pub wrapped: bool,
     pub token: u64,
     pending_reveal: bool,
+    pub preserve_reading: bool,
     busy: bool,
     delayed: bool,
     query: Option<SearchQuery>,
@@ -79,6 +80,7 @@ impl DocumentSession {
         self.search.capped = false;
         self.search.wrapped = false;
         self.search.pending_reveal = false;
+        self.search.preserve_reading = false;
         self.search.query = SearchQuery::new(
             self.search_input.read(cx).value().as_str(),
             self.search.options,
@@ -113,7 +115,7 @@ impl DocumentSession {
         {
             return;
         }
-        let Some(workspace) = &self.workspace else {
+        let Some(workspace) = self.workspace.as_ref() else {
             self.search.running = false;
             return;
         };
@@ -164,7 +166,7 @@ impl DocumentSession {
                             );
                             if this.search.current.is_none() && !this.search.matches.is_empty() {
                                 this.search.current = Some(0);
-                                if !this.edits_locked() {
+                                if !this.edits_locked() && !this.search.preserve_reading {
                                     this.reveal_search_match(cx);
                                 }
                             }
@@ -181,7 +183,7 @@ impl DocumentSession {
                             this.invalidate_work();
                             this.clear_bitmaps(cx);
                             this.text = text_selection::TextState::new(this.text_budget);
-                            this.workspace = None;
+                            this.workspace.clear();
                             this.navigation = Navigation::default();
                             this.source_sequence += 1;
                             this.error =

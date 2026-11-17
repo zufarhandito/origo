@@ -121,7 +121,32 @@ nama tab dan history; nama output dilaporkan pada hasil ekspor.
   dokumen/revisi asal; berpindah fokus tidak memindahkan job, consent atau receipt.
   Close/zoom bawaan Dock dinonaktifkan agar tidak melewati guard aplikasi.
 - Restore sesi baca tetap menyimpan daftar dokumen/posisi, bukan layout split.
-  Dua view PDF yang sama masih tahap 4B; belum tersedia pada checkpoint 4A ini.
+
+## Dua tampilan satu PDF — tahap 4B
+
+- **Tampilan → Tampilan kedua PDF ini** membuka panel kiri/kanan dari dokumen yang
+  sama. Jumlah tab tetap satu. Maksimal satu tampilan tambahan disimpan per dokumen;
+  aksi berulang memakai kembali state tampilan tersebut.
+- Kedua panel berbagi workspace, urutan/rotasi halaman, seleksi halaman, Undo/Redo,
+  revisi dan status perubahan. Impor dari panel mana pun menambah model bersama
+  dengan identitas sumber yang unik. Inspeksi impor mengunci edit kedua tampilan.
+- Posisi baca, zoom/pan, query/opsi/hasil Find, seleksi teks dan anchor seleksi rentang
+  masing-masing panel tetap terpisah. Edit memperbarui kedua panel dan membatalkan
+  hasil lama. Halaman baca dipertahankan berdasarkan identitas; jika dihapus, panel
+  berpindah ke indeks terdekat yang masih ada. Rescan akibat edit tidak melompat ke
+  hasil pertama; Enter/F3 tetap dapat menavigasi hasil pencarian.
+- **Tutup tampilan** (× pada header panel) menyisakan panel lain tanpa menutup PDF.
+  **Tampilan tunggal** menyisakan panel yang dipilih. State tampilan tersembunyi
+  disimpan tanpa cache raster/teks/GPU; membuka tampilan kedua memakainya lagi.
+  Tab ×/Ctrl+W tetap menutup dokumen, dengan satu guard bersama untuk edit/ekspor.
+- Ekspor/PNG/Split PDF dan receipt tetap dimiliki dokumen. Save As dari panel kanan
+  tetap selesai dan menandai model bersama clean setelah panel kiri ditutup.
+  Menutup tampilan tidak membatalkan pekerjaan dokumen. Duplicate Open memfokuskan
+  tab yang sama dan mempertahankan tampilan terakhir yang dipilih.
+- Session restore/reopen menyimpan satu entri dokumen dengan posisi baca tampilan
+  yang terakhir dipilih. Layout/panel kedua dan edit yang dibuang tidak dipulihkan.
+  Sumber yang berubah menginvalidasi kedua tampilan. Budget jendela tetap sama,
+  maksimal dua panel terlihat; batas delapan tab tetap menghitung dokumen.
 
 ## Panel dan keyboard
 

@@ -89,7 +89,8 @@ try {
     New-Item -ItemType Directory -Path $sessionPath|Out-Null
     Page '2'
     $null=Wait-State {param($s) $s.activePage -eq 2}
-    Close-Window
+    # Observe the failed background checkpoint before closing. Otherwise the
+    # one-second poll may report it first and Close is already the allowed retry.
     $null=Find 'Sesi baca gagal disimpan. PDF tidak berubah. Tutup lagi untuk keluar tanpa menyimpan sesi, atau ubah posisi baca untuk mencoba lagi.'
     $null=Wait-State {param($s) $s.tabCount -eq 1 -and -not $s.closingTabs -and $s.pendingPreferences -eq 0}
     Stop-Session

@@ -1,3 +1,27 @@
+# Checkpoint tahap 4B — 17 November 2026
+
+Seluruh urutan multi-tab yang diotorisasi (1 → 2 → 3 → 4A → 4B) kini diimplementasikan.
+**Tampilan → Tampilan kedua PDF ini** menyediakan dua view satu workspace, dengan
+history/seleksi halaman/revisi/dirty bersama; viewport/zoom/Find/seleksi teks terpisah.
+Actor dokumen utama tetap memiliki ekspor/PNG/Split/receipt/close walau view-nya
+ditutup. View tambahan dipakai kembali, maksimal satu per tab; dua panel terlihat
+membagi budget jendela yang sama. Close view mempertahankan dokumen; tab ×/Ctrl+W
+menutup dokumen dengan satu guard. Session/reopen mengambil posisi view pilihan.
+
+`scripts/check.ps1` lulus **57 unit tests**, fmt, denied-warning Clippy dan build
+release. Bukti UI/profil terakhir ada di [testing](../testing.md). Backlog yang masih
+ditunda: group tab/tab vertikal, pin/preview/MRU/multi-window dan gate rilis fisik.
+Tidak ada publikasi binary maupun perubahan kontrak keselamatan sumber/ekspor.
+
+Commit tahap sebelumnya: `615e57e`, `7c9db9a`, `bf51fb6`, **`73e2409`** (4A).
+Lihat Git log untuk commit 4B setelah checkpoint. Branch/remote diperiksa tetap
+`main`, `origin = https://github.com/zufarhandito/origo.git`. Push belum dilakukan:
+penolakan automatic approval review meminta persetujuan tujuan/payload spesifik,
+dan pertanyaan konfirmasi yang dikirim pada sesi implementasi belum dijawab.
+Jangan retry/bypass atau mengklaim sudah push. Tes hanya menutup proses fixture
+yang command line-nya diverifikasi; tidak menutup proses/dokumen pengguna.
+Bagian di bawah merupakan checkpoint historis dan tidak menggantikan status ini.
+
 # Checkpoint tahap 4A — 17 November 2026
 
 Dua PDF berdampingan sudah diimplementasikan dengan Dock GPUI Kit 0.9.1 dan

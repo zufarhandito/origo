@@ -57,7 +57,7 @@ impl DocumentSession {
                         return;
                     }
                     this.page_dragging = false;
-                    if let Some(w) = &mut this.workspace {
+                    if let Some(mut w) = this.workspace.as_mut() {
                         w.select([]);
                     }
                     this.page_anchor = None;
@@ -99,7 +99,7 @@ impl DocumentSession {
                     )
                 }))
                 .on_action(cx.listener(|this, _: &SelectPages, _, cx| {
-                    if let Some(w) = &mut this.workspace {
+                    if let Some(mut w) = this.workspace.as_mut() {
                         let ids = w.pages().iter().map(|p| p.id).collect::<Vec<_>>();
                         w.select(ids);
                     }
@@ -171,8 +171,8 @@ impl DocumentSession {
                                 if drag.0 != this.tab_id {
                                     return;
                                 }
-                                if let Some(w) = &this.workspace {
-                                    let target = w.pages().len();
+                                let target = this.workspace.as_ref().map(|w| w.pages().len());
+                                if let Some(target) = target {
                                     this.edit(
                                         pdf_domain::Command::Move {
                                             ids: drag.1.clone(),
@@ -231,6 +231,7 @@ impl DocumentSession {
         } else {
             vec![page_id]
         };
+        drop(workspace);
         let failed = self.failures.get(&key).cloned();
         let mut bitmap_key = key.clone();
         let mut bitmap = self.bitmap(&key);
@@ -798,8 +799,7 @@ impl Render for DocumentSession {
                                 .icon(IconName::X)
                                 .accessibility_label("Tutup pemberitahuan ekspor")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.export.notice = None;
-                                    cx.notify();
+                                    this.dismiss_export_notice(cx);
                                 })),
                         ),
                 )
