@@ -64,6 +64,36 @@ nama tab dan history; nama output dilaporkan pada hasil ekspor.
 - Panah atas/bawah memilih hasil, Enter berpindah, Esc atau klik di luar overlay
   menutupnya. Ctrl+F tetap pencarian isi PDF. Hasil kosong mempunyai label eksplisit.
 
+## Restore sesi baca — tahap 3
+
+- Startup tanpa PDF eksplisit menawarkan **Pulihkan sesi / Mulai kosong** bila sesi
+  sebelumnya berisi dokumen. Menolak tawaran mengosongkan sesi tersimpan. Startup
+  dengan argumen PDF membuka permintaan tersebut tanpa otomatis memulihkan sesi lain.
+- `%LOCALAPPDATA%/PDF Studio/session.json` menyimpan maksimal 8 sumber utama, urutan,
+  tab aktif, fingerprint dan posisi baca/zoom/pan. Ini metadata lokal dengan lokasi
+  file, bukan backup PDF, history, seleksi, pencarian atau edit yang belum diekspor.
+- Snapshot diperiksa setiap satu detik dan ditulis hanya saat berubah, di background
+  dengan penggantian atomik. Maksimal satu penulisan sesi berjalan dan satu snapshot
+  terbaru menunggu. Batas file 1 MiB; versi/struktur/posisi yang tidak valid ditolak.
+- Close jendela yang disetujui menyimpan sesi sebelum semua tab dilepas, dengan tab
+  aktif sebelum prompt close. Save/Discard/Cancel tetap berlaku untuk edit PDF.
+  Menutup tab terakhir secara individual menyimpan sesi kosong.
+- Restore menginspeksi kembali setiap sumber. File hilang/gagal tidak membatalkan
+  PDF lain; fingerprint berubah memulai baca dari halaman pertama. Tab aktif yang
+  hilang memakai tab berhasil pertama. Posisi di halaman impor dipetakan ke awal
+  sumber utama. Sumber/history asli tetap berlaku setelah Save As.
+- Untuk dokumen dirty atau multi-source, hanya sumber utama asli yang dibuka lagi.
+  Tawaran restore menjelaskan bahwa edit halaman dan impor belum diekspor tidak pulih.
+  Ini bukan autosave edit atau crash-orphan recovery ekspor.
+- Metadata rusak tidak ditimpa otomatis; pemulihan/penyimpanan sesi dinonaktifkan
+  dengan pemberitahuan. **Berkas → Hapus riwayat sesi** menghapusnya secara eksplisit
+  dan menghentikan pencatatan sampai proses berikutnya, tanpa menghapus PDF/favorit.
+- Jika simpan sesi saat close gagal, jendela dipertahankan dan pesan ditampilkan.
+  Close berikutnya dapat keluar tanpa checkpoint sesi yang gagal. PDF tetap melalui
+  guard tersendiri; kegagalan preferensi tidak mengubah receipt atau dirty revision.
+- Suite UI memakai `--state-dir` dalam folder fixture ignored; preferensi pengguna
+  tidak digunakan untuk menyimpan metadata sintetis. Direktori override tahap 1 tetap berlaku.
+
 ## Panel dan keyboard
 
 Reader tidak membuka panel alat secara default. Panel alat/Alat → Atur halaman
@@ -109,7 +139,7 @@ async. Copy dapat memuat ulang halaman seleksi yang keluar dari cache secara ber
 dengan buffer hasil maksimal 1 MiB; pindah tab membatalkan job copy yang belum selesai.
 
 Batas sumber 1024 halaman/128 MiB berlaku per workspace. PDFium tetap in-process,
-tanpa hard native timeout/sandbox. Tidak ada session restore, detach/multi-window,
+tanpa hard native timeout/sandbox. Tidak ada pemulihan edit belum diekspor, detach/multi-window,
 converter baru, OCR, atau content editing.
 
 ## Verifikasi

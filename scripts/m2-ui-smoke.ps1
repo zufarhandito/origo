@@ -13,7 +13,7 @@ $metrics=Join-Path $directory 'metrics.json'
 $exe=Join-Path $root "target/$Profile/pdf-studio.exe"
 $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-Object Id)
 $desktop=New-Object -ComObject Shell.Application
-$desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'"'),$root,'open',1)
+$desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'" --state-dir "'+(Join-Path $directory 'state')+'"'),$root,'open',1)
 $deadline=(Get-Date).AddSeconds(20)
 do { Start-Sleep -Milliseconds 200; $app=Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | Where-Object Id -NotIn $oldIds | Select-Object -First 1; if($app){$app.Refresh()} } while((Get-Date) -lt $deadline -and (-not $app -or $app.MainWindowHandle -eq 0))
 if(-not $app -or $app.MainWindowHandle -eq 0){throw 'Visible test window unavailable'}

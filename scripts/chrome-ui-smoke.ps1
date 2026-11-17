@@ -11,7 +11,7 @@ $fixture=Join-Path $directory 'Laporan pengujian navigasi dan toolbar dengan nam
 Copy-Item (Join-Path $root tests/fixtures/text-selection.pdf) $fixture
 $metrics=Join-Path $directory metrics.json
 $old=@(Get-Process pdf-studio -ErrorAction SilentlyContinue|ForEach-Object Id)
-$arguments=if($NoDocument){'--metrics "'+$metrics+'"'}else{'"'+$fixture+'" --metrics "'+$metrics+'"'}
+$arguments=if($NoDocument){'--metrics "'+$metrics+'" --state-dir "'+(Join-Path $directory 'state')+'"'}else{'"'+$fixture+'" --metrics "'+$metrics+'" --state-dir "'+(Join-Path $directory 'state')+'"'}
 (New-Object -ComObject Shell.Application).ShellExecute((Join-Path $root "target/$Profile/pdf-studio.exe"),$arguments,$root,'open',1)
 $deadline=(Get-Date).AddSeconds(25)
 do {

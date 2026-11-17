@@ -17,7 +17,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class PdfTextWindow{[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);[StructLayout(LayoutKind.Sequential)]public struct Point{public int X,Y;}[StructLayout(LayoutKind.Sequential)]public struct Rect{public int L,T,R,B;}[DllImport("user32.dll")]public static extern bool ScreenToClient(IntPtr h,ref Point p);[DllImport("user32.dll")]public static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,IntPtr l);[DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out Rect r);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint flags);}'
 $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-Object Id)
 $shell=New-Object -ComObject Shell.Application
-$shell.ShellExecute((Join-Path $root "target/$Profile/pdf-studio.exe"),('"'+$source+'" --metrics "'+$metrics+'"'),$root,'open',1)
+$shell.ShellExecute((Join-Path $root "target/$Profile/pdf-studio.exe"),('"'+$source+'" --metrics "'+$metrics+'" --state-dir "'+(Join-Path $directory 'state')+'"'),$root,'open',1)
 Start-Sleep -Seconds 2
 $app=Get-Process -Name pdf-studio | Where-Object Id -NotIn $oldIds | Select-Object -First 1
 if(-not $app){throw 'Synthetic viewer not found'}

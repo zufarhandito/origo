@@ -23,8 +23,8 @@ Commits dan push ke tujuan repo yang disepakati.
 
 Fokus berikutnya yang disetujui: [riset dan TODO pematangan multi-tab](research/multitab-roadmap.md).
 Dokumen tunggal ini memuat prioritas 1–4, Dock GPUI Kit untuk split yang dapat
-di-resize, organizer saat split, serta backlog group tab/tab vertikal. Tahap 1–2
-sudah diimplementasikan; tahap 3–4 dikerjakan berikutnya. Lihat handoff paling atas.
+di-resize, organizer saat split, serta backlog group tab/tab vertikal. Tahap 1–3
+sudah diimplementasikan; tahap 4 dikerjakan berikutnya. Lihat handoff paling atas.
 
 Handover terbaru **17 November 2026** dimulai pada HEAD `6bbc6c1`, main bersih dan
 ahead 3 terhadap cache `origin/main`, sebelum commit handover itu sendiri. Find

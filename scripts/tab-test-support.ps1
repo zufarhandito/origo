@@ -1,4 +1,4 @@
-param([ValidateSet('debug','release')][string]$Profile='release',[string]$TestName='tab-hardening',[string]$Fixture='tests/fixtures/text-selection.pdf',[string]$ExecutablePath,[switch]$IsolatedState)
+﻿param([ValidateSet('debug','release')][string]$Profile='release',[string]$TestName='tab-hardening',[string]$Fixture='tests/fixtures/text-selection.pdf',[string]$ExecutablePath,[switch]$IsolatedState=$true)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Add-Type -AssemblyName UIAutomationClient

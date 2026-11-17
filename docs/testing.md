@@ -1,3 +1,25 @@
+# Verification — multi-tab tahap 3, 17 November 2026
+
+- `scripts/check.ps1` passed: fmt, denied-warning Clippy, **55 unit tests**, release
+  workspace build. New metadata test covers all zoom modes, Unicode paths, fingerprint
+  roundtrip, invalid schema/ranges/relative paths, 8-tab/1-MiB bounds, atomic replacement
+  failure and cleanup without overwriting previous metadata.
+- Debug session suite passed 7 cases at `.research/session-restore-ui-2f2550b0b1a941c89bad5091e07c2e20`.
+- Final release session suite passed **8 named cases** at
+  `.research/session-restore-ui-2abe3c4aca3741728aad875ff445bf42`: dirty/multi-source
+  reading metadata, offer/order/active/positions without edit recovery, partial/changed
+  sources, last-tab empty session, corrupt preservation/explicit clear (including
+  recording disabled with a PDF open), declined restore, visible write failure/retry
+  exit, and unchanged source bytes. Source mtime was deliberately changed on its own fixture.
+- Release recovery suite passed at `.research/tab-recovery-ui-85cf2928db1b4a608fef25037c7da3c7`.
+- Release existing multi-tab suite passed at `.research/tabs-ui-83ab36c36c314f499f662bc1663ff474`.
+- Release empty-startup chrome passed at `.research/chrome-ui-e5045b225b324be595448bb8e5110bea`.
+- Harnesses now explicitly isolate UI state under their own fixture directories;
+  existing test cases remain intact. Windows PowerShell scripts use UTF-8 BOM for
+  non-ASCII menu labels. An initial debug trial had an incorrectly decoded ellipsis;
+  that harness issue was fixed before successful runs.
+- No new physical mixed-DPI, hostile-native isolation, remote CI or binary-publication claim.
+
 # Verification — multi-tab tahap 2, 17 November 2026
 
 - `scripts/check.ps1` passed: fmt, denied-warning Clippy, **54 unit tests**, release

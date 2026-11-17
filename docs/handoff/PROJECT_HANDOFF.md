@@ -4,7 +4,9 @@ Pemilik telah mengotorisasi eksekusi tahap 1 → 2 → 3 → 4A → 4B, satu per
 Tahap 1 diimplementasikan: drag reorder, bintang kuning permanen lokal, + setelah
 strip, menu konteks dan transactional subset close. Lihat multitab.md/testing.md
 untuk kontrak dan bukti. Tahap 2 kini juga diimplementasikan: reopen metadata-only dan pencarian Daftar tab.
-Tahap 3–4 masih berikutnya; lihat testing untuk bukti aktual.
+Tahap 3 sudah diimplementasikan: tawaran restore sesi baca, metadata lokal bounded,
+partial restore, clear history dan failure handling. Tahap 4 masih berikutnya.
+Tahap 2 di commit 7c9db9a; lihat log/testing untuk checkpoint tahap 3.
 Pilihan produk yang dikunci dicatat pada research/multitab-roadmap.md.
 Git/push diperiksa kembali saat checkpoint; status lama di bawah adalah historis.
 Penolakan push sebelumnya tetap belum dijawab dengan konfirmasi tujuan/payload.

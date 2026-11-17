@@ -1,7 +1,7 @@
 //! Reading-only bookmark mapped back to the primary source, never an edit backup.
 use crate::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(super) struct ReadingPosition {
     pub page: u16,
     pub zoom: Zoom,
@@ -20,6 +20,9 @@ impl Default for ReadingPosition {
 }
 impl DocumentSession {
     pub(super) fn reading_position(&self) -> ReadingPosition {
+        if let Some(position) = &self.pending_reading {
+            return position.clone();
+        }
         let Some(workspace) = &self.workspace else {
             return ReadingPosition::default();
         };

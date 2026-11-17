@@ -37,6 +37,7 @@ struct CloseBatch {
     window: bool,
     previous: Option<TabId>,
     external_export: Option<(TabId, u64)>,
+    session_snapshot: Option<crate::local_state::SessionSnapshot>,
 }
 pub(super) struct WindowShell {
     tabs: Vec<Tab>,
@@ -66,6 +67,13 @@ pub(super) struct WindowShell {
     tab_picker_input: Entity<InputState>,
     tab_picker_selected: usize,
     tab_picker_scroll: ScrollHandle,
+    session_ready: bool,
+    session_offer: Option<crate::local_state::SessionSnapshot>,
+    restoring_session: Option<crate::local_state::SessionSnapshot>,
+    session_last: Option<crate::local_state::SessionSnapshot>,
+    session_writing: bool,
+    session_queued: Option<crate::local_state::SessionSnapshot>,
+    session_cleared: bool,
 }
 
 fn path_key(path: &std::path::Path) -> String {
@@ -120,6 +128,13 @@ impl WindowShell {
                 }),
                 tab_picker_selected: 0,
                 tab_picker_scroll: ScrollHandle::new(),
+                session_ready: false,
+                session_offer: None,
+                restoring_session: None,
+                session_last: None,
+                session_writing: false,
+                session_queued: None,
+                session_cleared: false,
             };
             cx.subscribe(&shell.tab_picker_input, |this, _, event, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -129,6 +144,7 @@ impl WindowShell {
             })
             .detach();
             shell.load_favorites(cx);
+            shell.initialize_session_restore(initial.is_some(), cx);
             shell.focus.focus(window, cx);
             if shell.metrics.is_some() {
                 cx.spawn(async move |this, cx| {
@@ -190,6 +206,9 @@ impl WindowShell {
         json["pendingPreferences"] = serde_json::json!(self.pending_preferences);
         json["closedTabCount"] = serde_json::json!(self.closed_tabs.len());
         json["tabPickerOpen"] = serde_json::json!(self.tab_picker_open);
+        json["sessionReady"] = serde_json::json!(self.session_ready);
+        json["sessionRestoreOffered"] = serde_json::json!(self.session_offer.is_some());
+        json["sessionRecording"] = serde_json::json!(!self.session_cleared && self.session_ready);
         json["tabsOpening"] = serde_json::json!(self.opening);
         json["closingTabs"] = serde_json::json!(self.close.is_some());
         json["windowExportOwner"] =
@@ -258,6 +277,7 @@ impl WindowShell {
         }
         self.opening = true;
         self.tab_picker_open = false;
+        self.session_offer = None;
         let picker = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
@@ -342,6 +362,7 @@ impl WindowShell {
         if !capacity(self.tabs.len(), paths.len()) {
             self.opening = false;
             self.reopening_tab = None;
+            self.finish_session_restore(cx);
             self.notice = Some(format!(
                 "Maksimal 8 tab. Tersisa {} slot; tutup tab atau pilih lebih sedikit PDF.",
                 MAX_TABS - self.tabs.len()
@@ -358,6 +379,7 @@ impl WindowShell {
                 }
             }
             self.reopening_tab = None;
+            self.finish_session_restore(cx);
             self.notice = (!failures.is_empty()).then(|| failures.join("\n"));
             cx.notify();
             return;
@@ -422,6 +444,7 @@ impl WindowShell {
                                 );
                                 session.update(cx, |s, cx| s.install_workspace(workspace, cx));
                                 this.finish_reopen(id, &session, cx);
+                                this.apply_session_position(id, &session, cx);
                                 cx.observe(&session, |_, _, cx| {
                                     let weak = cx.weak_entity();
                                     cx.defer(move |cx| {
@@ -453,6 +476,7 @@ impl WindowShell {
                     if let Some(id) = first.or(first_existing) {
                         this.activate(id, cx);
                     }
+                    this.finish_session_restore(cx);
                     cx.notify();
                 });
             });
@@ -558,16 +582,15 @@ impl WindowShell {
         {
             return false;
         }
-        if self.tabs.is_empty() {
-            return window;
-        }
         let ids: Vec<_> = ids
             .into_iter()
             .filter(|id| self.tabs.iter().any(|t| t.id == *id))
             .collect();
-        if ids.is_empty() {
+        if ids.is_empty() && !window {
             return false;
         }
+        let session_snapshot = (window && self.session_ready && self.session_offer.is_none())
+            .then(|| self.capture_session(cx));
         self.resources.closing.store(true, Ordering::SeqCst);
         self.tab_picker_open = false;
         self.close = Some(CloseBatch {
@@ -577,6 +600,7 @@ impl WindowShell {
             window,
             previous: self.active,
             external_export: None,
+            session_snapshot,
         });
         self.advance_close(cx);
         false
@@ -617,6 +641,10 @@ impl WindowShell {
                 return;
             };
             if batch.index == batch.ids.len() {
+                if let Some(snapshot) = self.close.as_mut().and_then(|b| b.session_snapshot.take())
+                {
+                    self.persist_session(snapshot, cx);
+                }
                 if self.pending_preferences != 0 {
                     return;
                 }
@@ -645,6 +673,9 @@ impl WindowShell {
                     .active
                     .filter(|id| self.tabs.iter().any(|t| t.id == *id));
                 self.resources.closing.store(false, Ordering::SeqCst);
+                if !batch.window {
+                    self.checkpoint_session(cx);
+                }
                 if batch.window {
                     let handle = self.handle;
                     cx.defer(move |cx| {
@@ -759,6 +790,7 @@ pub(super) struct ShellOptions {
 enum MenuAction {
     Open,
     Reopen,
+    ClearSession,
     Save,
     Close,
     Quit,
@@ -795,6 +827,7 @@ impl WindowShell {
         use MenuAction::*;
         match action {
             Reopen => self.reopen_tab(cx),
+            ClearSession => self.clear_session_history(cx),
             Open => self.choose_open(cx),
             Close => {
                 self.begin_close(false, cx);
@@ -895,7 +928,7 @@ impl WindowShell {
         if matches!(action, Reopen) {
             return !self.opening && !self.closed_tabs.is_empty() && self.tabs.len() < MAX_TABS;
         }
-        if matches!(action, Quit | Light | Dark | Help | About) {
+        if matches!(action, Quit | Light | Dark | Help | About | ClearSession) {
             return true;
         }
         let Some(s) = self.session() else {
@@ -957,6 +990,8 @@ use tab_management::{TabDrag, TabDragLabel, tab_context_menu};
 #[path = "tab_recovery.rs"]
 mod tab_recovery;
 use tab_recovery::ClosedTab;
+#[path = "session_restore.rs"]
+mod session_restore;
 
 impl Render for WindowShell {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1143,6 +1178,7 @@ impl Render for WindowShell {
                 &[
                     ("Buka PDF…  Ctrl+O", Open),
                     ("Buka ulang tab tertutup  Ctrl+Shift+T", Reopen),
+                    ("Hapus riwayat sesi", ClearSession),
                     ("Simpan sebagai…  Ctrl+Shift+S", Save),
                     ("Tutup tab  Ctrl+W", Close),
                     ("Keluar", Quit),
@@ -1240,6 +1276,9 @@ impl Render for WindowShell {
             )
             .when(self.tab_picker_open, |el| {
                 el.child(gpui::deferred(self.render_tab_picker(cx)).with_priority(2))
+            })
+            .when(self.session_offer.is_some(), |el| {
+                el.child(self.render_session_offer(cx))
             })
             .when_some(self.notice.clone(), |el, notice| {
                 el.child(

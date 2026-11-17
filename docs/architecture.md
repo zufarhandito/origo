@@ -1,5 +1,14 @@
 # Architecture - desktop multi-tab
 
+Reading session snapshots are versioned, bounded local JSON, separate from export
+transactions and unsaved edits. WindowShell polls metadata changes every second,
+coalescing writes to one running task plus the latest pending snapshot. Normal window
+close captures pre-close reading state and waits for writes; individual last-tab close
+persists empty state. Startup without an explicit PDF offers restore. Reinspection,
+partial failure and fingerprint rejection apply before bookmark projection. Corrupt
+metadata is preserved until explicit clear; session write failure during exit cancels
+that exit once and reports how to retry without a session checkpoint.
+
 Shell tab recovery keeps at most 20 metadata-only closed-tab entries in memory.
 Only successful close batches record entries; reopening reinspects the primary source
 and creates a fresh session, or focuses an existing duplicate. ReadingPosition maps

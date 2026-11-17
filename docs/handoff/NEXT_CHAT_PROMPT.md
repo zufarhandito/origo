@@ -11,8 +11,8 @@ paling atas docs/handoff/PROJECT_HANDOFF.md. Cocokkan dengan git status/log.
 Pemilik mengotorisasi seluruh tahap pematangan multi-tab, satu per satu:
 1 pengelolaan tab → 2 reopen/pencarian Daftar tab → 3 restore sesi baca →
 4A dua PDF berdampingan → 4B dua view dokumen yang sama.
-Tahap 1 sudah di commit 615e57e. Tahap 2 diimplementasikan pada checkpoint ini;
-lihat log dan testing untuk commit/verifikasi terbaru. Tahap 3–4 belum dikerjakan.
+Tahap 1 sudah di commit 615e57e. Tahap 2 di commit 7c9db9a; tahap 3 diimplementasikan pada checkpoint ini;
+lihat log dan testing untuk commit/verifikasi terbaru. Tahap 4 belum dikerjakan.
 
 Keputusan: bintang permanen lokal berdasarkan path; reopen maksimal 20 entri
 selama proses berjalan tanpa edit yang dibuang; tawarkan restore sesi baca saat

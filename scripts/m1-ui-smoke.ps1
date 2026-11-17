@@ -22,7 +22,7 @@ $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-O
 $desktop=New-Object -ComObject Shell.Application
 # Cover the no-argument path used by run.cmd; document-only tests missed a
 # debug-build main-thread stack overflow in the empty-state view.
-$desktop.ShellExecute($exe,'',$root,'open',1)
+$desktop.ShellExecute($exe,('--state-dir "'+(Join-Path $directory 'state')+'"'),$root,'open',1)
 $startupDeadline=(Get-Date).AddSeconds(15)
 $emptyViewer=$null
 do {
@@ -37,7 +37,7 @@ if($emptyViewer.HasExited -or -not $emptyViewer.Responding){throw 'Empty viewer 
 $null=$emptyViewer.CloseMainWindow()
 if(-not $emptyViewer.WaitForExit(10000)){throw 'Empty viewer did not close'}
 Write-Host 'PASS empty startup without PDF argument'
-$arguments='"'+$fixture+'" --metrics "'+$metricsPath+'"'
+$arguments='"'+$fixture+'" --metrics "'+$metricsPath+'" --state-dir "'+(Join-Path $directory 'state')+'"'
 $desktop.ShellExecute($exe,$arguments,$root,'open',1)
 Start-Sleep -Seconds 2
 $app=Get-Process -Name pdf-studio | Where-Object Id -NotIn $oldIds | Sort-Object StartTime -Descending | Select-Object -First 1

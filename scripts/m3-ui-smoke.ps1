@@ -16,7 +16,7 @@ $metrics=Join-Path $directory 'metrics.json'
 $exe=Join-Path $root "target/$Profile/pdf-studio.exe"
 $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-Object Id)
 $desktop=New-Object -ComObject Shell.Application
-$desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'"'),$root,'open',1)
+$desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'" --state-dir "'+(Join-Path $directory 'state')+'"'),$root,'open',1)
 $deadline=(Get-Date).AddSeconds(20)
 do {
     Start-Sleep -Milliseconds 200
@@ -309,7 +309,7 @@ try {
     if(-not $app.WaitForExit(10000)){throw 'Discard did not close viewer'}
     [IO.File]::Delete($metrics)
     $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-Object Id)
-    $desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'"'),$root,'open',1)
+    $desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'" --state-dir "'+(Join-Path $directory 'state')+'"'),$root,'open',1)
     $deadline=(Get-Date).AddSeconds(20)
     do {
         Start-Sleep -Milliseconds 200
