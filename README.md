@@ -3,6 +3,8 @@
 For the next development chat, start with the [documentation index](docs/README.md)
 and [current handoff](docs/handoff/PROJECT_HANDOFF.md). A [ready-to-copy prompt](docs/handoff/NEXT_CHAT_PROMPT.md)
 records progress, verification, toolchain precautions and the latest Git checkpoint.
+The [progress summary](docs/PROGRESS.md) maps completed work to commits and separates
+the remaining backlog from release gates.
 Read [agent instructions](AGENTS.md) and the [feature workflow](docs/feature-development.md)
 for competitor-based research and Conventional Commit/push checkpoints after each feature.
 The [desktop UI and multi-tab design](docs/plans/UI_REDESIGN_MULTITAB_PLAN.md) is implemented;

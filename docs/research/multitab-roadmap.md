@@ -7,6 +7,9 @@ Dokumen ini menjadi sumber tunggal riset dan TODO multi-tab berikutnya. Status
 tahap 1–4B: **sudah diimplementasikan**. Lihat [perilaku aktual](../multitab.md) dan
 [bukti pengujian](../testing.md). Riset awal hanya dokumentasi; implementasi bertahap
 kemudian diotorisasi pemilik. Group tab dan tab vertikal tetap backlog.
+Checkpoint hasil/commit, fix background tab aktif `70287a7`, dan pekerjaan yang
+masih terbuka dirangkum di [progres proyek](../PROGRESS.md). Handover terbaru hanya
+memperbarui dokumentasi; tidak memulai backlog atau menjalankan tes produk baru.
 
 ## 1. Metode, status, dan kondisi saat ini
 
@@ -118,10 +121,10 @@ tersedia juga di menu klik kanan dan terlihat dalam Daftar tab. Bintang tidak
 mengubah posisi tab, isi PDF, dirty state atau history. Simpan favorit lokal agar
 tetap diingat ketika file dibuka lagi; tidak ada upload otomatis.
 
-**Keputusan awal (digantikan keputusan implementasi di bawah):** favorit permanen versus penanda selama tab terbuka belum
-dijawab secara eksplisit. Permanen adalah rekomendasi, bukan keputusan terkunci.
-Jika permanen dipilih, tetapkan identitas file, perilaku rename/move/file hilang,
-serta penanganan gagal tulis preferensi.
+**Keputusan implementasi:** favorit permanen lokal berdasarkan canonical Windows
+path. Rename/move dianggap file berbeda; metadata dibatasi 4096 entri/1 MiB.
+Gagal tulis dilaporkan, metadata rusak dipertahankan dan tidak ditimpa diam-diam.
+Detail aktual di [multi-tab](../multitab.md).
 
 **Acceptance:** toggle, reorder, close/reopen, nama sama di folder berbeda, serta
 restart dan failure penyimpanan bila persistensi dipilih. PDF dan dirty state utuh.
@@ -167,8 +170,9 @@ Sasaran adalah tab yang diklik kanan, termasuk yang belum aktif. Aksi tidak berl
 dinonaktifkan. Semua penutupan melewati guard aplikasi, termasuk ekspor berjalan.
 Cancel pada close batch mempertahankan tab; Save As yang sudah sukses tetap berlaku.
 
-**Keputusan lanjutan:** rincian menu dan perilaku fokus saat klik kanan tab nonaktif
-ditetapkan saat merancang interaksi, tanpa mengubah sasaran aksi berdasarkan indeks.
+**Keputusan implementasi:** klik kanan tidak mengaktifkan tab; target memakai TabId
+stabil. Menu bintang/pindah awal-akhir/tutup/tutup lainnya/tutup kanan tersedia;
+subset close transactional dan tetap menghormati modal/pekerjaan dokumen.
 
 **Acceptance:** tab nonaktif/terakhir/dirty, keyboard menu, reorder saat menu relevan,
 job berjalan dan cancel di tengah batch. Tidak ada discard implisit.
@@ -189,8 +193,9 @@ Hormati kapasitas, duplicate Open, serta sumber hilang atau berubah.
 
 **Batas:** membuka kembali file dari disk tidak otomatis mengembalikan edit organizer
 yang sebelumnya dipilih untuk dibuang. Jangan memberi kesan bahwa Discard sudah
-memiliki backup/recovery. Retensi riwayat dan data apa yang dipulihkan ditetapkan
-sebelum implementasi; hindari menahan semua bitmap/workspace tanpa batas.
+memiliki backup/recovery. Implementasi menyimpan maksimal 20 entri metadata selama
+proses berjalan, bukan workspace/bitmap. Sumber yang fingerprint-nya berubah kembali
+ke halaman awal; reopen yang gagal tetap dapat dicoba lagi.
 
 **Acceptance:** close clean, Save As lalu close, Discard, close cancel, beberapa
 penutupan, duplicate path, kapasitas penuh, file hilang/berubah dan gagal reopen.
@@ -238,9 +243,11 @@ tidak selalu setara dengan indeks pada workspace yang sudah diubah. Jangan diam-
 menganggap hasil Save As adalah sumber baru; semantics Save As sekarang mempertahankan
 source/history asli.
 
-**Keputusan lanjutan:** default restore otomatis/manual, informasi yang disimpan,
-retensi/clear history, serta cakupan dokumen dirty atau multi-source. Tidak ada
-janji pemulihan edit yang belum diekspor sebelum kontraknya ditetapkan dan diuji.
+**Keputusan implementasi:** tawarkan restore pada startup tanpa PDF eksplisit;
+simpan daftar/urutan/aktif/posisi baca/zoom sumber utama, maksimal 8 dokumen/1 MiB.
+Dirty/multi-source tetap hanya metadata baca sumber utama, tanpa recovery edit.
+Clear history menonaktifkan pencatatan sampai proses dibuka kembali. Posisi dua view
+memakai view pilihan terakhir; layout split tidak disimpan. Detail failure di multi-tab.
 
 **Acceptance:** restart normal, partial restore, file hilang/berubah, metadata rusak,
 kapasitas, serta Save/Discard/Cancel ketika keluar. Restore tidak menimpa PDF.

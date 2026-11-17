@@ -12,6 +12,7 @@ Commits dan push ke tujuan repo yang disepakati.
 
 1. [Handoff terkini](handoff/PROJECT_HANDOFF.md): fitur nyata, hasil tes terakhir,
    batas, status Git/push, dan instruksi terakhir pengguna.
+   [Progres proyek](PROGRESS.md): tahap selesai, commit, backlog dan gate yang terbuka.
 2. [Perilaku desktop + multi-tab](multitab.md) dan
    [rancangan yang diimplementasikan](plans/UI_REDESIGN_MULTITAB_PLAN.md).
 3. [Arsitektur saat ini](architecture.md), [kompatibilitas](compatibility.md), dan
@@ -21,22 +22,24 @@ Commits dan push ke tujuan repo yang disepakati.
 
 [Prompt siap salin ke chat berikutnya](handoff/NEXT_CHAT_PROMPT.md).
 
-Fokus berikutnya yang disetujui: [riset dan TODO pematangan multi-tab](research/multitab-roadmap.md).
-Dokumen tunggal ini memuat prioritas 1–4, Dock GPUI Kit untuk split yang dapat
-di-resize, organizer saat split, serta backlog group tab/tab vertikal. Tahap 1–3
-sudah diimplementasikan, termasuk tahap 4A dua PDF berdampingan dan tahap 4B dua
-tampilan PDF yang sama. Group tab/tab vertikal tetap backlog. Lihat handoff paling atas.
+Pematangan multi-tab **1–4B sudah selesai**, termasuk fix background tab aktif.
+[Roadmap/riset](research/multitab-roadmap.md) menyimpan keputusan dan daftar acceptance;
+[progres](PROGRESS.md) memetakan hasil ke commit. Group tab/tab vertikal tetap backlog;
+task berikutnya belum dipilih. Jangan menganggap daftar backlog sebagai izin eksekusi.
 
 Implementasi bertahap **17 November 2026** mencakup commit `615e57e` (tahap 1),
-`7c9db9a` (2), `bf51fb6` (3), dan `73e2409` (4A); lihat Git log dan handoff paling
-atas untuk checkpoint 4B. Find ada di `a74d380`; roadmap awal di `6bbc6c1`.
-Push tertahan automatic approval review untuk tujuan/payload spesifik; jangan
-menganggap instruksi umum commit/push sudah menyelesaikan penolakan tersebut.
+`7c9db9a` (2), `bf51fb6` (3), `73e2409` (4A), `a1647e0` (4B), dan `70287a7`
+(background tab). Awal handover: `main` bersih, HEAD `70287a7`, cache `origin/main`
+`a1647e0`, selisih 1 ahead/0 behind sebelum commit dokumen ini. Cache/reflog kini
+mencakup 4B, tetapi bukan verifikasi ulang server/CI. Push agen sebelumnya ditolak
+automatic approval review untuk tujuan/payload spesifik; jangan menyamakan perubahan
+cache dengan jawaban persetujuan. Tidak ada fetch/push oleh agen pada handover ini.
 Rincian dan batas kelanjutan ada di [handoff terbaru](handoff/PROJECT_HANDOFF.md).
 
 [Pencarian PDF aktif](search.md) sudah diimplementasikan, default tidak case-sensitive
-dan frasa berurutan. Bukti 53 unit tests dan 14 kasus search UI tetap dicatat di
-[testing](testing.md); suite produk tidak diulang pada handover dokumentasi.
+dan frasa berurutan. Check multi-tab terakhir lulus 57 unit tests; search UI lulus
+14 kasus. Fix background berikutnya lulus cek visual dua tema/fmt/Clippy/build.
+Bukti dan batas ada di [testing](testing.md); suite produk tidak diulang pada handover ini.
 
 Handoff terkini mengalahkan status milestone historis di arsip/blueprint. Rencana
 tidak berarti sudah diimplementasikan atau otomatis diizinkan untuk dieksekusi.
@@ -47,10 +50,11 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 | Kelompok | Dokumen |
 |---|---|
 | Konteks aktif | [Handoff](handoff/PROJECT_HANDOFF.md), [prompt chat baru](handoff/NEXT_CHAT_PROMPT.md) |
+| Progres proyek | [Tahap selesai, commit dan pekerjaan terbuka](PROGRESS.md) |
 | Alur pengembangan | [Riset kompetitor, commit dan push](feature-development.md), [contoh riset Find](research/text-search.md) |
 | Rencana UI | [Redesain desktop dan multi-tab](plans/UI_REDESIGN_MULTITAB_PLAN.md) |
 | Multi-tab aktif | [Perilaku tab](multitab.md), [hardening dan hasil profil](multitab-hardening.md) |
-| Multi-tab berikutnya | [Riset kompetitor, TODO dan backlog](research/multitab-roadmap.md) |
+| Keputusan multi-tab | [Riset kompetitor, acceptance selesai dan backlog](research/multitab-roadmap.md) |
 | Arsitektur/keputusan | [Arsitektur](architecture.md), [keputusan](decisions.md), [ADR](adr/) |
 | Viewer | [Buku dan benchmark](books.md), [seleksi teks](text-selection.md) |
 | Pencarian PDF aktif | [Cari kata/frasa](search.md), default tidak case-sensitive |
@@ -63,7 +67,7 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 | Arah konversi | [Roadmap konversi](conversion-roadmap.md), hanya PNG yang aktif |
 | Ekspor gambar aktif | [PDF → PNG](png.md), semua/seleksi dan 150/300 DPI |
 | Kontrak awal | [Blueprint Level 1](blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md), memuat status historis |
-| Sejarah sesi | [Arsip handoff](archive/PROJECT_HANDOFF_HISTORY.md), bukan titik mulai kerja |
+| Sejarah sesi | [Arsip multi-tab 17 November](archive/PROJECT_HANDOFF_2026-11-17_MULTITAB.md), [arsip sebelumnya](archive/PROJECT_HANDOFF_HISTORY.md); bukan titik mulai kerja |
 
 Dokumen multi-tab menjelaskan perilaku shell baru. Suite M3 sudah dimigrasikan;
 [coverage map](m3-ui-coverage.md) menjelaskan padanan kasus dan snapshot historisnya.

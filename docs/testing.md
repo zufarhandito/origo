@@ -1,3 +1,19 @@
+# Documentation handover — 17 November 2026
+
+- Docs-only checkpoint from source HEAD `70287a7`; no product build/tests were rerun.
+- Rechecked recorded manifests: same-document 9, comparison 10, Find 14 and session
+  restore 8 cases; all entries passed. Same-document profile summary still reports
+  passed, 3 rounds/31 samples, 330,465,280 peak private bytes and 679,936 warmed growth.
+- Primary release executable exists and its hash matches the isolated build used by
+  the background-tab verification below. This does not establish remote CI or a
+  current portable release.
+- Git started clean on main, local tracking origin/main `a1647e0`, HEAD `70287a7`,
+  1 ahead/0 behind before the docs commit. No fetch/push/server check in this handover.
+  New progress summary/current handoff replace obsolete next-step instructions;
+  old handoff is preserved in the explicitly historical archive.
+- Checked 188 local documentation links and diff whitespace. The archived payload
+  matches the `70287a7` source blob after reversing its relative prompt-link adjustment.
+
 # Verification — active-tab background fix, 17 November 2026
 
 - Restored the theme `tab_bar` background on the custom document strip. Standalone
