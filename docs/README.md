@@ -26,13 +26,16 @@ Dokumen tunggal ini memuat prioritas 1–4, Dock GPUI Kit untuk split yang dapat
 di-resize, organizer saat split, serta backlog group tab/tab vertikal. Fitur-fitur
 tersebut belum diimplementasikan; keputusan lanjutan tetap ditandai.
 
-Checkpoint handover **17 November 2026** mencatat PNG pada commit `2124580`,
-hasil 49 unit tests dan PNG UI lokal/portable, gate rilis yang terbuka, serta
-keputusan model bisnis AI yang ditunda. Detail dan status Git ada di handoff.
+Handover terbaru **17 November 2026** dimulai pada HEAD `6bbc6c1`, main bersih dan
+ahead 3 terhadap cache `origin/main`, sebelum commit handover itu sendiri. Find
+ada di `a74d380`; workflow riset di `9478ddc`; roadmap multi-tab di `6bbc6c1`.
+Push tertahan automatic approval review untuk tujuan/payload spesifik; jangan
+menganggap instruksi umum commit/push sudah menyelesaikan penolakan tersebut.
+Rincian dan batas kelanjutan ada di [handoff terbaru](handoff/PROJECT_HANDOFF.md).
 
-Follow-up sesudah checkpoint: [pencarian teks PDF aktif](search.md) diimplementasikan,
-default tidak case-sensitive dan frasa berurutan, di commit `a74d380`;
-53 unit tests serta 14 kasus search UI dicatat di [testing](testing.md).
+[Pencarian PDF aktif](search.md) sudah diimplementasikan, default tidak case-sensitive
+dan frasa berurutan. Bukti 53 unit tests dan 14 kasus search UI tetap dicatat di
+[testing](testing.md); suite produk tidak diulang pada handover dokumentasi.
 
 Handoff terkini mengalahkan status milestone historis di arsip/blueprint. Rencana
 tidak berarti sudah diimplementasikan atau otomatis diizinkan untuk dieksekusi.

@@ -1,5 +1,82 @@
 # Handoff terkini — desktop multi-tab, PNG dan pencarian teks, 17 November 2026
 
+## Checkpoint handover terbaru — 17 November 2026
+
+Permintaan terakhir pemilik: **buat handover ke chat berikutnya seperti biasa**.
+Bagian ini adalah acuan status terbaru; checkpoint PNG dan snapshot di bawah tetap
+riwayat. Sesi handover hanya mengubah dokumentasi, tidak mengimplementasikan roadmap.
+
+### Git dan push yang benar-benar diperiksa
+
+- Saat mulai handover: working tree bersih, branch `main`, HEAD **`6bbc6c1`**.
+- Tiga commit lokal di atas cache `origin/main` (`2124580`):
+  - `a74d380` — `feat(search): add phrase search to active PDF tabs`.
+  - `9478ddc` — `docs(workflow): require competitor research and feature checkpoints`.
+  - `6bbc6c1` — `docs(multitab): document researched roadmap and backlog`.
+- `git rev-list --left-right --count HEAD...origin/main` menghasilkan `3 0` saat
+  mulai handover. Angka ini belum termasuk commit dokumentasi handover ini; lihat
+  `git log -1`/`git status` untuk checkpoint setelahnya. Cache upstream bukan
+  pemeriksaan server; tidak ada fetch atau verifikasi remote CI pada handover ini.
+- Remote push dikonfigurasi ke **https://github.com/zufarhandito/origo.git**, `main`.
+  Push sebelumnya **ditolak automatic approval review**, termasuk percobaan terakhir
+  atas ketiga commit di atas: pengiriman source dan dokumentasi ke tujuan spesifik
+  tersebut masih dinilai belum mendapat persetujuan eksplisit tujuan/payload.
+- Konfirmasi tujuan dan payload sudah ditanyakan; pemilik kemudian meminta handover,
+  belum menjawab konfirmasi tersebut secara eksplisit. Instruksi umum commit/push
+  tetap tercatat di AGENTS/workflow, tetapi tidak menghapus penolakan eksekusi ini.
+  **Jangan retry/bypass penolakan atau mengklaim sudah push.** Tidak ada push ulang
+  pada handover ini. Commit lokal aman; tidak ada publikasi binary/ZIP.
+
+### Yang sudah selesai dan bukti yang tersedia
+
+Produk nyata tetap viewer, organizer, desktop multi-tab, safe Save As/Extract,
+unsaved guard, Split PDF, Optimize lossless, PNG dan **Find pada PDF aktif**.
+Find sudah ada di `a74d380`: default tidak case-sensitive, frasa berurutan,
+whitespace/pergantian baris dalam satu halaman, bar di dalam tab, counter/sorotan,
+Enter/F3 dan arah balik, opsi kapitalisasi/kata utuh, serta state per dokumen.
+Detail/limit ada di [search](../search.md); risetnya di [text-search](../research/text-search.md).
+
+Catatan pengujian terakhir tetap **53 unit tests**, fmt/denied-warning Clippy,
+release workspace build, search native/full native smoke, **14 kasus search UI**
+termasuk 1000 halaman/pause/resume, dan chrome dua tema/empat lebar yang lulus.
+Handover ini hanya memeriksa ulang keberadaan manifest search dan **14 hasil unik
+berstatus passed** di `.research/search-ui-4e4935cb28a548e88e110e53a2d9ea66/cases.json`.
+**Tidak ada test/build produk yang dijalankan ulang pada handover ini.** Detail
+run/limit tetap di [testing](../testing.md), bukan klaim verifikasi fisik/remote baru.
+
+Executable release desktop dan smoke masih ada saat diperiksa. Proses lama milik
+pengguna dapat memakai build terdahulu; jangan menutupnya atau menyimpulkan build
+berdasarkan nama proses saja. `run.cmd` membuka executable release terbaru, fallback debug.
+
+### Kelanjutan yang diminta: matangkan multi-tab dahulu
+
+Sumber tunggal: [riset dan TODO multi-tab](../research/multitab-roadmap.md),
+**389 baris, 9 bagian fitur, 2 bagian backlog**, dicatat pada commit `6bbc6c1`.
+Semua TODO fitur masih belum dikerjakan. Pemilik meminta satu dokumen lengkap dan
+mengizinkan implementasi rencana **penulisan dokumen**, bukan memulai fitur secara
+diam-diam. Ikuti permintaan berikutnya; roadmap tidak otomatis izin mengeksekusi semuanya.
+
+- Tahap 1: drag urutan, bintang kuning, + langsung di kanan tab terakhir,
+  menu klik kanan. Tahap 2: reopen tab tertutup dan cari dalam Daftar tab.
+- Tahap 3: restore sesi/posisi baca. Tahap 4A: dua PDF berdampingan; 4B: dua view
+  PDF yang sama. Split view **wajib Dock GPUI Kit 0.9.1** dengan splitter resize.
+- Organizer: satu panel alat mengikuti PDF fokus dan menyebut sasarannya; seleksi
+  per PDF terpisah. Shortcut menghormati fokus input. Ekspor tetap milik dokumen asal.
+- Bedakan panel **terlihat** dari **fokus**: dua panel split terlihat perlu dirender;
+  tab tersembunyi tetap melepas cache dan berhenti menjadwalkan kerja. Integrasi
+  Dock tidak boleh melewati Save/Discard/Cancel guard aplikasi.
+- Group tab/tab vertikal adalah backlog tanpa jadwal. Pin, hover preview, MRU dan
+  multi-window menunggu pengalaman penggunaan; bukan bagian otomatis tahap 1–4.
+- Belum terkunci: persistensi bintang, retensi/recovery reopen, default/cakupan restore
+  terutama dirty/multi-source, rincian masuk/keluar split dan close view/dokumen,
+  serta kepemilikan seleksi/pencarian saat satu PDF punya dua tampilan.
+
+Untuk melanjutkan implementasi, mulai dari tahap yang diminta dan kunci keputusan
+yang berdampak pada tahap itu. Riset tetap memakai kompetitor/sumber primer, bukan
+menebak dari kemampuan aplikasi. Gunakan Conventional Commits per fitur yang selesai.
+Safety sumber, batas toolchain/privasi, gate rilis dan penundaan AI/JPEG/TXT tetap
+berlaku seperti bagian berikut. Handover ini tidak meminta fitur AI atau rilis publik.
+
 ## Fokus berikutnya — pematangan multi-tab
 
 Keputusan dan riset lengkap disatukan dalam

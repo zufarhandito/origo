@@ -1,131 +1,123 @@
 # Prompt siap pakai untuk chat baru
 
-Aturan aktif: baca `AGENTS.md` dan `docs/feature-development.md`. Research fitur wajib
-berbasis kompetitor/sumber primer; setiap fitur selesai wajib Conventional Commit
-dan push. Instruksi ini menggantikan status izin push historis pada checkpoint lama.
-
-Fokus berikutnya: [riset dan TODO multi-tab](../research/multitab-roadmap.md), satu
-dokumen untuk prioritas 1–4 dan backlog group tab/tab vertikal. Baru dokumentasi;
-fitur belum diimplementasikan. Dock GPUI Kit/resizing dan organizer saat split
-adalah keputusan pengguna; detail yang belum diputuskan ditandai sebagai usulan.
-
-**Follow-up terbaru:** pencarian teks PDF aktif sudah diimplementasikan setelah
-checkpoint PNG berikut. Baca bagian teratas handoff, `docs/search.md` dan bagian
-search terbaru `docs/testing.md`: default tidak case-sensitive, pencocokan frasa
-berurutan, bar dalam tab, 53 unit tests dan 14 kasus search UI lulus termasuk
-1000 halaman/pause/resume. Fitur tercatat di commit `a74d380`; periksa Git untuk
-checkpoint dokumentasi dan status upstream terbaru.
-Keterangan PNG sebagai implementasi terakhir di prompt checkpoint berikut bersifat
-historis dan digantikan follow-up ini.
-
-Salin teks berikut dan ganti permintaan terakhir. Checkpoint **17 November 2026**:
-PNG sudah tercatat di commit `2124580`; saat mulai handover, working tree bersih dan `main`
-sama dengan cache `origin/main`. Sesi handover hanya mengubah dokumentasi, tanpa
-fetch/commit/push atau pemeriksaan remote CI. Periksa Git lagi saat melanjutkan.
+Checkpoint **17 November 2026**, ditulis di atas `6bbc6c1`. Baca
+[handoff terkini](PROJECT_HANDOFF.md) untuk detail dan [roadmap multi-tab](../research/multitab-roadmap.md)
+untuk satu dokumen riset/TODO. Copy teks berikut, lalu ganti permintaan terakhir.
+Prompt ini menggantikan prompt checkpoint PNG lama; riwayat tetap di handoff/Git.
 
 ```text
-Kita lanjut proyek PDF Studio di D:\projects\bpdf. Berkomunikasi bahasa Indonesia.
-Baca docs/research/multitab-roadmap.md untuk prioritas multi-tab yang disetujui:
-1 drag/bintang/posisi +/menu konteks; 2 reopen dan cari tab; 3 restore sesi/posisi;
-4 dua PDF berdampingan lalu dua view satu PDF. Split memakai Dock GPUI Kit dan
-splitter resize; organizer/seleksi/shortcut mengikuti fokus yang tepat. Group tab
-dan tab vertikal backlog tanpa jadwal. Dokumen ini riset/TODO, belum implementasi;
-detail belum terkunci (misalnya persistensi bintang/recovery) tetap perlu ditetapkan.
-Baca AGENTS.md dan docs/feature-development.md terlebih dahulu. Research fitur harus
-berbasis produk kompetitor (Acrobat/Reader, Firefox/PDF.js, Chrome PDF, Edge PDF, dll),
-bukan menebak dari keterbatasan aplikasi kita. Sertakan sumber primer, bedakan fakta/
-observasi/rekomendasi/unknown dan simpan riset substantif di docs/research/.
-Setiap fitur implementasi yang selesai dan lolos tes wajib Conventional Commit lalu
-push ke origin https://github.com/zufarhandito/origo.git, branch main. Ini izin
-berkelanjutan terbaru; status penolakan/izin lama pada checkpoint historis sudah
-digantikan. Tidak mengizinkan implementasi plan-only atau publikasi binary/data privat.
+Kita lanjut PDF Studio di D:\projects\bpdf, Windows x64/PowerShell. Bahasa Indonesia.
 Baca berurutan:
-1. README.md dan docs/README.md
-2. Bagian terkini docs/handoff/PROJECT_HANDOFF.md (17 November 2026)
-3. docs/png.md dan bagian PDF-to-PNG terbaru docs/testing.md
-4. docs/multitab.md, docs/multitab-hardening.md dan docs/architecture.md
-5. docs/device-acceptance.md, docs/distribution-audit.md, docs/release-checklist.md
-Lalu baca kode/dokumen fitur terkait. Blueprint dan snapshot lama bersifat historis;
-rancangan UI di docs/plans/UI_REDESIGN_MULTITAB_PLAN.md sudah diimplementasikan.
+1. AGENTS.md, docs/README.md dan docs/feature-development.md.
+2. Checkpoint paling atas docs/handoff/PROJECT_HANDOFF.md, 17 November 2026.
+3. docs/research/multitab-roadmap.md: satu dokumen TODO/riset multi-tab berikutnya.
+4. docs/search.md, docs/research/text-search.md dan bagian terbaru docs/testing.md.
+5. docs/multitab.md, docs/multitab-hardening.md, docs/architecture.md.
+Lalu dokumen/kode terkait tahap yang diminta. Blueprint/snapshot lama bukan status terkini.
 
-Produk nyata: viewer, organizer, multi-tab desktop, safe Save As/Extract, unsaved
-guard, Split, Optimize lossless dan PDF → PNG. Nama PDF/close menyatu dalam tab,
-Daftar tab satu control berlabel/caret; state/callback terpisah per dokumen.
-Renderer, slot ekspor dan budget cache bersama. Maksimal 8 tab termasuk loading.
+Status Git saat handover dimulai: main/HEAD 6bbc6c1, working tree bersih,
+cache origin/main di 2124580; ahead 3/behind 0. Commit belum terkirim:
+- a74d380 feat(search): add phrase search to active PDF tabs.
+- 9478ddc docs(workflow): require competitor research and feature checkpoints.
+- 6bbc6c1 docs(multitab): document researched roadmap and backlog.
+Commit handover menambah checkpoint di atasnya; periksa git status/log/upstream.
+Tidak ada fetch atau verifikasi remote CI pada handover. Cache bukan bukti server.
 
-Update setelah checkpoint PNG: fitur Find sudah di commit a74d380
-(feat(search): add phrase search to active PDF tabs). Baca docs/search.md,
-docs/research/text-search.md dan bagian terbaru docs/testing.md. Ctrl+F membuka bar
-dalam tab aktif; default tidak case-sensitive dan frasa berurutan, dengan sorotan,
-penghitung, navigasi, case/whole-word options dan state per tab. 53 unit tests,
-full native smoke, 14 kasus search UI termasuk 1000 halaman/pause/resume dan chrome
-regression lulus. Checkpoint Git/izin push lama di bawah bersifat historis.
+Push ke origin https://github.com/zufarhandito/origo.git branch main sebelumnya
+DITOLAK automatic approval review: pengiriman source/dokumentasi ke tujuan spesifik
+itu belum dianggap mendapat persetujuan eksplisit destination/payload. Konfirmasi
+sudah ditanyakan untuk ketiga commit; pemilik beralih meminta handover, belum menjawab
+secara eksplisit. Jangan retry/bypass atau mengklaim sudah push. Instruksi umum
+pemilik untuk Conventional Commit lalu push tiap fitur tetap berlaku, tetapi tidak
+menghapus penolakan ini. Pertahankan commit lokal dan jelaskan blocker bila relevan.
+Tidak ada binary/ZIP yang dipublikasikan; handover bukan instruksi publikasi.
 
-PNG: Alat → Ekspor PNG…, semua/seleksi, 150 DPI default atau 300 DPI, folder baru
-no-overwrite; page-0001.png dst mengikuti snapshot urutan/impor/rotasi workspace.
-Latar putih opaque, dimensi exact terpisah dari viewer zoom/DPR; batas 8192px/sisi,
-16 × 1024 × 1024 pixel/halaman dan 1 GiB encoded/batch. Encode/decode divalidasi per
-halaman. DPI belum ditulis sebagai metadata physical-print pHYs. Input kompleks
-masih diblokir preflight konservatif; lihat docs/png.md untuk detail/batas.
-Job tetap milik tab asal, dapat dibatalkan dari tab lain, close menunggu job.
-Cancel cooperative, native render tidak preemptible; crash-orphan recovery belum ada.
+Produk nyata: viewer, seleksi/copy teks, organizer, desktop multi-tab maksimal 8
+termasuk loading, safe Save As/Extract, unsaved guard, Split PDF, Optimize lossless,
+PNG dan Find. Source read-only; state/history/viewport terpisah per PDF. Tab
+tersembunyi berhenti menjadwalkan render dan melepas cache raster/teks/GPU, tetapi
+workspace/seleksi/posisi baca bertahan di RAM. Belum ada restore sesi/crash recovery.
 
-Sumber read-only, policy v4, private snapshots, validation/source recheck dan
-staging/no-overwrite harus dipertahankan. Hanya full PDF Save As dengan receipt
-instance/revisi sesuai menandai clean; Extract/Split/Optimize/PNG tidak.
-PNG sukses tidak mengizinkan dirty-close otomatis. Optimize lossless bisa membesar,
-tanpa rasterisasi atau re-encoding JPEG.
+Find sudah di commit a74d380: Ctrl+F/tombol Cari teks/menu Edit, bar di dalam tab
+bawah toolbar, default TIDAK case-sensitive. 'hasil penelitian' dicari sebagai
+frasa berurutan, bukan kata terpisah. Normalisasi whitespace/linebreak hanya dalam
+satu halaman. Counter/highlight, next/previous/Enter/F3/arah balik, wrap, Esc,
+opsi case/whole-word, state per tab. Debounce 200 ms, scan satu halaman melalui
+worker bersama, query <=1024 karakter, <=10000 hasil. Tidak ada OCR/upload/regex.
+Tab nonaktif pause scan belum selesai, kembali mengulangnya; hasil lama ditolak token.
 
-Git saat handover dimulai: main/HEAD 2124580 (export png), cache origin/main sama,
-working tree bersih. Perubahan handover sesudahnya belum di-commit oleh sesi itu.
-Sebelumnya 2c3033c (portable/audit), 06c2a39 (M3/device gates), 582cd67 (tab).
-Recheck git status/log/upstream dan pertahankan perubahan pengguna. Tidak ada fetch
-atau verifikasi remote CI/server baru pada sesi handover. Status push ditolak dan
-HEAD lama di snapshot historis tidak menggantikan checkpoint ini.
+Bukti terakhir di docs/testing.md: fmt/denied-warning Clippy, 53 unit tests dan
+release workspace build lulus; search/full native smoke termasuk M1/text/M3/
+whole-source/tagged Extract/Split/Optimize/PNG lulus. Final search UI 14 kasus:
+.research/search-ui-4e4935cb28a548e88e110e53a2d9ea66, termasuk 1000 halaman,
+progress/pause/resume/cache, frasa/case, isolasi tab, organizer dan source hash.
+Chrome UI dua tema/empat lebar lulus di chrome-ui-8b6d7ecc2a954fd581726d239ebb9a32.
+Handover hanya memeriksa keberadaan manifest dan 14 passed unik, executable,
+Git/dokumen/tautan; TIDAK mengulang test/build produk. Bukti historis bukan remote CI.
 
-Bukti pekerjaan PNG di docs/testing.md: check.ps1 lulus fmt/Clippy, 49 unit tests
-dan release build; full native smoke dan final release --png-smoke lulus.
-PNG UI 11 kasus bernama pada build lokal dan 11 pada extracted portable lulus.
-Tabs, 25 kasus M3, Split dan Optimize UI lulus. Jangan klaim suite produk dijalankan
-ulang saat handover dokumentasi. Profil delapan buku/400% ada di multitab-hardening.
-Snapshot M3 asli tetap byte-identical di scripts/archive/m3-single-workspace-ui.ps1.txt.
-Kandidat dist/pdf-studio-windows-x64-candidate-2c3033c-0442227c.zip lulus manifest
-1103 file/checksum/import/runtime, lima negative checks, serta PNG UI restricted
-PATH dari path Unicode. Ini dirty source sebelum commit PNG, bukan build bersih
-HEAD 2124580. ZIP ignored/internal dan belum dipublikasikan.
+FOKUS BERIKUTNYA: pemilik ingin mematangkan multi-tab sebelum prioritas lain.
+Roadmap 389 baris pada 6bbc6c1 memuat 9 riset fitur dan 2 backlog; semua TODO belum
+implementasi. Urutan disetujui:
+1. Drag urutan tab; bintang kuning; + langsung di kanan tab terakhir, kelompok rata
+   kiri dan Daftar tab di ujung; menu klik kanan tab.
+2. Buka ulang tab tertutup dan pencarian dalam Daftar tab.
+3. Pemulihan sesi/posisi baca.
+4A. Dua PDF berdampingan; 4B. dua tampilan PDF yang sama.
+Pemilik mewajibkan Dock GPUI Kit untuk split, dengan pembatas bisa digeser/resize.
+API lokal 0.9.1 sudah dibaca: DockArea, DockLayout::h_split(), DockSkin dan resize
+handle. Tes/source upstream yang dibaca tidak diklaim diuji sebagai integrasi app.
 
-Gate terbuka: physical 150/200%, mixed-monitor, physical modifier shortcuts,
-trackpad/Narrator, clean Windows 10/11, lisensi/redistribution/MSVC entitlement,
-tiga notice gaps dan native/security review. Bukti otomatis satu display 100%/DPI96
-tidak menutup tes fisik; P4 belum penuh. anyhow sudah 1.0.103; empat unmaintained
-advisories tetap tercatat. Jangan menyatakan public-release ready.
+Organizer saat split sudah disetujui: satu panel alat mengikuti PDF fokus dan
+menyebut nama/jumlah seleksi; seleksi A/B terpisah dan bertahan saat pindah fokus.
+Rotasi/hapus/pindah/ekstrak/impor/Undo/Redo/Save As ke sasaran yang benar; Ctrl+A/Delete
+pada input tetap mengedit teks. Job ekspor tetap milik dokumen asal setelah switch.
+Dua panel terlihat boleh render; fokus hanya satu penerima aksi. Jangan memakai
+'active=false' lama untuk mematikan semua kerja panel split yang masih terlihat.
+Resize memakai viewport panel; Dock close tidak boleh melewati unsaved guard.
+Dua view PDF yang sama: edit dokumen dibagi, posisi baca/zoom terpisah; perlu
+pemisahan state dokumen dan state tampilan, bukan salinan workspace yang berkonflik.
 
-JPEG/TXT sengaja di-skip; AI/OCR/converter lain belum diimplementasikan.
-Konteks AI ditunda: AI online berbayar ke pemilik, model usage termasuk paket,
-mahasiswa/peneliti Indonesia. Reader gratis + trial sekali per akun; beta Rp49.000/
-30 hari prepaid/manual renewal, tanpa autodebit/top-up. Target biaya AI maksimum
-Rp10.000/pelanggan/30 hari; kredit transparan dan estimasi sebelum tugas berat;
-pilot 10–20 undangan. Pendamping baca + riset multi-PDF dengan sumber/halaman.
-PDF lokal, kirim konteks perlu dengan persetujuan saat AI dipakai. Provider/model
-belum dipilih; ACP/Zed hanya inspirasi. Belum ada backend/auth/payments AI.
-File docs/plans/AI_BUSINESS_MODEL.md belum dibuat. Jika diminta melanjutkan AI,
-tulis/validasi bisnis dahulu, jangan langsung implementasi. Detail keputusan vs
-usulan kredit/trial/limit PDF/unit economics ada di handover; usulan belum terbukti.
+Group tab dan tab vertikal BACKLOG tanpa jadwal. Pin/hover preview/MRU/multi-window
+menunggu pengalaman penggunaan, bukan bagian otomatis tahap 1-4. Belum dikunci:
+persistensi bintang (permanen baru rekomendasi), retensi/cakupan reopen, default/
+cakupan restore dirty atau multi-source, detail split/close view, dan kepemilikan
+seleksi/pencarian untuk dua view satu PDF. Kunci detail relevan sebelum implementasi.
+Permintaan 'Implement the approved plan' terakhir mengimplementasikan PENULISAN
+DOKUMEN roadmap, bukan memulai semua fitur. Permintaan terakhir sekarang handover.
+Ikuti task berikutnya dari pemilik; jangan otomatis menjalankan seluruh roadmap.
 
-Run: run.cmd (release, debug fallback, tanpa build). Build/check dari root PowerShell:
+Riset fitur harus berdasarkan kompetitor/sumber primer (Acrobat/Reader, Firefox/
+PDF.js, Chrome PDF, Edge PDF), bukan menebak dari kondisi app kita. Bedakan fakta,
+uji langsung, rekomendasi dan unknown; simpan bukti/keputusan. Commit fitur selesai
+memakai Conventional Commits. Dokumentasi multi-tab riset/TODO tetap satu dokumen.
+
+Kontrak ekspor: policy v4, private snapshots, preflight/consent, validasi/source
+recheck, staging/no-overwrite. Hanya full Save As receipt instance/revisi cocok
+menandai clean; Extract/Split/Optimize/PNG tidak. Optimize lossless bisa membesar.
+Native PDFium masih in-process/cooperative, tanpa hard timeout/sandbox. Fingerprint
+size/mtime bukan hash. PNG 150/300 DPI, opaque putih, exact dimensions, 8192px/sisi,
+16 Mi-pixel/halaman dan 1 GiB/batch; belum ada pHYs/crash-orphan recovery.
+
+Run: run.cmd (release, fallback debug, tanpa build). Toolchain sudah di D:.
 . ./scripts/use-build-environment.ps1
 ./scripts/check.ps1
 ./scripts/smoke-test.ps1
-cargo run --release --locked --offline -p pdf-smoke -- --png-smoke
-./scripts/png-ui-smoke.ps1 -Profile release
-Rust 1.98.1; GPUI Kit 0.9.1; pdfium-render 0.9.5/PDFium 8125; QPDF 12.4.2.
-Toolchain sudah di D:. Jangan reinstall rutin, menghapus/memindahkan .tools atau
-merusak VS/SDK junction. Gunakan UTF-8 eksplisit. UI suites bergantian, hanya
-HWND/PID fixture sendiri; jangan menutup dokumen/proses pengguna. Gunakan PDF sintetis.
-.research/PROJECT_HANDOFF_PRIVATE.md dan PDF pengguna tetap privat/lokal/ignored;
-jangan dibaca/disalin ke docs, commit atau upload. Handover tidak memerintahkan
-publikasi binary atau implementasi fitur baru. Pilih tes sesuai perubahan;
-docs-only cukup link/diff/fact checks. Lanjut sesuai permintaan pemilik berikutnya.
+cargo run --release --locked --offline -p pdf-smoke -- --search-smoke
+cargo run --release --locked --offline -p pdf-smoke -- --write-search-fixtures
+./scripts/search-ui-smoke.ps1 -Profile release
+Pilih check sesuai perubahan; docs-only cukup fact/link/diff checks. Rust 1.98.1,
+GPUI Kit 0.9.1, pdfium-render 0.9.5/PDFium 8125, QPDF 12.4.2. Jangan reinstall rutin,
+hapus/pindah .tools atau merusak VS/SDK junction. Gunakan UTF-8 eksplisit.
+Headed suites bergantian, hanya HWND/PID fixture sintetis sendiri. Jangan tutup/
+kill dokumen/proses pengguna. .research/PROJECT_HANDOFF_PRIVATE.md dan PDF pengguna
+privat/lokal/ignored, jangan dibaca/disalin/commit/upload. Pertahankan perubahan user.
+
+Gate rilis tetap terbuka: physical DPI150/200/mixed monitor/trackpad/modifier/Narrator,
+clean Windows10/11, lisensi/redistribusi/MSVC entitlement/notice gaps dan security.
+Lihat docs/device-acceptance.md, docs/distribution-audit.md, docs/release-checklist.md.
+Candidate ZIP lama bukan build bersih fitur Find dan bukan public release.
+JPEG/TXT sengaja ditunda; OCR/Office converter/AI belum ada. Diskusi bisnis AI
+sebelumnya tetap di handoff, bukan task sekarang; AI_BUSINESS_MODEL.md belum dibuat.
 
 Permintaan saya berikutnya: [tulis pekerjaan yang ingin dilanjutkan di sini].
 ```
