@@ -1,5 +1,13 @@
 # Documentation handover — 17 November 2026
 
+Pemasangan branding ke lokasi launcher: build Origo teruji disalin ke
+`target/release/pdf-studio.exe` setelah dipastikan tidak aktif. Hash identik dengan
+build isolated: `3008C73397F0562A9592C6EDE332F4C0CFA8A005D975E78663EF414F0AA64283`.
+Branding smoke pada executable utama lulus; bukti lokal
+`.research/branding-ui-7ed58dbff8a4411a9adeb54f02da2354/result.json`.
+`run.cmd` kini meluncurkan binary berikon tanpa perubahan script.
+
+
 ## Ikon/nama Origo (17 November 2026)
 
 Fmt, Clippy desktop/all-targets denied warnings dan isolated release build lulus.

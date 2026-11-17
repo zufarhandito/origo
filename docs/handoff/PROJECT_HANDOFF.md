@@ -5,11 +5,15 @@ sementara lingkaran dari PNG-nya. Resource icon ID 1/metadata produk, title nati
 custom title bar dan About kini Origo. Aset di apps/desktop/resources/branding;
 script update-origo-icon.py memudahkan penggantian. Nama exe/state/package internal
 belum dimigrasikan. Detail docs/branding.md dan hasil tes di testing.md.
-Build branding teruji: target/tab-background-check/release/pdf-studio.exe.
-Pemasangan ke target/release ditunda karena proses pengguna sedang memakai executable
-utama. Jangan menutup proses pengguna. run.cmd masih memilih binary utama lama;
-jalankan build terisolasi secara langsung atau salin setelah aplikasi ditutup.
-Branding smoke lulus di .research/branding-ui-6f5664a6be524a25a5c2a8771276bf8d.
+Build branding `ad2f79d` sudah dipasang ke target/release/pdf-studio.exe setelah
+proses pengguna tidak lagi aktif. run.cmd kini memilih build Origo berikon.
+Hash sama dengan build terisolasi teruji:
+3008C73397F0562A9592C6EDE332F4C0CFA8A005D975E78663EF414F0AA64283.
+Branding smoke dijalankan ulang pada executable utama dan lulus:
+.research/branding-ui-7ed58dbff8a4411a9adeb54f02da2354.
+Sebelumnya pemasangan ditunda saat executable aktif; masalah peluncuran versi lama
+kini diselesaikan tanpa menutup proses pengguna atau mengubah launcher.
+
 
 
 
