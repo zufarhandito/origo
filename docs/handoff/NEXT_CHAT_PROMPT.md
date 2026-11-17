@@ -4,6 +4,11 @@ Aturan aktif: baca `AGENTS.md` dan `docs/feature-development.md`. Research fitur
 berbasis kompetitor/sumber primer; setiap fitur selesai wajib Conventional Commit
 dan push. Instruksi ini menggantikan status izin push historis pada checkpoint lama.
 
+Fokus berikutnya: [riset dan TODO multi-tab](../research/multitab-roadmap.md), satu
+dokumen untuk prioritas 1–4 dan backlog group tab/tab vertikal. Baru dokumentasi;
+fitur belum diimplementasikan. Dock GPUI Kit/resizing dan organizer saat split
+adalah keputusan pengguna; detail yang belum diputuskan ditandai sebagai usulan.
+
 **Follow-up terbaru:** pencarian teks PDF aktif sudah diimplementasikan setelah
 checkpoint PNG berikut. Baca bagian teratas handoff, `docs/search.md` dan bagian
 search terbaru `docs/testing.md`: default tidak case-sensitive, pencocokan frasa
@@ -20,6 +25,12 @@ fetch/commit/push atau pemeriksaan remote CI. Periksa Git lagi saat melanjutkan.
 
 ```text
 Kita lanjut proyek PDF Studio di D:\projects\bpdf. Berkomunikasi bahasa Indonesia.
+Baca docs/research/multitab-roadmap.md untuk prioritas multi-tab yang disetujui:
+1 drag/bintang/posisi +/menu konteks; 2 reopen dan cari tab; 3 restore sesi/posisi;
+4 dua PDF berdampingan lalu dua view satu PDF. Split memakai Dock GPUI Kit dan
+splitter resize; organizer/seleksi/shortcut mengikuti fokus yang tepat. Group tab
+dan tab vertikal backlog tanpa jadwal. Dokumen ini riset/TODO, belum implementasi;
+detail belum terkunci (misalnya persistensi bintang/recovery) tetap perlu ditetapkan.
 Baca AGENTS.md dan docs/feature-development.md terlebih dahulu. Research fitur harus
 berbasis produk kompetitor (Acrobat/Reader, Firefox/PDF.js, Chrome PDF, Edge PDF, dll),
 bukan menebak dari keterbatasan aplikasi kita. Sertakan sumber primer, bedakan fakta/

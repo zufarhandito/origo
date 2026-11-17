@@ -1,5 +1,20 @@
 # Handoff terkini — desktop multi-tab, PNG dan pencarian teks, 17 November 2026
 
+## Fokus berikutnya — pematangan multi-tab
+
+Keputusan dan riset lengkap disatukan dalam
+[riset dan TODO multi-tab](../research/multitab-roadmap.md). Urutan yang disetujui:
+1) drag/bintang kuning/posisi +/menu konteks; 2) reopen tab dan pencarian Daftar tab;
+3) restore sesi/posisi baca; 4) dua PDF berdampingan lalu dua view PDF yang sama.
+Split view wajib memakai Dock GPUI Kit dengan pembatas resize. Organizer mengikuti
+panel fokus, seleksi tiap PDF terpisah, dan job tetap milik dokumen asal.
+
+Group tab dan tab vertikal menjadi backlog tanpa jadwal. Rincian yang belum dikunci
+(termasuk persistensi bintang dan cakupan recovery) ditandai di dokumen. Follow-up
+ini hanya menyimpan dokumentasi rencana, bukan mengimplementasikan fitur; jangan
+menyamakan TODO/acceptance masa depan dengan kemampuan atau hasil tes saat ini.
+Indeks dan prompt ditautkan; blueprint/rencana UI historis dipertahankan.
+
 ## Instruksi kerja terbaru pemilik — riset, commit dan push
 
 Saat diminta research fitur, teliti produk kompetitor (Acrobat/Reader, Firefox/PDF.js,

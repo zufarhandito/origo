@@ -21,6 +21,11 @@ Commits dan push ke tujuan repo yang disepakati.
 
 [Prompt siap salin ke chat berikutnya](handoff/NEXT_CHAT_PROMPT.md).
 
+Fokus berikutnya yang disetujui: [riset dan TODO pematangan multi-tab](research/multitab-roadmap.md).
+Dokumen tunggal ini memuat prioritas 1–4, Dock GPUI Kit untuk split yang dapat
+di-resize, organizer saat split, serta backlog group tab/tab vertikal. Fitur-fitur
+tersebut belum diimplementasikan; keputusan lanjutan tetap ditandai.
+
 Checkpoint handover **17 November 2026** mencatat PNG pada commit `2124580`,
 hasil 49 unit tests dan PNG UI lokal/portable, gate rilis yang terbuka, serta
 keputusan model bisnis AI yang ditunda. Detail dan status Git ada di handoff.
@@ -41,6 +46,7 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 | Alur pengembangan | [Riset kompetitor, commit dan push](feature-development.md), [contoh riset Find](research/text-search.md) |
 | Rencana UI | [Redesain desktop dan multi-tab](plans/UI_REDESIGN_MULTITAB_PLAN.md) |
 | Multi-tab aktif | [Perilaku tab](multitab.md), [hardening dan hasil profil](multitab-hardening.md) |
+| Multi-tab berikutnya | [Riset kompetitor, TODO dan backlog](research/multitab-roadmap.md) |
 | Arsitektur/keputusan | [Arsitektur](architecture.md), [keputusan](decisions.md), [ADR](adr/) |
 | Viewer | [Buku dan benchmark](books.md), [seleksi teks](text-selection.md) |
 | Pencarian PDF aktif | [Cari kata/frasa](search.md), default tidak case-sensitive |
