@@ -13,6 +13,7 @@ tempfile.workspace = true
 pdf-domain.workspace = true
 pdf-platform.workspace = true
 serde_json.workspace = true
+image.workspace = true
 [lints]
 workspace = true
 

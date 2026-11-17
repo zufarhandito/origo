@@ -5,6 +5,13 @@ Open creates/focuses a tab; unsaved protection applies to tab/window Close, with
 transactional cancellation across all tabs. See [multi-tab](multitab.md). Historical
 single-workspace Open-replacement and conversion-page descriptions below are superseded.
 
+PNG export is under **Alat → Ekspor PNG…**. It captures all or selected workspace
+pages at 150/300 DPI to a new folder, including source/virtual rotations. The raster
+is opaque white, limited to 8192 pixels/side and 16 Mi-pixels; oversized pages are
+rejected rather than downscaled. Encoded batch output is capped at 1 GiB. PNG uses
+normal conservative source preflight; image conversion omits interactive semantics.
+It never marks PDF edits clean. See [PNG](png.md) for limits and folder safety.
+
 Optimize PDF (lossless) is under Alat. It exports the entire captured page plan
 to a new PDF, comparing an ordinary export of that same plan with the final bytes.
 Object/stream recompression does not rasterize or lower image quality; valid output
@@ -28,9 +35,10 @@ There is no autosave/crash recovery; see unsaved-changes.md. See organizer.md fo
 aggregate limits. Baca mode is for navigation/text; Atur halaman exposes page operations.
 Mode changes do not mark content dirty. Structural edits explicitly clear text selection and positional caches.
 
-Konversi is an informational roadmap page with Akan datang cards. PDF-to-images,
-Word/TXT/Excel/PowerPoint and conversion into PDF are not operational. No converter
-runtime, OCR model or network upload was added. Save As/Extract produce PDFs only.
+The old Konversi catalog is informational. PNG export is now operational separately
+under Alat; JPEG, TXT, Word/Excel/PowerPoint and conversion into PDF remain deferred.
+The pinned renderer supplies PNG rasters; no OCR model or network upload was added.
+Save As/Extract continue to produce PDFs only.
 See m3-safe-export-plan.md and conversion-roadmap.md for scope and prerequisites.
 
 Text selection is available as a requested viewer addition before M2: single-click

@@ -7,6 +7,9 @@ use pdf_application::export::{
 use pdf_platform::LocalOutput;
 #[derive(Default)]
 pub(super) struct ExportState {
+    pub png: bool,
+    pub png_total: usize,
+    pub png_done: Arc<std::sync::atomic::AtomicUsize>,
     pub optimizing: bool,
     pub optimization: Option<OptimizationSizes>,
     pub split_total: usize,
@@ -19,12 +22,36 @@ pub(super) struct ExportState {
     pub completed: u64,
     pub pages: usize,
 }
+impl ExportState {
+    pub(super) fn phase_label(&self) -> &'static str {
+        use pdf_application::export::ExportPhase;
+        let phase = self
+            .control
+            .as_ref()
+            .map_or(ExportPhase::Choosing, |c| c.phase());
+        if self.png {
+            match phase {
+                ExportPhase::Writing => "Merender dan memvalidasi PNG",
+                ExportPhase::Validation => "Memvalidasi PNG",
+                ExportPhase::Commit => "Menyimpan folder PNG baru",
+                _ => phase.label(),
+            }
+        } else {
+            phase.label()
+        }
+    }
+}
 impl DocumentSession {
     pub(super) fn start_export_job(&mut self, control: ExportControl, cx: &mut Context<Self>) {
         self.resources
             .export_owner
             .store(self.tab_id.0, std::sync::atomic::Ordering::SeqCst);
         self.export.optimizing = false;
+        self.export.png = false;
+        self.export.png_total = 0;
+        self.export
+            .png_done
+            .store(0, std::sync::atomic::Ordering::SeqCst);
         self.export.optimization = None;
         self.export.split_total = 0;
         self.export

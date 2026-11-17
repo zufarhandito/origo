@@ -1,7 +1,7 @@
 use pdf_application::text::{TextChar, TextExtractor, TextPage, TextRect, TextRequest};
 use pdf_application::{
-    InspectedDocument, PageGeometry, PageRenderer, PdfInspector, RenderError, RenderRequest,
-    RenderedPage, SourceFingerprint,
+    ExactPageRenderer, ExactRenderRequest, InspectedDocument, PageGeometry, PageRenderer,
+    PdfInspector, RenderError, RenderRequest, RenderedPage, SourceFingerprint,
 };
 use pdfium_render::prelude::*;
 use std::{
@@ -56,6 +56,7 @@ enum Operation {
     Inspect,
     InspectOutput,
     Render(RenderRequest),
+    RenderExact(ExactRenderRequest),
     Text(TextRequest),
 }
 enum Output {
@@ -227,6 +228,11 @@ fn worker(
                     counters.renders.fetch_add(1, Ordering::Relaxed);
                     Output::Rendered(render(document, request, limits)?)
                 }
+                Operation::RenderExact(request) => {
+                    renders += 1;
+                    counters.renders.fetch_add(1, Ordering::Relaxed);
+                    Output::Rendered(render_exact(document, request, limits)?)
+                }
                 Operation::Text(request) => {
                     renders += 1;
                     Output::Text(extract(document, request.page_index)?)
@@ -237,7 +243,10 @@ fn worker(
                 session_key = None;
                 return Err(RenderError::SourceChanged);
             }
-            if matches!(job.operation, Operation::InspectOutput) {
+            if matches!(
+                job.operation,
+                Operation::InspectOutput | Operation::RenderExact(_)
+            ) {
                 session = None;
                 session_key = None;
             }
@@ -280,6 +289,18 @@ impl PageRenderer for PdfiumRenderer {
             &request.path,
             request.fingerprint,
             Operation::Render(request.clone()),
+        )? {
+            Output::Rendered(page) => Ok(page),
+            _ => Err(worker_error()),
+        }
+    }
+}
+impl ExactPageRenderer for PdfiumRenderer {
+    fn render_exact(&self, request: &ExactRenderRequest) -> Result<RenderedPage, RenderError> {
+        match self.request(
+            &request.path,
+            Some(request.fingerprint),
+            Operation::RenderExact(request.clone()),
         )? {
             Output::Rendered(page) => Ok(page),
             _ => Err(worker_error()),
@@ -382,6 +403,67 @@ fn geometry(page: &PdfPage<'_>) -> Result<PageGeometry, RenderError> {
         width_points: width,
         height_points: height,
         quarter_turns,
+    })
+}
+
+fn render_exact(
+    document: &PdfDocument<'_>,
+    request: &ExactRenderRequest,
+    limits: ResourceLimits,
+) -> Result<RenderedPage, RenderError> {
+    if request.rotation_delta > 3
+        || request.width == 0
+        || request.height == 0
+        || request.width > limits.max_bitmap_dimension
+        || request.height > limits.max_bitmap_dimension
+        || u64::from(request.width) * u64::from(request.height) > limits.max_bitmap_pixels
+    {
+        return Err(RenderError::ResourceLimit);
+    }
+    let page = document
+        .pages()
+        .get(i32::from(request.page_index))
+        .map_err(|_| RenderError::InvalidPage)?;
+    let geometry = geometry(&page)?;
+    let (width, height) = if request.rotation_delta % 2 == 1 {
+        (request.height, request.width)
+    } else {
+        (request.width, request.height)
+    };
+    let bitmap = page
+        .render_with_config(
+            &PdfRenderConfig::new()
+                .set_fixed_size(width as i32, height as i32)
+                .set_clear_color(PdfColor::WHITE),
+        )
+        .map_err(|_| RenderError::InvalidPdf)?;
+    if bitmap.width() != width as i32 || bitmap.height() != height as i32 {
+        return Err(RenderError::ResourceLimit);
+    }
+    let mut rgba = bitmap.as_rgba_bytes();
+    drop(bitmap);
+    if rgba.len() != width as usize * height as usize * 4 {
+        return Err(RenderError::InvalidPdf);
+    }
+    let (mut width, mut height) = (width, height);
+    for _ in 0..request.rotation_delta {
+        let mut rotated = vec![0; rgba.len()];
+        for y in 0..height as usize {
+            for x in 0..width as usize {
+                let from = (y * width as usize + x) * 4;
+                let to = (x * height as usize + height as usize - 1 - y) * 4;
+                rotated[to..to + 4].copy_from_slice(&rgba[from..from + 4]);
+            }
+        }
+        rgba = rotated;
+        std::mem::swap(&mut width, &mut height);
+    }
+    Ok(RenderedPage {
+        width,
+        height,
+        rgba,
+        page_count: document.pages().len() as u16,
+        clockwise_quarter_turns: (geometry.quarter_turns + request.rotation_delta) % 4,
     })
 }
 

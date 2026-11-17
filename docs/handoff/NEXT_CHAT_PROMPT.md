@@ -31,9 +31,9 @@ M1 viewer, M2 organizer, M3 safe Save As/Extract, unsaved guard, M4 Split dan
 Optimize lossless sudah diimplementasikan. Pengguna kemudian meminta implementasi
 rancangan yang disetujui. UI desktop dan multi-tab sekarang sudah dibuat: grouped
 menus, WindowShell, DocumentSession terpisah, Open multi-file/deduplikasi, close
-batch transactional dan renderer/koordinasi ekspor bersama. Konversi tetap belum
-aktif dan placeholder-nya tidak masuk navigasi utama. Jangan menganggap fitur
-konversi/OCR/content editing atau publikasi ikut diotorisasi.
+batch transactional dan renderer/koordinasi ekspor bersama. Konversi PNG kini aktif
+lewat Alat → Ekspor PNG, semua/seleksi dan 150/300 DPI; baca docs/png.md dan testing.
+JPEG/TXT, OCR, AI, content editing dan publikasi tidak termasuk implementasi PNG.
 
 Sumber read-only, ekspor policy v4, staging/validation/no-overwrite tetap berlaku.
 Hanya full Save As dengan receipt instance/revisi yang sesuai menandai clean;

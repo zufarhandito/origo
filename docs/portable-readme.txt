@@ -9,7 +9,8 @@ Target for acceptance: Windows 10 22H2 and Windows 11 x64, with OS ICU/UCRT,
 Direct3D 11 and a working graphics driver. Clean-machine acceptance is pending.
 Open PDF through Berkas > Buka PDF. Changes are virtual until Simpan sebagai.
 Existing destinations and source PDFs are never overwritten. Complex PDFs may
-be viewable but conservatively blocked for export. There is no OCR/converter.
+be viewable but conservatively blocked for export. Alat > Ekspor PNG exports all or
+selected pages at 150/300 DPI into a new folder. OCR/other converters are not included.
 
 This is a test candidate, not an approved public release. See build-info.json,
 RELEASE-CHECKLIST.md and LICENSES/dependencies/cargo-inventory.json for open gates.

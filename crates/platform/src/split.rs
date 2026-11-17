@@ -24,30 +24,38 @@ impl SplitOutput for LocalSplitOutput {
         destination: &Path,
         control: &ExportControl,
     ) -> Result<SafeSplit, SplitError> {
-        control.checkpoint()?;
-        let name = destination
-            .file_name()
-            .and_then(|s| s.to_str())
-            .ok_or(SplitError::Folder)?;
-        validate_folder(name)?;
-        let parent = dunce::canonicalize(destination.parent().ok_or(SplitError::Output)?)
-            .map_err(|_| SplitError::Output)?;
-        let destination = parent.join(name);
-        require_absent(&destination)?;
-        let directory = tempfile::Builder::new()
-            .prefix(".pdf-studio-split-")
-            .tempdir_in(&parent)
-            .map_err(|_| SplitError::Output)?;
-        let ready = directory.path().join("results");
-        fs::create_dir(&ready).map_err(|_| SplitError::Output)?;
-        let snapshots = LocalOutput.stage(plan, &directory.path().join("snapshot.pdf"), control)?;
-        Ok(SafeSplit {
-            directory,
-            snapshots,
-            ready,
-            destination,
-        })
+        stage_batch(plan, destination, control, ".pdf-studio-split-")
     }
+}
+pub(crate) fn stage_batch(
+    plan: &ExportPlan,
+    destination: &Path,
+    control: &ExportControl,
+    prefix: &str,
+) -> Result<SafeSplit, SplitError> {
+    control.checkpoint()?;
+    let name = destination
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or(SplitError::Folder)?;
+    validate_folder(name)?;
+    let parent = dunce::canonicalize(destination.parent().ok_or(SplitError::Output)?)
+        .map_err(|_| SplitError::Output)?;
+    let destination = parent.join(name);
+    require_absent(&destination)?;
+    let directory = tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(&parent)
+        .map_err(|_| SplitError::Output)?;
+    let ready = directory.path().join("results");
+    fs::create_dir(&ready).map_err(|_| SplitError::Output)?;
+    let snapshots = LocalOutput.stage(plan, &directory.path().join("snapshot.pdf"), control)?;
+    Ok(SafeSplit {
+        directory,
+        snapshots,
+        ready,
+        destination,
+    })
 }
 impl SplitTransaction for SafeSplit {
     fn sources(&self) -> &[SourceDocument] {

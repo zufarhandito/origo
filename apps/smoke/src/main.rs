@@ -8,6 +8,7 @@ use std::path::PathBuf;
 mod books;
 mod exporting;
 mod optimizing;
+mod png;
 mod splitting;
 mod synthetic;
 mod text;
@@ -171,6 +172,9 @@ fn main() -> Result<()> {
         return Ok(());
     }
     let sidecars = root.join("sidecars");
+    if std::env::args().nth(1).as_deref() == Some("--png-smoke") {
+        return png::run(&root, &PdfiumRenderer::new(&sidecars));
+    }
     let fixture = root.join("tests/fixtures/two-pages.pdf");
     let before =
         std::fs::read(&fixture).context("Generate fixture with scripts/new-fixture.ps1")?;
@@ -217,5 +221,6 @@ fn main() -> Result<()> {
     exporting::run(&root, &renderer)?;
     splitting::run(&root, &renderer)?;
     optimizing::run(&root, &renderer)?;
+    png::run(&root, &renderer)?;
     Ok(())
 }

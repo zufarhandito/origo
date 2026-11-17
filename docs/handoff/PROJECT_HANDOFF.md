@@ -1,5 +1,16 @@
 # Handoff terkini — desktop multi-tab, 16 November 2026
 
+## Terbaru: PDF → PNG saja
+
+Pengguna menyetujui implementasi PNG, semua/halaman terpilih, default 150 DPI dan
+opsi 300 DPI. Menu **Alat → Ekspor PNG…**, folder baru tanpa overwrite, snapshot
+origin tab, progress/cancel dan guard close dipakai. Receipt PNG tidak menandai PDF
+clean. Jalur raster ukuran tepat terpisah dari clamp viewer; encoding/decode validation
+satu halaman bergantian, batas 8192/16 Mi-piksel dan 1 GiB output batch.
+Lihat [PNG](../png.md), [architecture](../architecture.md), dan [testing](../testing.md).
+JPEG/TXT di-skip oleh pemilik. AI hanya diskusi/rencana bisnis; fitur dan file rencana
+bisnis AI belum diimplementasikan pada pekerjaan PNG. Gate rilis lama tetap terbuka.
+
 ## Follow-up distribusi dan verifikasi akhir
 
 Setelah checkpoint `06c2a39`, pengguna meminta prioritas berikutnya sampai terakhir,

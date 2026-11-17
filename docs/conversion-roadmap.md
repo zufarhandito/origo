@@ -1,11 +1,14 @@
 ﻿# Conversion roadmap and extension boundaries
 
-Desktop multi-tab follow-up: the old Akan datang catalog is excluded from primary
-navigation. It remains a future capability direction, with no converter enabled.
+Current slice: **PDF → PNG only** through Alat → Ekspor PNG. All/selected workspace
+pages, 150/300 DPI, exact bounded raster and new-folder publication are implemented;
+see [PNG](png.md). JPEG and TXT are explicitly deferred by the owner. The old Akan
+datang catalog remains excluded from primary navigation.
 
-Status: future design, 11 November 2026. The owner explicitly requested a visible
-Konversi page with Akan datang cards. That page is implemented; all conversion engines
-below remain planned. M3 PDF Save As/Extract is implemented; format conversion is separate.
+The original future design dates from 11 November 2026. The owner requested an
+Akan datang catalog, later replaced by the desktop navigation. PNG is now the first
+implemented converter; other format engines below remain planned. M3 PDF Save As/
+Extract is implemented separately.
 
 ## Product categories and order
 
@@ -17,7 +20,7 @@ not a promise to reproduce their engines, quality, accounts or hosted services.
 |---|---|---|---|
 | C0 (now) | Konversi home with planned cards | GPUI presentation only | Clear Akan datang; no execution/upload |
 | M3 (implemented) | PDF Save As + selected-page Extract | QPDF page plan + safe output | Conservative preflight, validation and no-clobber commit |
-| C1 | PDF pages to PNG/JPEG, PDF to TXT | PDFium owned raster/text + explicit encoders | Bounded batch export, dimensions/Unicode/order |
+| C1 | PDF pages to PNG implemented; JPEG/TXT deferred | PDFium exact owned raster + pinned PNG encoder | Bounded batch export, dimensions/order and safe folder publication |
 | M4 | Split and lossless Optimize implemented; release hardening remains | Existing blueprint; see split.md and optimize.md | Cancellation/process/packaging gates |
 | C2 | PNG/JPEG to PDF | Dedicated image-to-PDF writer/adapter | EXIF, DPI/page fit, colors, large inputs |
 | C3 | DOCX/XLSX/PPTX to PDF | Benchmark a local Office engine such as headless LibreOffice | Fonts, pagination, profiles/process cleanup, redistribution |
@@ -39,8 +42,8 @@ Baca/Atur keep their current controls. Back/Esc returns to reading; Ctrl+G retur
 reader page field. Reader page/zoom/history shortcuts do not mutate a hidden plan while
 the hub is shown. Source loading still returns to Baca and import still enters Atur.
 
-During C1, add only the first concrete conversion use case and the minimal interface
-it consumes. Proposed application-side shapes, not implemented APIs:
+PNG uses a concrete PngPlan/receipt and an exact raster port. The following shapes
+remain suggestions for future formats, not an implemented generic conversion API:
 
 - `ConversionRequest`: conversion kind, immutable workspace-instance/revision page
   snapshot or separate owned input files, format-specific options, destination intent.

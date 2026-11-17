@@ -45,6 +45,8 @@ impl DocumentSession {
             "transition": format!("{:?}", self.transition.phase), "workspaceInstance": self.workspace_instance,
             "splitFiles": self.export.split_total, "splitDone": self.export.split_done.load(Ordering::SeqCst),
             "optimizing": self.export.optimizing,
+            "pngExport": self.export.png, "pngPages": self.export.png_total,
+            "pngDone": self.export.png_done.load(Ordering::SeqCst),
             "optimizeBeforeBytes": self.export.optimization.map_or(0, |s| s.baseline_bytes),
             "optimizeAfterBytes": self.export.optimization.map_or(0, |s| s.output_bytes),
         });

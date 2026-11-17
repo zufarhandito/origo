@@ -128,6 +128,9 @@ pub fn selection_pdf() -> Vec<u8> {
 pub fn selection_pdf_named(prefix: &str) -> Vec<u8> {
     vector_pdf(4, false, true, prefix)
 }
+pub fn mixed_selection_pdf_named(prefix: &str) -> Vec<u8> {
+    vector_pdf(4, true, true, prefix)
+}
 fn vector_pdf(count: usize, mixed: bool, selection: bool, prefix: &str) -> Vec<u8> {
     let kids = (0..count)
         .map(|i| format!("{} 0 R", 4 + i * 2))

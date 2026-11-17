@@ -698,6 +698,7 @@ enum MenuAction {
     Import,
     Extract,
     Split,
+    Png,
     Optimize,
     Help,
     About,
@@ -775,6 +776,7 @@ impl WindowShell {
                             s.start_export(pdf_application::export::ExportScope::Selected, cx)
                         }
                         Split => s.show_split(window, cx),
+                        Png => s.show_png(window, cx),
                         Optimize => {
                             s.start_export(pdf_application::export::ExportScope::Optimized, cx)
                         }
@@ -818,7 +820,7 @@ impl WindowShell {
             Redo => content && s.workspace.as_ref().is_some_and(|w| w.can_redo()),
             Copy => s.text.selection.is_some(),
             Select | Clear => content && s.mode == ViewerMode::Organize,
-            Save | Optimize | Split => {
+            Save | Optimize | Split | Png => {
                 content
                     && s.navigation.count > 0
                     && self.resources.export_owner.load(Ordering::SeqCst) == 0
@@ -998,6 +1000,7 @@ impl Render for WindowShell {
                     ("Impor PDF…", Import),
                     ("Ekstrak…", Extract),
                     ("Split PDF…", Split),
+                    ("Ekspor PNG…", Png),
                     ("Optimize PDF (lossless)…", Optimize),
                 ],
                 cx,
@@ -1096,12 +1099,7 @@ impl Render for WindowShell {
                     })
                     .unwrap_or_default();
                 let s = job.read(cx);
-                let phase = s
-                    .export
-                    .control
-                    .as_ref()
-                    .map(|c| c.phase().label())
-                    .unwrap_or("Mengekspor");
+                let phase = s.export.phase_label();
                 let text = format!("{name} — {phase}");
                 el.child(
                     div()

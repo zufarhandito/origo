@@ -15,6 +15,7 @@ use std::{
     time::{Duration, Instant, UNIX_EPOCH},
 };
 use tempfile::{TempDir, TempPath};
+pub mod png;
 pub mod split;
 
 pub fn fingerprint(path: &Path) -> Result<SourceFingerprint, ExportError> {

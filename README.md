@@ -12,6 +12,8 @@ are described in [distribution audit](docs/distribution-audit.md). Public releas
 requires the [release gates](docs/release-checklist.md), including physical acceptance.
 
 Native Windows PDF organizer following [the original blueprint](docs/blueprints/PDF_EDITOR_CODEX_BLUEPRINT.md).
+**Alat → Ekspor PNG…** exports all or selected pages to a new folder at 150/300 DPI,
+following the current page order and rotation. See [PDF to PNG](docs/png.md).
 Current slice: **desktop UI and multi-tab**, retaining M3 safe Save As/Extract,
 using GPUI Kit 0.9.1 and pinned PDFium/QPDF.
 The first M4 feature is **Split PDF**, under **Alat → Split PDF**: split every N
@@ -48,7 +50,8 @@ See [testing](docs/testing.md), [compatibility](docs/compatibility.md) and
 The previous **Konversi** catalog reserves a direction for PDF-to-PNG/JPEG, Word, text, Excel,
 PowerPoint, images-to-PDF and Office-to-PDF. Every card currently says **Akan datang**:
 there is no converter, upload or format-selection execution behind these cards.
-It is excluded from the new desktop navigation; no converter is enabled.
+It is excluded from the new desktop navigation. PNG export is available separately
+under **Alat → Ekspor PNG…**; other format converters remain deferred.
 
 [M3 safe PDF Save As/Extract](docs/m3-safe-export-plan.md) is implemented for ordinary,
 unencrypted PDFs passing conservative structural preflight. Complex documents such as

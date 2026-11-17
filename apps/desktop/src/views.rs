@@ -736,6 +736,11 @@ impl Render for DocumentSession {
                     "Split PDF: {} dari {} file selesai divalidasi. Folder diterbitkan setelah seluruh batch berhasil.",
                     self.export.split_done.load(std::sync::atomic::Ordering::SeqCst), self.export.split_total)))
             })
+            .when(self.export.running && self.export.png, |el| {
+                el.child(div().id("png-progress").px_4().py_2().text_sm().child(format!(
+                    "PNG: {} dari {} halaman selesai divalidasi. Folder diterbitkan setelah seluruh batch berhasil.",
+                    self.export.png_done.load(std::sync::atomic::Ordering::SeqCst), self.export.png_total)))
+            })
             .when(
                 self.transition.phase == transitions::Phase::WaitingExport,
                 |el| {
@@ -808,12 +813,7 @@ impl Render for DocumentSession {
                                 |this| this.child(Spinner::new().xsmall()),
                             )
                             .child(if self.export.running {
-                                self.export
-                                    .control
-                                    .as_ref()
-                                    .map(|c| c.phase().label())
-                                    .unwrap_or("Mengekspor PDF")
-                                    .to_owned()
+                                self.export.phase_label().to_owned()
                             } else if self.mode == ViewerMode::Convert {
                                 "Konversi - fitur akan datang".to_owned()
                             } else {

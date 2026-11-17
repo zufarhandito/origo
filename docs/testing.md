@@ -1,3 +1,54 @@
+# Latest verification - PDF to PNG only, 16 November 2026
+
+Baseline `2c3033c`. The owner approved PNG only, all/selected pages and 150/300 DPI;
+JPEG/TXT are deferred. See [PNG](png.md) for behavior, limits and the physical-DPI
+metadata limitation. No AI, OCR, network service or other converter was implemented.
+
+- `scripts/check.ps1` passed formatting, denied-warning workspace/all-target Clippy,
+  **49 unit tests** and release workspace build. Two new unit tests cover exact DPI
+  rounding/resource rejection and immutable selected order/rotation/revision.
+- Full native smoke passed Save As/Extract, M1/text, tagged/whole-source preservation,
+  Split and Optimize regressions, plus PNG. The final release `--png-smoke` also passed
+  with mixed page geometry across sources: 150/300 DPI, all 16 source/virtual rotation
+  combinations, full decoded RGBA equality against independently rotated native source
+  rasters, selected pages, counts/progress, metadata/bookmarks and complex-input blockers.
+  Existing file/folder, mid-batch encoder failure/cancel, output cap, destination race,
+  referenced-source changes and staging/source cleanup were exercised on generated PDFs.
+- Release PNG UI passed **11 named cases**:
+  `.research/png-ui-266cd6a2b9ca4c2eae9aa8c809386038`.
+  Configuration/default selection, disabled empty selection, dialog/picker cancellation,
+  exact selected 150/300 dimensions and rotation, all-page export, existing-image hash,
+  tab origin, cancellation of a running 100-page batch from another tab, dirty-close
+  waiting for PNG then asking for unsaved edits, source hashes and cleanup all passed.
+  The dialog screenshot and emitted PNG were visually inspected.
+- Regression UI passed tabs (`.research/tabs-ui-ac342587e39f47b197165530473de2e8`),
+  all **25 M3 cases** (`.research/m3-ui-a7f1205c6ba94b6c92efe69c5f0bc25a`),
+  Split (`.research/split-ui-6cd872c2aa874e639a9f473c427acd36`), and Optimize
+  (`.research/optimize-ui-89d891ae2b1644d19f6fcca76bc00de4`). The exact observed PASS
+  output is retained in `.research/png-split-regression.log` and
+  `.research/png-optimize-regression.log`.
+- Internal portable candidate:
+  `dist/pdf-studio-windows-x64-candidate-2c3033c-0442227c.zip` (dirty source marker).
+  ZIP/file SHA-256, **1103 files**, pinned QPDF and x64 import closure passed. Five
+  negative integrity/import tests rejected changed contents, extra files, missing CRT
+  and incorrect ZIP checksum, then restored/revalidated the owned extraction.
+  All **11 PNG UI cases passed again** against the extracted executable under restricted
+  PATH at `.research/png-ui-ec4e718920c24b1b84dffe9cbd292337`, using
+  `.research/portable-658643116fb74ea1ae3b55be4e9646d6/PDF Studio 日本 & test`.
+  Candidate inventory retains the existing three notice gaps and release-review gates;
+  the lockfile adds image dependencies to platform/smoke without changing package versions.
+- Intermediate test corrections: the source-change injection initially targeted an
+  unreferenced source, correctly leaving a selected-only export unaffected; it now
+  mutates a referenced source. The harness initially discarded only one dirty fixture
+  tab; cleanup now walks the full owned close batch and requires process exit.
+  Clippy's fixed-size chunk lint was corrected; no assertions or export policy were relaxed.
+- Markdown links, PowerShell syntax, source diff/whitespace and per-case manifests were
+  rechecked. The old M3 snapshot remains intact. All UI/process tests use owned synthetic
+  fixtures. Mixed-DPI/physical accessibility, clean Windows and distribution review
+  remain open; local candidate success is not a public release or remote CI result.
+
+---
+
 # Latest verification - distribution candidate and final regression, 16 November 2026
 
 Baseline `06c2a39`. Follow-up runtime/notice inventory, internal portable ZIP and

@@ -1,5 +1,11 @@
 # Architecture - desktop multi-tab
 
+PNG jobs capture a separate immutable
+PngPlan and use an exact-size PDFium request, then background PNG encode/full-decode
+validation. They reuse Split's private snapshots/no-replace folder publication, share
+the window export slot and cannot mark PDF edits clean. PNG is the only active raster
+converter; see [PNG](png.md).
+
 WindowShell owns stable TabIds, active-tab/menu state, transactional multi-document
 close and window-wide export/modal coordination. Each DocumentSession is a separate
 GPUI entity, preserving its workspace, history, input and viewport. Async completions
@@ -117,8 +123,9 @@ All cards are non-interactive groups marked Akan datang, with stable accessibili
 The reader page plan, text cache and history remain shared; navigation/zoom/history
 commands are guarded while the hub is displayed. Opening a PDF returns to Baca;
 successful import still enters Atur halaman. No converter capability is implied by
-presence in this catalog. No converter has been registered or implemented; no plugin discovery/placeholder
-engine crates have been added.
+presence in this catalog. PNG export is available separately through Alat and the
+dedicated application/PNG pipeline; no plugin discovery or placeholder engine crates
+have been added.
 
 M3 application/export.rs owns immutable plans, preflight/export/output ports, phases,
 cancellation and completion receipts. A workspace instance advances on successful replacement independently

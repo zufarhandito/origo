@@ -125,7 +125,7 @@ function Fill-Picker([string]$Path,[switch]$Cancel){
         $id=[OutputDialog]::GetDlgCtrlID($h);$cls=New-Object Text.StringBuilder 256;[OutputDialog]::GetClassName($h,$cls,256)|Out-Null
         # IFileOpenDialog uses 1148; IFileSaveDialog uses the filename ComboBox Edit 1001.
         # The address bar's 1001 is ToolbarWindow32, so it cannot match this field.
-        if(($id -eq 1148 -or $id -eq 1001) -and $cls.ToString() -eq 'Edit'){$script:filename=$h}
+        if(($id -eq 1148 -or $id -eq 1001 -or $id -eq 1152) -and $cls.ToString() -eq 'Edit'){$script:filename=$h}
         if($id -eq 1 -and $cls.ToString() -eq 'Button'){$script:accept=$h}
         if($id -eq 2 -and $cls.ToString() -eq 'Button'){$script:cancel=$h}
         return $true

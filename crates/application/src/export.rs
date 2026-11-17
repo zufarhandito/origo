@@ -122,6 +122,12 @@ impl ExportPlan {
     pub fn scope(&self) -> ExportScope {
         self.scope
     }
+    pub fn instance(&self) -> u64 {
+        self.instance
+    }
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
     pub(crate) fn subset(&self, indices: &[usize]) -> Result<Self, ExportError> {
         if indices.is_empty() {
             return Err(ExportError::Empty);

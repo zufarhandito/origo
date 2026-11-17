@@ -19,6 +19,7 @@ mod conversion;
 mod diagnostics;
 mod exporting;
 mod feedback;
+mod png_export;
 mod shell;
 mod splitting;
 mod transitions;
@@ -86,6 +87,7 @@ struct DocumentSession {
     active: bool,
     close_approved: bool,
     split_dialog: Option<splitting::SplitDialog>,
+    png_dialog: Option<png_export::PngDialog>,
     transition: transitions::Transition,
     error_popup: bool,
     export: exporting::ExportState,
@@ -312,6 +314,7 @@ impl DocumentSession {
                 active: false,
                 close_approved: false,
                 split_dialog: None,
+                png_dialog: None,
                 transition: transitions::Transition::default(),
                 error_popup: false,
                 export: exporting::ExportState::default(),

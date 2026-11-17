@@ -4,6 +4,7 @@ pub use pdf_domain::{
 };
 use std::path::{Path, PathBuf};
 pub mod export;
+pub mod png;
 pub mod split;
 pub mod text;
 pub mod viewer;
@@ -80,6 +81,20 @@ pub trait PageRenderer {
             fingerprint: None,
         })
     }
+}
+
+/// Export-quality dimensions; independent of viewer zoom, DPR and preview limits.
+#[derive(Clone, Debug)]
+pub struct ExactRenderRequest {
+    pub path: PathBuf,
+    pub page_index: u16,
+    pub rotation_delta: u8,
+    pub fingerprint: SourceFingerprint,
+    pub width: u32,
+    pub height: u32,
+}
+pub trait ExactPageRenderer {
+    fn render_exact(&self, request: &ExactRenderRequest) -> Result<RenderedPage, RenderError>;
 }
 
 #[cfg(test)]

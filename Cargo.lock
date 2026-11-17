@@ -4557,6 +4557,7 @@ version = "0.1.0"
 dependencies = [
  "atomicwrites",
  "dunce",
+ "image",
  "pdf-application",
  "tempfile",
 ]
@@ -4567,6 +4568,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dunce",
+ "image",
  "pdf-application",
  "pdf-domain",
  "pdf-engine",
