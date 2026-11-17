@@ -9,6 +9,7 @@ mod books;
 mod exporting;
 mod optimizing;
 mod png;
+mod search;
 mod splitting;
 mod synthetic;
 mod text;
@@ -95,6 +96,17 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
 
 fn main() -> Result<()> {
     let root = dunce::canonicalize(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
+    if std::env::args().nth(1).as_deref() == Some("--write-search-fixtures") {
+        let dir = root.join(".research/search-fixtures");
+        std::fs::create_dir_all(&dir)?;
+        std::fs::write(dir.join("search.pdf"), synthetic::search_pdf())?;
+        std::fs::write(dir.join("long.pdf"), synthetic::pdf(1000, false))?;
+        std::fs::write(dir.join("blank.pdf"), synthetic::blank_pdf())?;
+        return Ok(());
+    }
+    if std::env::args().nth(1).as_deref() == Some("--search-smoke") {
+        return search::run(&root, &PdfiumRenderer::new(&root.join("sidecars")));
+    }
     if std::env::args().nth(1).as_deref() == Some("--verify-tagged-extract") {
         let path = std::env::args_os().nth(2).context("PDF path required")?;
         let page = std::env::args()
@@ -218,6 +230,7 @@ fn main() -> Result<()> {
     println!("PASS: pinned QPDF, PDFium rendering, page order, rotation, source unchanged");
     m1_smoke(&root, &renderer)?;
     text::run(&root, &renderer)?;
+    search::run(&root, &renderer)?;
     exporting::run(&root, &renderer)?;
     splitting::run(&root, &renderer)?;
     optimizing::run(&root, &renderer)?;

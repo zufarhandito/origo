@@ -1,4 +1,4 @@
-﻿use crate::*;
+use crate::*;
 use gpui::assets::IconName;
 use gpui::component::{
     ActiveTheme, Disableable, Selectable, Sizable, StyledExt,
@@ -341,6 +341,13 @@ impl DocumentSession {
                     .items_center()
                     .justify_end()
                     .gap_1()
+                    .child(
+                        icon("find-text", IconName::Search, "Cari teks", "Ctrl+F")
+                            .disabled(!available || self.edits_locked())
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.show_search(window, cx)),
+                            ),
+                    )
                     .child(
                         icon("zoom-out", IconName::Minus, "Perkecil", "Ctrl+-")
                             .disabled(!available || self.zoom_percent() <= 50)

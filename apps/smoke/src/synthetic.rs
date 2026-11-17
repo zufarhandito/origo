@@ -54,6 +54,35 @@ pub fn blank_pdf() -> Vec<u8> {
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Resources << >> >>".to_vec(),
     ])
 }
+
+pub fn search_pdf() -> Vec<u8> {
+    let lines = [
+        "(Hasil PENELITIAN data database) Tj",
+        "(hasil penelitian) Tj",
+        "(HASIL PENELITIAN) Tj",
+        "(hasil penelitian) Tj",
+        "(hasil) Tj 0 -28 Td (penelitian) Tj",
+        "(hasil lain penelitian) Tj",
+        "",
+    ];
+    let kids = (0..lines.len())
+        .map(|i| format!("{} 0 R", 4 + i * 2))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut objects = vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        format!("<< /Type /Pages /Kids [{kids}] /Count {} >>", lines.len()).into_bytes(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
+    ];
+    for (index, line) in lines.iter().enumerate() {
+        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 600] /Rotate {} /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R >>", if index < 4 { index * 90 } else { 0 }, 5 + index * 2).into_bytes());
+        objects.push(stream(
+            "",
+            format!("BT /F1 18 Tf 25 100 Td {line} ET").as_bytes(),
+        ));
+    }
+    assemble(&objects)
+}
 pub fn tagged_ink_pdf() -> Vec<u8> {
     let mut objects = vec![
         b"<< /Type /Catalog /Pages 2 0 R /StructTreeRoot 10 0 R /MarkInfo << /Marked true >> /ViewerPreferences << /DisplayDocTitle true >> /Metadata 16 0 R >>".to_vec(),

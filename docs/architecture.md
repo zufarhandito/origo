@@ -1,5 +1,13 @@
 # Architecture - desktop multi-tab
 
+Find state belongs to each DocumentSession. A debounced query scans one workspace
+page at a time on the shared PDFium worker; application/search implements bounded
+literal phrase matching with source-character ranges. Only compact occurrences are
+retained (10,000 maximum); visible highlights reuse TextPage geometry in the existing
+16 MiB cache. Query/source tokens reject stale callbacks, inactive sessions pause
+incomplete scans, and page edits restart against the current plan. Search diagnostics
+exclude query/text content. See [Find behavior and limits](search.md).
+
 PNG jobs capture a separate immutable
 PngPlan and use an exact-size PDFium request, then background PNG encode/full-decode
 validation. They reuse Split's private snapshots/no-replace folder publication, share

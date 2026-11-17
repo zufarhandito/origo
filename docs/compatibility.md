@@ -1,5 +1,13 @@
 # Current compatibility
 
+Ctrl+F searches the active workspace with a compact in-tab bar, counts, highlights
+and next/previous navigation. Default matching is case-insensitive and treats a phrase
+as a contiguous sequence; same-page whitespace/linebreaks are normalized. Optional case
+and whole-word matching are available. Search is bounded, progressive and per tab;
+scans require text layers, and extraction failures are reported as incomplete results.
+See [search](search.md). Historical statements below that text search is unavailable
+are superseded by this addition.
+
 Desktop navigation now uses grouped menus and up to eight independent document tabs.
 Open creates/focuses a tab; unsaved protection applies to tab/window Close, with
 transactional cancellation across all tabs. See [multi-tab](multitab.md). Historical

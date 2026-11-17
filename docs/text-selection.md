@@ -1,5 +1,10 @@
 # Text selection before M2
 
+Follow-up: [Find text](search.md) now uses the same extraction/geometry for a separate
+search overlay. Search is available; the exclusions below describe the original slice.
+Offscreen selection copy was also extended by [multi-tab hardening](multitab-hardening.md)
+to reload evicted selected pages within the existing 1 MiB buffer limit.
+
 This is an owner-requested extension to the original M1 viewer scope. Raster preview
 remains the visual page. A separate PDFium extraction port provides owned characters
 and character rectangles; an overlay handles selection and highlights without drawing

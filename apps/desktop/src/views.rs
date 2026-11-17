@@ -265,10 +265,45 @@ impl DocumentSession {
                 });
             }
             let selection = self.text.selection;
+            let current_search_match = self.search.current;
+            let search_highlights: Vec<_> = if self.search.open {
+                self.search
+                    .matches
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, hit)| hit.page == index)
+                    .flat_map(|(i, hit)| {
+                        text.as_ref()
+                            .map(|text| text.highlights(hit.range.clone()))
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(move |rect| (rect, current_search_match == Some(i)))
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
             let weak = cx.weak_entity();
             canvas(
                 |_, _, _| {},
                 move |bounds, _, window, _| {
+                    for (rect, active) in &search_highlights {
+                        let highlight = Bounds::new(
+                            bounds.origin
+                                + gpui::point(
+                                    bounds.size.width * rect.left,
+                                    bounds.size.height * rect.top,
+                                ),
+                            gpui::size(
+                                bounds.size.width * (rect.right - rect.left),
+                                bounds.size.height * (rect.bottom - rect.top),
+                            ),
+                        );
+                        window.paint_quad(gpui::fill(
+                            highlight,
+                            gpui::rgba(if *active { 0xff8c0090 } else { 0xffdf0060 }),
+                        ));
+                    }
                     if let (Some(text), Some(selection)) = (&text, selection) {
                         for rect in text.highlights(selection.range(index, text.chars.len())) {
                             let highlight = Bounds::new(
@@ -474,6 +509,8 @@ impl Render for DocumentSession {
 
         let reading_toolbar =
             (self.mode != ViewerMode::Convert).then(|| self.reading_toolbar(window, cx));
+        let search_bar = (has_document && self.search.open && self.mode != ViewerMode::Convert)
+            .then(|| self.search_bar(cx));
 
         let body = if self.mode == ViewerMode::Convert {
             self.conversion_hub(window, cx)
@@ -665,6 +702,13 @@ impl Render for DocumentSession {
             .font_family("Segoe UI")
             .track_focus(&self.focus)
             .key_context("PdfViewer")
+            .on_action(cx.listener(|this, _: &FindText, window, cx| this.show_search(window, cx)))
+            .on_action(cx.listener(|this, _: &FindNext, window, cx| {
+                if this.search.open { this.move_search(false, cx); } else { this.show_search(window, cx); }
+            }))
+            .on_action(cx.listener(|this, _: &FindPrevious, window, cx| {
+                if this.search.open { this.move_search(true, cx); } else { this.show_search(window, cx); }
+            }))
             .on_action(cx.listener(|this, _: &CopyText, _, cx| {
                 if this.mode != ViewerMode::Convert {
                     this.copy_text(cx);
@@ -672,6 +716,7 @@ impl Render for DocumentSession {
             }))
             .on_action(cx.listener(|this, _: &ClearTextSelection, window, cx| {
                 if this.edits_locked() { return; }
+                if this.search.open { this.close_search(window, cx); return; }
                 if this.mode == ViewerMode::Convert {
                     this.set_mode(ViewerMode::Read, window, cx);
                     return;
@@ -796,6 +841,7 @@ impl Render for DocumentSession {
                 )
             })
             .children(reading_toolbar)
+            .children(search_bar)
 
             .child(body)
             .child(

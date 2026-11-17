@@ -95,6 +95,7 @@ impl DocumentSession {
         }
         self.source_sequence += 1; // Reject positional text results from before this edit.
         self.text = text_selection::TextState::default();
+        self.restart_search(cx);
         self.invalidate_work();
         self.clear_bitmaps(cx);
         if let Some(w) = &self.workspace {

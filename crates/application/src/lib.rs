@@ -5,6 +5,7 @@ pub use pdf_domain::{
 use std::path::{Path, PathBuf};
 pub mod export;
 pub mod png;
+pub mod search;
 pub mod split;
 pub mod text;
 pub mod viewer;

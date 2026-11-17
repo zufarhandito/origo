@@ -87,6 +87,7 @@ impl DocumentSession {
         self.page_anchor = None;
         self.opening = false;
         self.workspace = Some(workspace);
+        self.restart_search(cx);
         self.navigation = Navigation::default();
         self.clear_bitmaps(cx);
         self.stats = RenderStats::default();
@@ -497,6 +498,10 @@ impl DocumentSession {
                                 );
                             }
                             if matches!(error, RenderError::SourceChanged) {
+                                this.search.pause();
+                                this.search.running = false;
+                                this.search.matches.clear();
+                                this.search.current = None;
                                 this.text = text_selection::TextState::default();
                                 this.invalidate_work();
                                 this.clear_bitmaps(cx);

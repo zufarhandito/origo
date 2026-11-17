@@ -1,3 +1,42 @@
+# Latest verification - active-PDF text search, 17 November 2026
+
+Owner approved Find in the active PDF, with an in-tab compact bar. The explicit
+contract is default case-insensitive matching and contiguous phrases: `hasil penelitian`
+must not match scattered words. See [search](search.md).
+
+- Workspace formatting, denied-warning all-target Clippy, **53 unit tests**, and
+  release workspace build passed. Four new matcher/navigation tests cover phrase
+  whitespace/linebreaks, case/whole-word independence, Unicode character offsets,
+  query/result limits, non-overlapping occurrences and wrapping in both directions.
+- Release `--search-smoke` passed actual PDFium extraction: phrase/case matching,
+  same-page wrapped phrases, scattered-word rejection, four intrinsic rotations and
+  virtual geometry rotations, empty-page text, unchanged bytes and changed-source
+  rejection. The full release native smoke also passed M1/text, search, M3, tagged/
+  whole-source Extract, Split, Optimize and PNG, including their failure/cleanup cases.
+- Final release `scripts/search-ui-smoke.ps1` passed **14 named cases**:
+  `.research/search-ui-4e4935cb28a548e88e110e53a2d9ea66`.
+  It covers bar position below tabs, default phrase matching, rotated-result reveal,
+  next/previous/Enter/F3/wrap, case/whole-word options, empty/missing/oversized queries,
+  rapid replacements, per-tab state, Escape/reopen, rotate/import/delete/Undo,
+  no-text feedback, close with pending search and unchanged source hashes.
+  Its 1000-page case observed progressive results, paused an incomplete scan by
+  switching tabs, resumed to 1000 matches and checked shared/inactive cache bounds.
+- Release chrome regression passed both themes at 860/1000/1200/1600 px, toolbar
+  containment, drawer input/Escape and page entry:
+  `.research/chrome-ui-8b6d7ecc2a954fd581726d239ebb9a32`.
+  Search screenshots were inspected: orange active hit, yellow other visible hits,
+  correct phrase bounds and rotated vertical text.
+- An intermediate UI run exposed a visible search-status label missing from the
+  accessibility tree. Adding its semantic Group role fixed it; the final complete
+  suite passed afterward. Buttons also restore search-field focus for Enter navigation.
+- Numeric diagnostics include counts/options/progress only, excluding queries/text.
+  All UI tests use owned synthetic fixtures/processes; the pre-existing user app was
+  preserved by renaming its locked old EXE within target/release before rebuilding.
+  No new dependencies, export-policy change, public package, remote CI or physical
+  modifier/assistive-technology acceptance is claimed. Prior release gates remain open.
+
+---
+
 # Latest verification - PDF to PNG only, 16 November 2026
 
 Baseline `2c3033c`. The owner approved PNG only, all/selected pages and 150/300 DPI;

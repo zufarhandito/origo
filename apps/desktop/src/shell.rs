@@ -413,6 +413,7 @@ impl WindowShell {
             if let Some(session) = self.session() {
                 session.update(cx, |s, cx| {
                     s.active = false;
+                    s.search.pause();
                     s.invalidate_work();
                     s.clear_bitmaps(cx);
                     s.text.pages.clear();
@@ -426,6 +427,9 @@ impl WindowShell {
             if let Some(session) = self.session() {
                 session.update(cx, |s, cx| {
                     s.active = true;
+                    if s.search.running {
+                        s.restart_search(cx);
+                    }
                     s.schedule_current(cx);
                     s.report(cx);
                     cx.notify();
@@ -682,6 +686,7 @@ enum MenuAction {
     Undo,
     Redo,
     Copy,
+    Find,
     Select,
     Clear,
     Sidebar,
@@ -730,7 +735,7 @@ impl WindowShell {
             ),
             Help | About => {
                 let message = if matches!(action, Help) {
-                    "Ctrl+O Buka PDF · Ctrl+W Tutup tab · Ctrl+Tab / Ctrl+Shift+Tab Pindah tab\nCtrl+Shift+S Simpan sebagai · Ctrl+Shift+O Impor PDF\nCtrl+Z / Ctrl+Y Undo / Redo · Ctrl+C Salin\nCtrl+G Halaman · Ctrl+0 Fit halaman · Ctrl+1 Fit lebar"
+                    "Ctrl+O Buka PDF · Ctrl+W Tutup tab · Ctrl+Tab / Ctrl+Shift+Tab Pindah tab\nCtrl+Shift+S Simpan sebagai · Ctrl+Shift+O Impor PDF\nCtrl+Z / Ctrl+Y Undo / Redo · Ctrl+C Salin\nCtrl+F Cari teks · F3 / Shift+F3 Hasil berikutnya / sebelumnya\nCtrl+G Halaman · Ctrl+0 Fit halaman · Ctrl+1 Fit lebar"
                 } else {
                     "PDF Studio 0.1.0\nPengatur PDF lokal untuk Windows. Sumber tetap utuh; output disimpan ke file baru."
                 };
@@ -750,6 +755,7 @@ impl WindowShell {
                         Save => s.start_export(pdf_application::export::ExportScope::All, cx),
                         Undo | Redo => s.history(matches!(action, Redo), cx),
                         Copy => s.copy_text(cx),
+                        Find => s.show_search(window, cx),
                         Select | Clear => {
                             if s.mode == ViewerMode::Organize {
                                 s.select_all_pages(matches!(action, Select), cx);
@@ -972,6 +978,7 @@ impl Render for WindowShell {
                     ("Undo  Ctrl+Z", Undo),
                     ("Redo  Ctrl+Y", Redo),
                     ("Salin  Ctrl+C", Copy),
+                    ("Cari teks…  Ctrl+F", Find),
                     ("Pilih semua halaman", Select),
                     ("Bersihkan pilihan", Clear),
                 ],

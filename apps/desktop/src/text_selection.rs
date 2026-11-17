@@ -114,10 +114,15 @@ impl DocumentSession {
                         page.rotate(rotation);
                         let bytes = page.bytes();
                         this.text.pages.insert(index, Arc::new(page), bytes);
+                        this.align_search_match(cx);
                     }
                     Err(error) => {
                         this.text.errors.insert(index, error.to_string());
                         if matches!(error, pdf_application::RenderError::SourceChanged) {
+                            this.search.pause();
+                            this.search.running = false;
+                            this.search.matches.clear();
+                            this.search.current = None;
                             this.invalidate_work();
                             this.clear_bitmaps(cx);
                             this.text = TextState::default();

@@ -34,6 +34,11 @@ impl DocumentSession {
             "documentOpens": native.document_opens, "nativeRenders": native.renders,
             "textCacheBytes": self.text.pages.bytes(), "textLoads": self.text.loads,
             "textLoading": self.text.busy, "copyingText": self.text.copying(),
+            "searchOpen": self.search.open, "searchRunning": self.search.running,
+            "searchMatches": self.search.matches.len(), "searchCurrent": self.search.current.map_or(0, |i| i + 1),
+            "searchScannedPages": self.search.scanned, "searchFailedPages": self.search.errors,
+            "searchCaseSensitive": self.search.options.case_sensitive, "searchWholeWords": self.search.options.whole_words,
+            "searchCapped": self.search.capped,
             "copyBufferBytes": self.text.copy_bytes(),
             "selectedChars": self.text.selection.filter(|s| s.anchor.page == s.focus.page)
                 .map_or(0, |s| s.anchor.character.abs_diff(s.focus.character) + 1),

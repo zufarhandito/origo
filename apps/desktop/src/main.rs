@@ -20,6 +20,7 @@ mod diagnostics;
 mod exporting;
 mod feedback;
 mod png_export;
+mod search;
 mod shell;
 mod splitting;
 mod transitions;
@@ -67,6 +68,9 @@ actions!(
         ToggleSidebar,
         FocusPage,
         CopyText,
+        FindText,
+        FindNext,
+        FindPrevious,
         ClearTextSelection
     ]
 );
@@ -96,6 +100,8 @@ struct DocumentSession {
     mode: ViewerMode,
     page_dragging: bool,
     text: text_selection::TextState,
+    search: search::SearchState,
+    search_input: Entity<InputState>,
     page_anchor: Option<pdf_domain::PageId>,
     page_focus: FocusHandle,
     focus: FocusHandle,
@@ -170,6 +176,9 @@ fn main() -> anyhow::Result<()> {
             gpui_kit::component::Theme::update(cx, |theme| theme.font_family = "Segoe UI".into());
             cx.bind_keys([
                 KeyBinding::new("ctrl-o", Open, None),
+                KeyBinding::new("ctrl-f", FindText, Some("PdfViewer")),
+                KeyBinding::new("f3", FindNext, Some("PdfViewer")),
+                KeyBinding::new("shift-f3", FindPrevious, Some("PdfViewer")),
                 KeyBinding::new("ctrl-w", CloseTab, None),
                 KeyBinding::new("ctrl-tab", NextTab, None),
                 KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
@@ -272,6 +281,18 @@ impl DocumentSession {
             .detach();
             focus.focus(window, cx);
             let jump = cx.new(|cx| InputState::new(window, cx).placeholder("No."));
+            let search_input =
+                cx.new(|cx| InputState::new(window, cx).placeholder("Cari dalam PDF…"));
+            cx.subscribe_in(
+                &search_input,
+                window,
+                |this: &mut DocumentSession, _, event: &InputEvent, _, cx| match event {
+                    InputEvent::Change => this.restart_search(cx),
+                    InputEvent::PressEnter { shift, .. } => this.move_search(*shift, cx),
+                    _ => {}
+                },
+            )
+            .detach();
             cx.subscribe_in(
                 &jump,
                 window,
@@ -323,6 +344,8 @@ impl DocumentSession {
                 mode: ViewerMode::Read,
                 page_dragging: false,
                 text: text_selection::TextState::default(),
+                search: search::SearchState::default(),
+                search_input,
                 page_anchor: None,
                 page_focus: cx.focus_handle(),
                 focus,
