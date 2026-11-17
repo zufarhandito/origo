@@ -1,3 +1,18 @@
+# Verification — active-tab background fix, 17 November 2026
+
+- Restored the theme `tab_bar` background on the custom document strip. Standalone
+  folder tabs already paint `tab_active`; the missing strip background made the
+  active shape blend into the surrounding content.
+- Fmt, denied-warning desktop Clippy, debug build and isolated release build passed.
+  Visual inspection plus pixel sampling passed for both A/B active tabs in both
+  themes at `.research/tab-background-3024590b2f5243dabfebe801e3f7a255` (4 captures).
+  Light active/inactive colors were #ffffff/#f5f5f5; dark #0a0a0a/#171717. The
+  colors swapped with focus and fixture hashes stayed unchanged.
+- Active release executable was preserved while building separately. After a fresh
+  process check found no user instance using it, the verified build was copied to
+  `target/release/pdf-studio.exe` and hashes matched. No user process was closed.
+  No unit tests added for this styling-only change; previous functional coverage remains.
+
 # Verification — multi-tab tahap 4B, 17 November 2026
 
 - Final `scripts/check.ps1` passed: fmt, denied-warning Clippy, **57 unit tests**

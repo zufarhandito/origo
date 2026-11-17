@@ -1,3 +1,14 @@
+# Active-tab background fix — 17 November 2026
+
+Latar strip tab dikembalikan ke token tema `tab_bar`, sehingga bentuk folder tab aktif
+(`tab_active`) terlihat lagi. Cek visual terang/gelap dan perpindahan A/B lulus pada
+`.research/tab-background-3024590b2f5243dabfebe801e3f7a255`; fmt/Clippy dan build lulus.
+Release dibangun terpisah selama executable utama dipakai pengguna. Setelah pemeriksaan
+ulang menunjukkan tidak ada proses yang memakainya, executable utama diperbarui dan
+hash dicocokkan dengan build teruji; `run.cmd` memakai hasil terbaru. Proses pengguna
+tidak ditutup. Commit 4B adalah `a1647e0`; lihat Git log untuk commit perbaikan ini.
+Push tetap belum dilakukan karena blocker persetujuan tujuan/payload di bawah.
+
 # Checkpoint tahap 4B — 17 November 2026
 
 Seluruh urutan multi-tab yang diotorisasi (1 → 2 → 3 → 4A → 4B) kini diimplementasikan.

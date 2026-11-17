@@ -18,6 +18,8 @@ toolbar baca tetap satu baris. Konversi placeholder tidak masuk navigasi utama.
 - Nama PDF dan × berada dalam satu komponen tab; × tetap aksi tutup tersendiri.
   Menutup tab clean nonaktif tidak memindahkan tab aktif. Daftar tab memakai satu
   tombol berlabel dengan caret.
+- Bar tab memakai warna tema `tab_bar`; bentuk folder tab aktif memakai `tab_active`.
+  Latar keduanya dibedakan pada tema terang maupun gelap agar tab aktif terlihat jelas.
 
 ## Pengelolaan tab — tahap 1
 

@@ -1325,6 +1325,7 @@ impl Render for WindowShell {
                     .items_center()
                     .border_b_1()
                     .border_color(colors.border)
+                    .bg(cx.theme().tokens.tab_bar)
                     .child(strip)
                     .child(
                         Button::new("new-tab")
