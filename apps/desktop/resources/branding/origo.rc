@@ -1,0 +1,28 @@
+#include <winver.h>
+1 ICON "origo.ico"
+1 VERSIONINFO
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904b0"
+  BEGIN
+   VALUE "FileDescription", "Origo\0"
+   VALUE "FileVersion", "0.1.0\0"
+   VALUE "InternalName", "Origo\0"
+   VALUE "OriginalFilename", "pdf-studio.exe\0"
+   VALUE "ProductName", "Origo\0"
+   VALUE "ProductVersion", "0.1.0\0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x409, 1200
+ END
+END

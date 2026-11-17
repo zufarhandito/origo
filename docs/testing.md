@@ -1,5 +1,19 @@
 # Documentation handover — 17 November 2026
 
+## Ikon/nama Origo (17 November 2026)
+
+Fmt, Clippy desktop/all-targets denied warnings dan isolated release build lulus.
+`branding-ui-smoke.ps1` lulus, bukti lokal ignored:
+`.research/branding-ui-6f5664a6be524a25a5c2a8771276bf8d/result.json`.
+Pemeriksaan meliputi group icon resource ID 1 sembilan ukuran, ProductName dan
+FileDescription Origo, native window title, nonzero class HICON dan kesamaan piksel
+ikon native 32px terhadap PNG sumber turunan. Class icon merupakan sumber native
+untuk taskbar/Alt+Tab; UI task switcher Windows tidak direkam secara terpisah.
+Capture terang/gelap/About diperiksa visual. Fixture PDF tidak berubah dan window
+uji ditutup normal. Script regenerasi ikon menghasilkan hash aset yang identik.
+Unit/native PDF suite tidak diulang untuk pemasangan resource/label UI ini.
+
+
 ## Tanda tangan visual (17 November 2026)
 
 Fmt, Clippy workspace/all-targets denied warnings dan release workspace build lulus.

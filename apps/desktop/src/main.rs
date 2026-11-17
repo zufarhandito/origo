@@ -255,7 +255,7 @@ fn main() -> anyhow::Result<()> {
             let result = gpui_kit::open_window(
                 WindowOptions {
                     titlebar: Some(gpui_kit::TitlebarOptions {
-                        title: Some("PDF Studio".into()),
+                        title: Some("Origo".into()),
                         ..gpui_kit::component::TitleBar::title_bar_options()
                     }),
                     window_bounds: Some(WindowBounds::Windowed(bounds)),

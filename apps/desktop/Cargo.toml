@@ -16,6 +16,8 @@ pdf-domain.workspace = true
 pdf-engine.workspace = true
 pdf-platform.workspace = true
 qpdf-adapter.workspace = true
+[build-dependencies]
+embed-resource = "=3.0.12"
 [lints]
 workspace = true
 

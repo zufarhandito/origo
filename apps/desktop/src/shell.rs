@@ -887,13 +887,13 @@ impl WindowShell {
                 let message = if matches!(action, Help) {
                     "Ctrl+O Buka PDF · Ctrl+W Tutup tab · Ctrl+Tab / Ctrl+Shift+Tab Pindah tab\nCtrl+Shift+S Simpan sebagai · Ctrl+Shift+O Impor PDF\nCtrl+Z / Ctrl+Y Undo / Redo · Ctrl+C Salin\nCtrl+F Cari teks · F3 / Shift+F3 Hasil berikutnya / sebelumnya\nCtrl+G Halaman · Ctrl+0 Fit halaman · Ctrl+1 Fit lebar"
                 } else {
-                    "PDF Studio 0.1.0\nPengatur PDF lokal untuk Windows. Sumber tetap utuh; output disimpan ke file baru."
+                    "Origo 0.1.0\nPengatur PDF lokal untuk Windows. Sumber tetap utuh; output disimpan ke file baru."
                 };
                 window.open_alert_dialog(cx, move |d, _, _| {
                     d.title(if matches!(action, Help) {
                         "Shortcut"
                     } else {
-                        "Tentang PDF Studio"
+                        "Tentang Origo"
                     })
                     .description(message)
                     .centered()
@@ -1293,7 +1293,7 @@ impl Render for WindowShell {
             ))
             .child(self.menu(
                 "Bantuan",
-                &[("Daftar shortcut", Help), ("Tentang PDF Studio", About)],
+                &[("Daftar shortcut", Help), ("Tentang Origo", About)],
                 cx,
             ));
         let export_owner = self.resources.export_owner.load(Ordering::SeqCst);
@@ -1320,7 +1320,16 @@ impl Render for WindowShell {
             .capture_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
                 this.tab_picker_key(event, window, cx)
             }))
-            .child(TitleBar::new().child("PDF Studio"))
+            .child(
+                TitleBar::new().child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(gpui::img(origo_icon()).size(px(16.)))
+                        .child("Origo"),
+                ),
+            )
             .child(menus)
             .child(
                 div()
@@ -1446,6 +1455,18 @@ impl Render for WindowShell {
                 )
             })
     }
+}
+
+// Embedded bytes keep the title-bar icon available in portable installs.
+fn origo_icon() -> Arc<gpui::Image> {
+    static ICON: std::sync::OnceLock<Arc<gpui::Image>> = std::sync::OnceLock::new();
+    ICON.get_or_init(|| {
+        Arc::new(gpui::Image::from_bytes(
+            gpui::ImageFormat::Png,
+            include_bytes!("../resources/branding/origo-32.png").to_vec(),
+        ))
+    })
+    .clone()
 }
 
 #[cfg(test)]

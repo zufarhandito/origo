@@ -1,5 +1,10 @@
 # Dokumentasi PDF Studio
 
+Nama aplikasi kini **Origo**, dengan ikon sementara yang disetujui pemilik.
+Lihat [branding dan penggantian ikon](branding.md). Nama internal/riwayat lama tetap
+kompatibel; dokumentasi PDF Studio terdahulu adalah riwayat proyek yang sama.
+
+
 Ini indeks dokumentasi untuk pengembang dan AI. Bahasa komunikasi dengan pemilik:
 Indonesia. Jalankan command dari root repository `D:\projects\bpdf`.
 

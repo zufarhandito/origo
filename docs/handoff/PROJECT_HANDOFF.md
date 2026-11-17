@@ -1,5 +1,18 @@
 # Handoff terkini - 17 November 2026
 
+Pembaruan aktif: pemilik memilih nama **Origo** dan mengotorisasi pemasangan ikon
+sementara lingkaran dari PNG-nya. Resource icon ID 1/metadata produk, title native,
+custom title bar dan About kini Origo. Aset di apps/desktop/resources/branding;
+script update-origo-icon.py memudahkan penggantian. Nama exe/state/package internal
+belum dimigrasikan. Detail docs/branding.md dan hasil tes di testing.md.
+Build branding teruji: target/tab-background-check/release/pdf-studio.exe.
+Pemasangan ke target/release ditunda karena proses pengguna sedang memakai executable
+utama. Jangan menutup proses pengguna. run.cmd masih memilih binary utama lama;
+jalankan build terisolasi secara langsung atau salin setelah aplikasi ditutup.
+Branding smoke lulus di .research/branding-ui-6f5664a6be524a25a5c2a8771276bf8d.
+
+
+
 Pemilik mengalihkan pekerjaan dari anotator ke tanda tangan setelah toolbar ikon
 selesai. Tanda tangan visual draw/import kini diimplementasikan. Baca
 [signatures](../signatures.md), [annotations](../annotations.md), [testing](../testing.md)

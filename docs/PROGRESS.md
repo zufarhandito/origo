@@ -1,5 +1,10 @@
 # Progres PDF Studio
 
+Branding Origo: ikon sementara pemilik dipasang sebagai resource native Windows ID 1,
+logo title bar, nama tampilan/About dan metadata produk. Aset dapat diganti melalui
+script konversi; lihat [branding](branding.md) dan [testing](testing.md).
+
+
 Checkpoint aktif **46eba59**, sudah di-push ke origin/main: tanda tangan visual draw/PNG/JPEG, klik/drag penempatan,
 move/resize proporsional, delete, history dan Save As/reopen sudah diimplementasikan
 setelah anotator dan toolbar ikon. Detail [signatures](signatures.md),
