@@ -28,6 +28,7 @@ mod reading_position;
 mod search;
 mod shared_workspace;
 mod shell;
+mod signatures;
 mod splitting;
 mod transitions;
 use chrome::ViewerMode;

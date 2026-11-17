@@ -1,5 +1,34 @@
 # Documentation handover — 17 November 2026
 
+## Tanda tangan visual (17 November 2026)
+
+Fmt, Clippy workspace/all-targets denied warnings dan release workspace build lulus.
+Workspace **64 unit tests** lulus: 25 application, 10 domain, 5 platform, 11 desktop,
+13 QPDF. Setelah hardening popup/mouse-up, 11 desktop tests lulus lagi. Tes mencakup
+asset metadata round-trip/malformed bounds, pad kosong/crop, PNG alpha, JPEG reduction,
+file rusak/transparan dan Stamp action/forged-subtype rejection.
+
+Native `--annotation-smoke` lulus pada plain dan CropBox nonzero + sumber terotasi:
+objek Stamp terlihat tanpa overlay, alpha/model pulih saat reopen, penghapusan pada
+Extract tidak terlewat copy shortcut, empat orientasi output, flag render dipulihkan,
+searchable source text, Optimize/Split appearance, PNG pixels dan source bytes utuh.
+Perbandingan rotasi memakai dimensi raster yang sama melalui exact rendering agar
+pembulatan satu piksel pada preview biasa tidak mengaburkan pemeriksaan posisi.
+Default native M1/text/search/Save As/Extract/Split/Optimize/PNG juga lulus, termasuk
+consent, compatibility blockers, cancellation, source changes dan no-clobber/race.
+
+UI signature memakai `scripts/signature-ui-smoke.ps1` dengan executable terisolasi.
+Input PDF/gambar sintetis; tidak membuka file privat. Kasus: pad kosong/Undo/preview
+non-dirty, drop di luar halaman batal, placement satu objek, move Undo/Redo,
+resize proporsional, invalid image, alpha PNG preview, shared views, popup guard,
+close guard, Save As/reopen/edit dan delete/save/reopen. Run final: **11 kasus signature lulus** di
+`.research/signature-ui-5ede606183b54cc68540f53ff1d12136`; regresi anotator **9 kasus**
+di `.research/annotation-ui-b4a3c978b93b4707ac5064032ebb115e` (total 20 UI).
+Perbaikan outside-drop dan outside-click popup diverifikasi ulang pada build final. Capture dua panel diperiksa visual; gambar/thumbnail konsisten dan
+PNG alpha tidak membawa kotak latar. Native/source resource bounds bukan benchmark
+performa tanda tangan padat. UI JPEG/EXIF, stylus/touch dan viewer vendor belum diuji.
+
+
 ## Toolbar anotasi dropdown (17 November 2026)
 
 Fmt, Clippy desktop/all-targets denied warnings dan release build lulus.

@@ -407,6 +407,7 @@ impl WindowShell {
                     s.visible_for_render = visible;
                     if !visible {
                         s.annotation.draft = None;
+                        s.close_annotation_popups();
                     }
                     s.split_presentation = split;
                     if !visible {

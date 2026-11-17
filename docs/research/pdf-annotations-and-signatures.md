@@ -236,3 +236,15 @@ ink: https://learn.microsoft.com/en-us/deployedge/microsoft-edge-pdf#inking.
 Ini bukan pengujian interaktif Edge. Adaptasi PDF Studio: slider pen 0.5-12 pt,
 stabilo 4-40 pt; mode teks menonaktifkan slider karena tinggi mengikuti kotak teks.
 Pengaturan terpisah per tool, tidak mengubah anotasi lama kecuali recolor objek terpilih.
+
+
+## Tanda tangan diotorisasi setelah anotator
+
+Pemilik kemudian meminta melanjutkan task tanda tangan. Implementasi inti memakai
+canvas mouse dan PNG/JPEG, klik/drag penempatan, drag objek, resize proporsional,
+hapus, history, shared views, Save As/reopen. Spike native membuktikan Stamp dengan
+RGB image + alpha soft mask dapat ditulis QPDF, dirender PDFium dan dibuka ulang
+sebagai model edit. Kualitas/batas input dan kandidat fitur yang belum tersedia
+tercatat di [tanda tangan visual](../signatures.md). Tidak ada template permanen,
+sertifikat, audit trail, type/font, background removal, duplicate atau rotasi objek.
+Riset vendor terdahulu adalah dokumentasi/source, bukan pengujian UI produk vendor.

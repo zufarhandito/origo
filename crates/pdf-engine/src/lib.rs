@@ -551,7 +551,9 @@ fn read_annotations(
     for a in page.annotations().iter() {
         if !matches!(
             a.annotation_type(),
-            PdfPageAnnotationType::Ink | PdfPageAnnotationType::Highlight
+            PdfPageAnnotationType::Ink
+                | PdfPageAnnotationType::Highlight
+                | PdfPageAnnotationType::Stamp
         ) {
             continue;
         }
@@ -562,7 +564,9 @@ fn read_annotations(
         {
             result.push(a);
         }
-        if result.len() > pdf_domain::annotation::MAX_PAGE_ANNOTATIONS {
+        if result.len() > pdf_domain::annotation::MAX_PAGE_ANNOTATIONS
+            || result.iter().filter(|a| a.signature.is_some()).count() > 8
+        {
             return Err(RenderError::ResourceLimit);
         }
     }
@@ -587,7 +591,9 @@ fn with_annotations(
     for mut a in page.annotations().iter() {
         if matches!(
             a.annotation_type(),
-            PdfPageAnnotationType::Ink | PdfPageAnnotationType::Highlight
+            PdfPageAnnotationType::Ink
+                | PdfPageAnnotationType::Highlight
+                | PdfPageAnnotationType::Stamp
         ) && a
             .name()
             .as_deref()
@@ -638,10 +644,12 @@ fn read_document_annotations(
 ) -> Result<Vec<Vec<pdf_domain::annotation::Annotation>>, RenderError> {
     let mut result = Vec::new();
     let mut points = 0;
+    let mut signatures = 0;
     for page in document.pages().iter() {
         let annotations = read_annotations(&page)?;
         points += annotations.iter().map(|a| a.points.len()).sum::<usize>();
-        if points > 65536 {
+        signatures += annotations.iter().filter(|a| a.signature.is_some()).count();
+        if points > 65536 || signatures > 8 {
             return Err(RenderError::ResourceLimit);
         }
         result.push(annotations);

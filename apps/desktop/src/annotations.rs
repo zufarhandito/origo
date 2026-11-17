@@ -20,6 +20,7 @@ pub(super) enum Tool {
 #[derive(Default)]
 pub(super) struct AnnotationState {
     pub open: bool,
+    pub signature: crate::signatures::SignatureState,
     pub tool: Tool,
     pub color: usize,
     pub pen_color: usize,
@@ -38,6 +39,46 @@ const COLORS: [[u8; 3]; 5] = [
     [25, 25, 25],
 ];
 impl DocumentSession {
+    pub(super) fn annotation_popup(&self, open: bool) {
+        use std::sync::atomic::Ordering;
+        if open {
+            self.resources
+                .annotation_popup_owner
+                .store(self.view_id.0, Ordering::SeqCst);
+        } else {
+            let _ = self.resources.annotation_popup_owner.compare_exchange(
+                self.view_id.0,
+                0,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            );
+        }
+    }
+    pub(super) fn annotation_popup_changed(&self, open: bool, cx: &mut Context<Self>) {
+        if open {
+            self.annotation_popup(true);
+        } else {
+            // Keep canvas input blocked for the outside click that dismissed the popup.
+            let resources = self.resources.clone();
+            let view = self.view_id.0;
+            cx.defer(move |_| {
+                let _ = resources.annotation_popup_owner.compare_exchange(
+                    view,
+                    0,
+                    std::sync::atomic::Ordering::SeqCst,
+                    std::sync::atomic::Ordering::SeqCst,
+                );
+            });
+        }
+    }
+    pub(super) fn close_annotation_popups(&mut self) {
+        self.annotation_popup(false);
+        self.annotation.popup_open = false;
+        self.annotation.signature.open = false;
+        self.annotation.signature.drawing = false;
+        self.annotation.signature.gesture = None;
+    }
+
     pub(super) fn annotation_bar(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let mut bar = gpui::div()
             .flex()
@@ -55,10 +96,13 @@ impl DocumentSession {
                 .selected(self.annotation.open)
                 .disabled(self.edits_locked())
                 .on_click(cx.listener(|s, _, _, cx| {
+                    s.close_annotation_popups();
                     s.annotation.open = !s.annotation.open;
                     s.annotation.draft = None;
                     s.annotation.selected = None;
                     s.annotation.tool = Tool::Select;
+                    s.annotation.signature.placing = false;
+                    s.annotation.signature.gesture = None;
                     cx.notify();
                 })),
         );
@@ -125,6 +169,8 @@ impl DocumentSession {
                         .selected(selected)
                         .disabled(self.edits_locked())
                         .on_click(cx.listener(move |s, _, window, cx| {
+                            s.annotation.signature.placing = false;
+                            s.annotation.signature.gesture = None;
                             s.annotation.tool =
                                 if tool == Tool::Highlight && !s.annotation.text_only {
                                     Tool::Marker
@@ -164,6 +210,7 @@ impl DocumentSession {
                                     .disabled(self.edits_locked()),
                             )
                             .on_open_change(cx.listener(|s, open, _, cx| {
+                                s.annotation_popup_changed(*open, cx);
                                 s.annotation.popup_open = *open;
                                 s.annotation.draft = None;
                                 cx.notify();
@@ -183,6 +230,9 @@ impl DocumentSession {
                     .disabled(self.annotation.selected.is_none() || self.edits_locked())
                     .on_click(cx.listener(|s, _, _, cx| s.delete_annotation(cx))),
             );
+        }
+        if self.annotation.open {
+            bar = bar.child(self.signature_button(cx));
         }
         bar.into_any_element()
     }
@@ -302,7 +352,7 @@ impl DocumentSession {
         }
         panel.into_any_element()
     }
-    fn set_annotations(
+    pub(super) fn set_annotations(
         &mut self,
         page: PageId,
         annotations: Vec<Annotation>,
@@ -324,7 +374,12 @@ impl DocumentSession {
             _ => {}
         }
     }
-    fn add_annotation(&mut self, page: PageId, mut a: Annotation, cx: &mut Context<Self>) {
+    pub(super) fn add_annotation(
+        &mut self,
+        page: PageId,
+        mut a: Annotation,
+        cx: &mut Context<Self>,
+    ) {
         let Some(mut w) = self.workspace.as_mut() else {
             return;
         };
@@ -355,7 +410,7 @@ impl DocumentSession {
                     .iter()
                     .cloned()
                     .map(|mut a| {
-                        if a.id == id {
+                        if a.id == id && a.signature.is_none() {
                             a.color = COLORS[self.annotation.color];
                         }
                         a
@@ -404,6 +459,16 @@ impl DocumentSession {
             ],
             (4 - g.quarter_turns) % 4,
         );
+        drop(w);
+        if self.signature_pointer(id, point, start, cx) {
+            if start {
+                self.annotation.signature.gesture_bounds = Some(bounds);
+            }
+            return true;
+        }
+        let Some(w) = self.workspace.as_ref() else {
+            return true;
+        };
         let tool = self.annotation.tool;
         if matches!(tool, Tool::Select | Tool::Eraser) {
             if !start {
@@ -446,6 +511,7 @@ impl DocumentSession {
                         }),
                     points: vec![point],
                     rectangles: false,
+                    signature: None,
                 },
             ));
             self.annotation.selected = None;
@@ -461,6 +527,22 @@ impl DocumentSession {
         true
     }
     pub(super) fn finish_annotation(&mut self, cx: &mut Context<Self>) {
+        self.annotation.signature.drawing = false;
+        if let Some((page, a, _, _)) = self.annotation.signature.gesture.take() {
+            let all = self.workspace.as_ref().map(|w| {
+                let mut all = w.annotations(page).to_vec();
+                if let Some(old) = all.iter_mut().find(|old| old.id == a.id) {
+                    *old = a.clone();
+                } else {
+                    all.push(a.clone());
+                }
+                all
+            });
+            if let Some(all) = all {
+                self.set_annotations(page, all, cx);
+            }
+            return;
+        }
         if let Some((page, mut a)) = self.annotation.draft.take() {
             if a.points.len() == 1 {
                 a.points.push(a.points[0]);
@@ -505,6 +587,7 @@ impl DocumentSession {
                         width: 1.,
                         points,
                         rectangles: true,
+                        signature: None,
                     },
                 ));
             }
@@ -535,7 +618,7 @@ impl DocumentSession {
     }
 }
 fn hit(a: &Annotation, p: [f32; 2], tolerance: f32) -> bool {
-    if a.rectangles {
+    if a.rectangles || a.signature.is_some() {
         return a.points.as_chunks::<2>().0.iter().any(|r| {
             p[0] >= r[0][0].min(r[1][0])
                 && p[0] <= r[0][0].max(r[1][0])
@@ -601,6 +684,15 @@ pub(super) fn paint_selection(
     let origin = bounds.origin + gpui::point(bounds.size.width * left, bounds.size.height * top);
     let width = bounds.size.width * (right - left);
     let height = bounds.size.height * (bottom - top);
+    if a.signature.is_some() {
+        window.paint_quad(gpui::fill(
+            Bounds::new(
+                origin + gpui::point(width - px(4.), height - px(4.)),
+                gpui::size(px(8.), px(8.)),
+            ),
+            gpui::rgb(0x2563eb),
+        ));
+    }
     for (offset, size) in [
         (gpui::point(px(0.), px(0.)), gpui::size(width, px(1.))),
         (gpui::point(px(0.), height), gpui::size(width, px(1.))),

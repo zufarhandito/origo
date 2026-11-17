@@ -16,6 +16,12 @@ impl DocumentSession {
     // tool drawer painted over the page, or a modal owned by another document.
     fn document_input_allowed(&self, position: gpui::Point<gpui::Pixels>, window: &Window) -> bool {
         self.visible_for_render
+            && self
+                .resources
+                .annotation_popup_owner
+                .load(std::sync::atomic::Ordering::SeqCst)
+                == 0
+            && !self.annotation.signature.open
             && !self.annotation.popup_open
             && !self
                 .resources
@@ -284,6 +290,14 @@ impl DocumentSession {
                     .as_ref()
                     .and_then(|w| w.annotations(page_id).iter().find(|a| a.id == id).cloned())
             });
+        let selected_annotation = self
+            .annotation
+            .signature
+            .gesture
+            .as_ref()
+            .filter(|(id, _, _, _)| *id == page_id)
+            .map(|(_, a, _, _)| a.clone())
+            .or(selected_annotation);
         let overlay = if !thumbnail {
             let text = self.text.pages.get(&index);
             if text.is_none() && !self.text.errors.contains_key(&index) {
@@ -628,6 +642,15 @@ impl Render for DocumentSession {
                             && event.button == MouseButton::Left
                         {
                             let _ = release_weak.update(cx, |this, cx| {
+                                if this
+                                    .annotation
+                                    .signature
+                                    .gesture_bounds
+                                    .is_some_and(|b| !b.contains(&event.position))
+                                {
+                                    this.annotation.signature.gesture = None;
+                                }
+                                this.annotation.signature.gesture_bounds = None;
                                 this.finish_annotation(cx);
                                 this.text.dragging = false;
                                 this.text.pending = None;

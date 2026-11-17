@@ -1,23 +1,21 @@
-# Prompt siap pakai untuk chat baru
+# Prompt chat berikutnya
 
 ```text
 Lanjut PDF Studio di D:\projects\bpdf, Windows/PowerShell, bahasa Indonesia.
 Mulai dari AGENTS.md, docs/README.md, docs/handoff/PROJECT_HANDOFF.md,
-docs/feature-development.md, docs/annotations.md dan docs/testing.md.
+docs/feature-development.md, docs/annotations.md, docs/signatures.md dan docs/testing.md.
 
-Pemilik sudah meminta implementasi anotator terlebih dahulu; tanda tangan ditunda.
-Anotator inti: highlight teks, pen/stabilo, warna/ketebalan, pilih/hapus, Undo/Redo,
-unsaved guard, safe Save As dan reopen/edit anotasi milik PDF Studio.
-Generic annotation editing dari Edge/Adobe belum didukung. Komentar/textbox/shape,
-move/resize dan tanda tangan belum tersedia. Jangan klaim semua kandidat riset selesai.
+Anotator dan tanda tangan visual sudah diotorisasi. Tanda tangan mendukung pad mouse,
+PNG/JPEG, klik/drag penempatan, drag pindah, resize proporsional, hapus, Undo/Redo,
+shared views serta Save As/reopen objek Stamp milik aplikasi. Ini belum sertifikat,
+template permanen, background removal atau general editor Stamp pihak ketiga.
 
-Periksa git status/log dan hasil push di handoff. Branch main, remote origin
-https://github.com/zufarhandito/origo.git. Instruksi commit/push setelah fitur selesai
-berlaku. Jangan force-push, unggah binary/data privat atau bypass penolakan review.
+Periksa git status/log dan hasil push terbaru. Remote origin
+https://github.com/zufarhandito/origo.git, branch main. Fitur selesai wajib commit
+Conventional Commit lalu push. Jangan force-push atau unggah PDF/binary/data privat.
 
-PDF sumber read-only. Snapshot/preflight/consent/validasi/no-overwrite tetap wajib.
-Jangan membaca PDF/catatan privat atau menutup proses pengguna untuk build/tes.
-Anotator dibangun terpisah di target/tab-background-check/release karena executable
-utama sebelumnya aktif, lalu disalin ke target/release setelah proses lama tidak aktif.
-Hash binary teruji dan terpasang sama. Periksa proses sebelum mengganti executable.
+PDF sumber read-only; snapshot/preflight/consent/validasi/no-overwrite tetap wajib.
+Jangan membuka PDF/catatan privat, memindahkan toolchain atau menutup proses pengguna
+untuk build. Gunakan build terisolasi jika executable aktif. run.cmd memilih target/release.
+Hasil test/batas serta SHA terbaru tercatat di handoff/testing dan git log.
 ```

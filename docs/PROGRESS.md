@@ -1,18 +1,13 @@
 # Progres PDF Studio
 
-Pembaruan toolbar: ikon + dropdown pen/highlighter, swatch warna, preview goresan,
-slider pen 0.5-12 pt dan stabilo 4-40 pt, serta toggle Hanya teks tersedia.
-Pengaturan tool terpisah; slider mode teks nonaktif. Clippy/release dan 9 kasus UI
-lulus. Build teruji dipasang ke target/release setelah memastikan tidak digunakan.
-Checkpoint Git/hash di bawah bersifat historis; periksa git log untuk commit toolbar.
+Checkpoint aktif: tanda tangan visual draw/PNG/JPEG, klik/drag penempatan,
+move/resize proporsional, delete, history dan Save As/reopen sudah diimplementasikan
+setelah anotator dan toolbar ikon. Detail [signatures](signatures.md),
+[handoff](handoff/PROJECT_HANDOFF.md), [testing](testing.md). Tidak ada template
+permanen atau sertifikat digital. Commit/status push terakhir cocokkan dengan git log.
 
-
-Checkpoint **17 November 2026**: anotator inti commit **`8a40b73`**, sudah di-push
-ke `origin/main` (remote `a1647e0..8a40b73`). Diimplementasikan setelah persetujuan
-pemilik. Highlight teks, pen/stabilo, pilih/hapus/warna, shared history, unsaved guard
-dan Save As/reopen tersedia. Tanda tangan ditunda. Lihat [anotator](annotations.md),
-[handoff](handoff/PROJECT_HANDOFF.md) dan [testing](testing.md) untuk batas dan bukti.
-Angka/commit multi-tab di bawah adalah checkpoint historis sebelum anotator.
+Anotator inti `8a40b73`, toolbar dropdown/slider `9617dae` sudah di-push ke origin/main.
+Checkpoint multi-tab di bawah adalah riwayat sebelum anotator/tanda tangan.
 
 ## Multi-tab yang sudah selesai
 

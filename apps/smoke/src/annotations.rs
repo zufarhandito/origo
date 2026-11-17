@@ -11,9 +11,15 @@ use pdf_platform::LocalOutput;
 use qpdf_adapter::QpdfExporter;
 use std::path::Path;
 pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
+    for feature in ["plain", "cropped-signature"] {
+        run_fixture(root, renderer, feature)?;
+    }
+    Ok(())
+}
+fn run_fixture(root: &Path, renderer: &PdfiumRenderer, feature: &str) -> Result<()> {
     let dir = tempfile::tempdir_in(root.join(".research"))?;
     let source = dir.path().join("source.pdf");
-    let bytes = crate::synthetic::export_safety_pdf("plain");
+    let bytes = crate::synthetic::export_safety_pdf(feature);
     std::fs::write(&source, &bytes)?;
     let mut w = open_document(renderer, &source, SourceId(1))?;
     let page = w.pages()[0].id;
@@ -24,6 +30,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         width: 1.,
         points: vec![[0.1, 0.1], [0.8, 0.2]],
         rectangles: true,
+        signature: None,
     };
     let ink = Annotation {
         id: 2,
@@ -32,10 +39,39 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         width: 4.,
         points: vec![[0.2, 0.3], [0.6, 0.6], [0.3, 0.7]],
         rectangles: false,
+        signature: None,
+    };
+    let signature = Annotation {
+        id: 3,
+        highlight: false,
+        color: [0, 0, 0],
+        width: 1.,
+        rectangles: false,
+        points: vec![[0.15, 0.75], [0.65, 0.9]],
+        signature: Some(std::sync::Arc::new(
+            pdf_domain::annotation::SignatureImage {
+                width: 64,
+                height: 24,
+                rgba: (0..64 * 24)
+                    .flat_map(|i| {
+                        [
+                            20,
+                            50,
+                            180,
+                            if i % 64 > i / 64 && i % 64 < i / 64 + 20 {
+                                180
+                            } else {
+                                0
+                            },
+                        ]
+                    })
+                    .collect(),
+            },
+        )),
     };
     w.execute(Command::Annotate {
         page,
-        annotations: vec![highlight.clone(), ink.clone()],
+        annotations: vec![highlight.clone(), ink.clone(), signature.clone()],
     })?;
     ensure!(w.is_dirty());
     ensure!(w.undo());
@@ -51,8 +87,23 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     ensure!(!w.is_dirty());
     let reopened = open_document(renderer, &output, SourceId(2))?;
     ensure!(
-        reopened.annotations(reopened.pages()[0].id) == [highlight.clone(), ink.clone()],
+        reopened.annotations(reopened.pages()[0].id)
+            == [highlight.clone(), ink.clone(), signature.clone()],
         "persisted editable annotations"
+    );
+    use pdf_application::{
+        PdfInspector,
+        text::{TextExtractor, TextRequest},
+    };
+    let info = renderer.inspect(&output)?;
+    let text = renderer.extract_text(&TextRequest {
+        path: output.clone(),
+        page_index: 0,
+        fingerprint: info.fingerprint,
+    })?;
+    ensure!(
+        text.copy_range(0..text.chars.len()).contains("SAFE"),
+        "signature preserves searchable source text"
     );
     let original = renderer.render(&source, 0)?;
     let native = renderer.render(&output, 0)?;
@@ -62,7 +113,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         target_width: 1200,
         rotation_delta: 0,
         fingerprint: None,
-        annotations: Some(vec![highlight.clone(), ink.clone()]),
+        annotations: Some(vec![highlight.clone(), ink.clone(), signature.clone()]),
     })?;
     let difference: u64 = editor
         .rgba
@@ -95,6 +146,77 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     ensure!(
         native_again.rgba == native.rgba,
         "temporary render flags restored"
+    );
+    // All downstream exporters must capture signature assets with the same snapshot.
+    let optimized = dir.path().join("optimized.pdf");
+    let prepared = prepare_export(
+        ExportPlan::capture(&w, 4, ExportScope::Optimized)?,
+        &optimized,
+        &LocalOutput,
+        &exporter,
+        &control,
+    )?;
+    finish_export(prepared, true, &exporter, renderer, &control)?;
+    ensure!(
+        renderer.render(&optimized, 0)?.rgba == native.rgba,
+        "Optimize preserves signature alpha and placement"
+    );
+    use pdf_application::split::{SplitPlan, SplitSpec, finish_split, prepare_split};
+    let split = dir.path().join("split-signature");
+    let prepared = prepare_split(
+        SplitPlan::new(
+            ExportPlan::capture(&w, 5, ExportScope::All)?,
+            SplitSpec::Every(1),
+        )?,
+        &split,
+        &pdf_platform::split::LocalSplitOutput,
+        &exporter,
+        &control,
+    )?;
+    finish_split(prepared, true, &exporter, renderer, &control, |_| {})?;
+    let part = std::fs::read_dir(&split)?
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("split empty"))??;
+    ensure!(
+        renderer.render(&part.path(), 0)?.rgba == native.rgba,
+        "Split preserves signature appearance"
+    );
+    use pdf_application::png::{PngDpi, PngPlan, finish_png, prepare_png};
+    let png = dir.path().join("png-signature");
+    let prepared = prepare_png(
+        PngPlan::new(
+            ExportPlan::capture(&w, 6, ExportScope::All)?,
+            PngDpi::Dpi150,
+        )?,
+        &png,
+        &pdf_platform::png::LocalPngOutput,
+        &exporter,
+        &control,
+    )?;
+    finish_png(
+        prepared,
+        renderer,
+        &pdf_platform::png::LocalPngWriter,
+        &control,
+        |_| {},
+    )?;
+    let image = std::fs::read_dir(&png)?
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("PNG empty"))??;
+    let decoded = image::open(image.path())?.to_rgba8();
+    use pdf_application::{ExactPageRenderer, ExactRenderRequest};
+    let expected = renderer.render_exact(&ExactRenderRequest {
+        path: source.clone(),
+        page_index: 0,
+        width: decoded.width(),
+        height: decoded.height(),
+        fingerprint: w.source().fingerprint,
+        rotation_delta: 0,
+        annotations: Some(vec![highlight.clone(), ink.clone(), signature.clone()]),
+    })?;
+    ensure!(
+        decoded.as_raw() == &expected.rgba,
+        "PNG captures signature pixels"
     );
     let mut reopened = reopened;
     let p = reopened.pages()[0].id;
@@ -133,13 +255,14 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         )?;
         finish_export(prepared, true, &exporter, renderer, &control)?;
         let native_rotated = renderer.render(&out, 0)?;
-        let editor_rotated = renderer.render_page(&RenderRequest {
+        let editor_rotated = renderer.render_exact(&ExactRenderRequest {
             path: source.clone(),
             page_index: 0,
-            target_width: 1200,
+            width: native_rotated.width,
+            height: native_rotated.height,
             rotation_delta: turn,
-            fingerprint: None,
-            annotations: Some(vec![highlight.clone(), ink.clone()]),
+            fingerprint: w.source().fingerprint,
+            annotations: Some(vec![highlight.clone(), ink.clone(), signature.clone()]),
         })?;
         ensure!(
             native_rotated.width == editor_rotated.width
@@ -156,7 +279,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
             "rotated editor/export appearance differs for rotation {turn}"
         );
         let check = open_document(renderer, &out, SourceId(20))?;
-        ensure!(check.annotations(check.pages()[0].id).len() == 2);
+        ensure!(check.annotations(check.pages()[0].id).len() == 3);
     }
     ensure!(std::fs::read(&source)? == bytes, "source read-only");
     println!(

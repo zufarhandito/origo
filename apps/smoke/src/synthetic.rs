@@ -227,6 +227,7 @@ fn vector_pdf(count: usize, mixed: bool, selection: bool, prefix: &str) -> Vec<u
 /// Structural export-policy fixtures; the signature marker is not cryptographically valid.
 pub fn export_safety_pdf(feature: &str) -> Vec<u8> {
     let (catalog, page, extra, trailer): (&str, &str, Vec<Vec<u8>>, &str) = match feature {
+        "cropped-signature" => ("", "/CropBox [30 50 280 390] /Rotate 90",vec![],""),
         "info" => (
             "",
             "",

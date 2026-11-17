@@ -28,6 +28,13 @@ impl DocumentSession {
                 if this.edits_locked() {
                     return;
                 }
+                if this.annotation.signature.placing || this.annotation.signature.gesture.is_some()
+                {
+                    this.annotation.signature.placing = false;
+                    this.annotation.signature.gesture = None;
+                    cx.notify();
+                    return;
+                }
                 if this.annotation.draft.take().is_some() || this.annotation.open {
                     this.annotation.selected = None;
                     this.annotation.tool = annotations::Tool::Select;

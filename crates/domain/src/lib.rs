@@ -109,6 +109,7 @@ impl Workspace {
                 a.iter().map(|a| a.points.len()).sum::<usize>() > 8192
                     || a.len() > annotation::MAX_PAGE_ANNOTATIONS
                     || a.iter().any(|a| !a.valid())
+                    || a.iter().filter(|a| a.signature.is_some()).count() > 8
                     || a.iter().map(|a| a.id).collect::<HashSet<_>>().len() != a.len()
             })
             || source
@@ -118,6 +119,13 @@ impl Workspace {
                 .map(|a| a.points.len())
                 .sum::<usize>()
                 > 65536
+            || source
+                .annotations
+                .iter()
+                .flatten()
+                .filter(|a| a.signature.is_some())
+                .count()
+                > 8
             || source.geometries.is_empty()
             || source.geometries.len() > u16::MAX as usize
             || source.geometries.iter().any(|g| {
@@ -276,7 +284,15 @@ impl Workspace {
                     .flat_map(|(_, _, a)| a)
                     .map(|a| a.points.len())
                     .sum::<usize>();
-            if total > 65536 {
+            let signature_count = self
+                .annotations
+                .iter()
+                .filter(|(p, _)| !edits.iter().any(|(changed, _, _)| changed == *p))
+                .flat_map(|(_, a)| a)
+                .chain(edits.iter().flat_map(|(_, _, a)| a))
+                .filter(|a| a.signature.is_some())
+                .count();
+            if total > 65536 || signature_count > 8 {
                 return Err(DomainError::ResourceLimit);
             }
             if edits.is_empty() {
@@ -312,6 +328,21 @@ impl Workspace {
         let mut source = None;
         let (ids, target, turns, delete) = match command {
             Command::Import(s) => {
+                if self
+                    .annotations
+                    .values()
+                    .flatten()
+                    .filter(|a| a.signature.is_some())
+                    .count()
+                    + s.annotations
+                        .iter()
+                        .flatten()
+                        .filter(|a| a.signature.is_some())
+                        .count()
+                    > 8
+                {
+                    return Err(DomainError::ResourceLimit);
+                }
                 Self::validate_source(&s)?;
                 if self
                     .annotations
@@ -524,6 +555,7 @@ mod tests {
             width: 2.,
             points: vec![[0.1, 0.2], [0.3, 0.4]],
             rectangles: false,
+            signature: None,
         };
         w.execute(Command::AnnotateMany(vec![
             (first, vec![a.clone()]),

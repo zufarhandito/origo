@@ -18,6 +18,41 @@ pub fn composite(
     }
     let mut mask = vec![false; w * h];
     for a in annotations.iter().filter(|a| a.valid()) {
+        if let Some(image) = &a.signature {
+            let corners = [rotate(a.points[0], turns), rotate(a.points[1], turns)];
+            let x0 = (corners[0][0].min(corners[1][0]) * width as f32).floor() as usize;
+            let x1 = (corners[0][0].max(corners[1][0]) * width as f32).ceil() as usize;
+            let y0 = (corners[0][1].min(corners[1][1]) * height as f32).floor() as usize;
+            let y1 = (corners[0][1].max(corners[1][1]) * height as f32).ceil() as usize;
+            for y in y0.min(h)..y1.min(h) {
+                for x in x0.min(w)..x1.min(w) {
+                    let p = rotate(
+                        [
+                            (x as f32 + 0.5) / width as f32,
+                            (y as f32 + 0.5) / height as f32,
+                        ],
+                        (4 - turns) % 4,
+                    );
+                    let u = (p[0] - a.points[0][0]) / (a.points[1][0] - a.points[0][0]);
+                    let v = (p[1] - a.points[0][1]) / (a.points[1][1] - a.points[0][1]);
+                    if !(0. ..1.).contains(&u) || !(0. ..1.).contains(&v) {
+                        continue;
+                    }
+                    let offset = ((v * image.height as f32) as usize * image.width as usize
+                        + (u * image.width as f32) as usize)
+                        * 4;
+                    let src = &image.rgba[offset..offset + 4];
+                    let dst = &mut rgba[(y * w + x) * 4..(y * w + x) * 4 + 4];
+                    for c in 0..3 {
+                        dst[c] = ((u32::from(src[c]) * u32::from(src[3])
+                            + u32::from(dst[c]) * (255 - u32::from(src[3]))
+                            + 127)
+                            / 255) as u8;
+                    }
+                }
+            }
+            continue;
+        }
         let points: Vec<_> = a
             .points
             .iter()
@@ -121,6 +156,7 @@ mod tests {
             width: 4.,
             points: vec![[0.1, 0.5], [0.9, 0.5], [0.1, 0.5]],
             rectangles: false,
+            signature: None,
         };
         let mut raster = vec![255; 40 * 40 * 4];
         let offset = (20 * 40 + 20) * 4;

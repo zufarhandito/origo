@@ -267,7 +267,7 @@ pub struct PreflightReport {
     pub tags_loss: bool,
     pub policy_version: u32,
 }
-pub const EXPORT_POLICY_VERSION: u32 = 5;
+pub const EXPORT_POLICY_VERSION: u32 = 6;
 impl PreflightReport {
     pub fn requires_acknowledgement(&self) -> bool {
         self.metadata_loss || self.bookmarks_loss || self.tags_loss

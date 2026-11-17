@@ -250,3 +250,21 @@ and vector AP streams; Optimize runs afterwards. Preflight validates the passive
 closed schema before generic exemptions, including inline annotation dictionaries.
 Output inspection checks annotation round-trip equality before publication. Policy
 version is 5. See [behavior and limitations](annotations.md).
+
+
+## Visual signature Stamp (policy v6)
+
+An optional Arc<SignatureImage> on Annotation carries bounded RGBA data and two
+opposite normalized corners. History/snapshots share asset allocation; each placed
+object has its own ID/corners. Aggregate signature count is eight across Workspace,
+including deleted-page data retained for Undo. Inspection also caps assets at eight.
+Draw/import and placement state are per view and are not saved in session metadata.
+
+QPDF writes owned passive Stamp annotations, Form appearances, RGB image XObjects and
+8-bit grayscale soft masks. Versioned NM metadata retains bounded asset/corners for
+reopen/edit. This is a visual image, not a cryptographic signature field. PDFium hides
+owned Stamp objects during editor rendering and the compositor applies alpha once;
+native PDF output uses the Form appearance. Export validation compares the full model.
+Image input is decoded locally with format/byte/dimension/allocation limits and EXIF
+orientation; transparent borders are cropped, with reduction to 512x256 if necessary.
+No permanent template storage or external service was added. See [signatures](signatures.md).

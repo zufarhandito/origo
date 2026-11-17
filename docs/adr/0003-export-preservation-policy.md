@@ -1,5 +1,12 @@
 # ADR-0003: conservative structural PDF export
 
+Policy v6 (17 November 2026) extends the owned passive subset to visual signature
+Stamp objects. Bounded RGBA assets/corners persist in model metadata; appearances
+use image XObjects plus alpha soft masks. Actions and forged annotation subtypes
+remain rejected. Output round-trip validation, snapshot/consent/no-overwrite remain
+mandatory. Certificate-based signature PDFs keep the prior restrictions.
+
+
 Policy v5 (17 November 2026): PDF Studio-owned Ink/Highlight annotations with bounded
 v1 NM metadata, passive closed schema and validated geometry/style are accepted in
 normal structural export. Inline and referenced objects are checked before exemption;

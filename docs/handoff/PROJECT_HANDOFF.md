@@ -1,65 +1,62 @@
-# Handoff terkini ? 17 November 2026
+# Handoff terkini - 17 November 2026
 
-Pembaruan toolbar: ikon + dropdown pen/highlighter, swatch warna, preview goresan,
-slider pen 0.5-12 pt dan stabilo 4-40 pt, serta toggle Hanya teks tersedia.
-Pengaturan tool terpisah; slider mode teks nonaktif. Clippy/release dan 9 kasus UI
-lulus. Build teruji dipasang ke target/release setelah memastikan tidak digunakan.
-Checkpoint Git/hash di bawah bersifat historis; periksa git log untuk commit toolbar.
+Pemilik mengalihkan pekerjaan dari anotator ke tanda tangan setelah toolbar ikon
+selesai. Tanda tangan visual draw/import kini diimplementasikan. Baca
+[signatures](../signatures.md), [annotations](../annotations.md), [testing](../testing.md)
+dan [compatibility](../compatibility.md). Task baru belum dipilih setelah fitur ini.
 
+## Kemampuan dan batas
 
-Permintaan terbaru pemilik: implementasikan anotator dulu; tanda tangan sesudahnya.
-**Anotator inti selesai**: highlight teks, pen/stabilo, lima warna, ketebalan goresan,
-pilih/hapus/recolor, Undo/Redo, unsaved-close guard, safe Save As dan reopen/edit.
-Lihat [anotator](../annotations.md), [testing](../testing.md), [kompatibilitas](../compatibility.md)
-dan [riset kompetitor](../research/pdf-annotations-and-signatures.md).
+- Anotator: highlight teks/stabilo, pen, warna, slider pen 0.5-12 pt/stabilo 4-40 pt,
+  ikon + dropdown/preview, pilih/hapus/recolor serta Undo/Redo.
+- Tanda tangan: canvas mouse dengan Undo stroke/clear, PNG/JPEG lokal dengan EXIF,
+  alpha PNG, crop batas transparan, preview, klik/drag penempatan, drag pindah,
+  resize proporsional lewat sudut kanan bawah, hapus, Undo/Redo, Save As/reopen edit.
+- Satu gesture adalah satu command. Draft tidak dirty; placement/move/resize/delete
+  menandai dirty. Esc atau drop di luar halaman membatalkan gesture. Drag/resize
+  menampilkan outline draft dan menerapkan gambar saat mouse dilepas.
+- Objek/ID/history/revisi dibagi dua view; template draft dan tool per view. Popup
+  mengunci canvas seluruh jendela agar tidak menggambar di belakangnya/panel sebelah.
+- Aset maksimal 512x256 RGBA, input 8 MiB, sisi 8192 dan decode 64 MiB. Maksimal delapan
+  tanda tangan dalam model (termasuk halaman dihapus yang disimpan untuk Undo).
+  Tidak ada upload, template permanen, SVG, type/font, background removal, pressure,
+  duplicate, gerak keyboard atau rotasi objek independen.
+- Output Ink/Highlight + Stamp pasif dengan appearance Form/image/alpha soft mask;
+  metadata NM milik aplikasi memulihkan model edit. Hanya anotasi milik PDF Studio
+  yang didukung untuk edit ulang. Konten asli/searchable text tidak di-flatten.
+- Policy v6 memperluas subset dengan Stamp. Action/subtype palsu ditolak. Certificate
+  signature, form/encryption dan struktur lain tetap mengikuti pembatasan lama.
+- Sumber read-only; snapshot/preflight/consent/validasi/no-overwrite dan receipt
+  revisi tetap wajib. Close guard berlaku. Tidak ada autosave/crash recovery.
 
-## Batas dan keputusan aktif
+## Verifikasi
 
-- Output memakai Ink/Highlight standar dan appearance stream vektor, bukan flatten.
-  Model edit bounded v1 tersimpan dalam NM. File hasil Save As bisa dibuka kembali
-  dan anotasinya dihapus; file sumber tetap read-only.
-- Edit ulang hanya untuk anotasi milik PDF Studio. Anotasi Edge/Adobe/Firefox dan
-  perubahan metadata oleh editor eksternal belum didukung sebagai model edit.
-- Komentar, textbox, shape, underline/strikethrough, move/resize, partial eraser, OCR
-  dan tanda tangan belum diimplementasikan. Tanda tangan tetap ditunda; daftar riset
-  bukan klaim semua fitur sudah selesai.
-- Workspace/history/revisi/ID allocator dibagi dua view; tool/draft/seleksi anotasi
-  per view. Satu drag atau seleksi teks multi-page adalah satu Undo.
-- Policy ekspor **v5** menambah subset pasif milik aplikasi, dengan closed-schema
-  preflight, penolakan action inline/reference dan validasi round-trip sebelum publish.
-  Snapshot/preflight/consent/validasi/no-overwrite serta batas form/signature/tag lama
-  tetap berlaku kecuali pengecualian eksplisit yang didokumentasikan.
-- Save As penuh pada revisi cocok menandai clean. Extract/Split/Optimize/PNG tidak.
-  Tidak ada autosave/crash recovery. Penghapus menghapus objek utuh yang diklik.
+64 unit tests workspace lulus (25 app, 10 domain, 5 platform, 11 desktop, 13 QPDF).
+Fmt dan Clippy workspace/all-targets denied warnings lulus. Native annotation/signature
+smoke lulus pada source biasa dan CropBox nonzero + rotasi sumber, empat rotasi
+output, alpha, editable reopen/delete, searchable text, Optimize/Split/PNG dan source
+bytes. Default native suite Save As/Extract/Split/Optimize/PNG juga lulus.
 
-## Hasil verifikasi sesi ini
+UI tanda tangan menguji draw pad, placement, move/resize, gambar rusak, PNG alpha,
+dua view, close guard, Save As/reopen/delete dan drop di luar halaman. UI anotator
+sembilan kasus lulus. Bukti run akhir/angka terkini di testing. Interoperabilitas
+interaktif Edge/Chrome/Firefox/Acrobat dan perangkat stylus/touch belum diuji.
 
-- Fmt, Clippy denied warnings, **61 unit tests** dan release workspace build lulus.
-- Annotation native smoke lulus: appearance nyata, metadata/reopen/delete, Extract
-  tidak melewatkan edit, empat rotasi editor vs output, render isolation dan source bytes.
-- Native regresi M1/text/search/Save As/Extract/Split/Optimize/PNG lulus, termasuk
-  failure/cancel/race dan blocking compatibility yang sudah ada.
-- UI release: anotator **7**, same-document **9**, Find **14** kasus lulus.
-  Capture anotasi dua panel diperiksa visual. Path bukti ignored ada di testing.
-- Interoperabilitas UI Acrobat/Edge/Chrome/Firefox dan profiling anotasi padat belum diuji.
-  Suite comparison/session restore historis tidak diulang.
+## Git/build
 
-## Build dan Git
+Awal task `main` bersih, HEAD `9617dae`, remote origin
+`https://github.com/zufarhandito/origo.git`. Riwayat anotator: `8a40b73`, handoff
+`7b8a658`, toolbar `9617dae`, semuanya sudah di-push sebelumnya.
+Commit fitur ini direncanakan `feat(signatures): add local drawing and image stamps`;
+periksa git log/laporan akhir untuk SHA serta hasil push aktual. Jangan mengklaim
+push atau CI sebelum hasilnya ada. Instruksi pemilik: fitur selesai harus commit
+Conventional Commit lalu push; tidak mengizinkan force-push atau unggah data privat.
 
-Build teruji dibuat di `target/tab-background-check/release` karena aplikasi release
-lama sempat aktif. Jangan menutup proses pengguna untuk mengganti executable; cek
-proses dan hash sebelum pemasangan. Setelah aplikasi lama tidak aktif, executable
-teruji disalin ke `target/release/pdf-studio.exe` (dipakai `run.cmd`); hash keduanya
-sama: `CD67BA1CE09D953E1D8D43D74D91B9F81FB6AE43C63825F0768B4BDD886E5396`.
+Build teruji dibuat di `target/tab-background-check/release`. `run.cmd` memakai
+`target/release/pdf-studio.exe`; pemasangan hanya setelah mengecek tidak ada proses
+pengguna memakai target. Jangan menutup proses/dokumen pengguna untuk build.
+Multi-tab tahap 1-4B tetap tersedia; lihat [multitab](../multitab.md) untuk kontraknya.
 
-Awal sesi: `main`, HEAD `47d3632`, cache `origin/main` `a1647e0` (2 ahead).
-Remote diverifikasi: `https://github.com/zufarhandito/origo.git`, branch `main`.
-Commit fitur **`8a40b73`**: `feat(annotations): add editable PDF highlights and ink`.
-`git push origin main` **berhasil**, respons remote `a1647e0..8a40b73 main -> main`.
-Ini mencakup dua commit lokal pendahulu yang sudah ada. Tidak ada force-push atau
-unggah binary/PDF/data privat. Keberhasilan push bukan bukti CI remote lulus.
-Catatan ini ditambahkan melalui commit dokumentasi setelah push fitur.
-
-Multi-tab tahap 1?4B dan fix background tetap tersedia; detail kontrak di
-[multi-tab](../multitab.md), hasil historis di [progres](../PROGRESS.md). Instruksi
-pemilik tetap commit Conventional Commits lalu push setelah fitur terotorisasi selesai.
+Build teruji sudah disalin ke target/release setelah memastikan tidak dipakai proses.
+Hash binary terisolasi/terpasang cocok. UI final: 11 signature + 9 anotator lulus;
+path bukti dan batas ada di testing.

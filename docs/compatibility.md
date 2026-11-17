@@ -5,7 +5,9 @@ under **Anotasi**. Standard PDF Ink/Highlight objects persist through safe Save 
 PDF Studio metadata enables reopening/editing its own annotations. Generic third-party
 annotation editing is not supported. Policy v5 admits this bounded passive subset,
 with action rejection and round-trip validation. Other export restrictions remain.
-Signature placement is deferred. See [annotations](annotations.md) and
+Visual signatures support drawing or PNG/JPEG import, placement, drag/resize and
+reopen/edit of PDF Studio-owned passive Stamp annotations. Policy v6 extends the
+owned subset; certificate signatures remain unsupported. See [signatures](signatures.md). See [annotations](annotations.md) and
 [competitor research](research/pdf-annotations-and-signatures.md).
 
 Two different open PDFs can be shown side by side with the GPUI Kit Dock splitter.

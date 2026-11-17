@@ -19,6 +19,7 @@ pub(super) struct ViewId(pub u64);
 pub(super) struct WindowResources {
     pub export_owner: AtomicU64,
     pub modal_owner: AtomicU64,
+    pub annotation_popup_owner: AtomicU64,
     pub closing: AtomicBool,
     pub tab_picker_open: AtomicBool,
     pub organizer_drawer: AtomicBool,
@@ -677,6 +678,7 @@ impl WindowShell {
                                 s.active = false;
                                 s.visible_for_render = false;
                                 s.annotation.draft = None;
+                                s.close_annotation_popups();
                                 s.invalidate_work();
                                 s.clear_bitmaps(cx);
                             });

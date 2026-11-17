@@ -27,7 +27,13 @@ pub(crate) fn validate(dict: &Map<String, Value>) -> Result<(), ExportError> {
     if dict.keys().any(|k| !keys.contains(&k.as_str()))
         || dict.get("/Type").and_then(Value::as_str) != Some("/Annot")
         || dict.get("/Subtype").and_then(Value::as_str)
-            != Some(if a.rectangles { "/Highlight" } else { "/Ink" })
+            != Some(if a.signature.is_some() {
+                "/Stamp"
+            } else if a.rectangles {
+                "/Highlight"
+            } else {
+                "/Ink"
+            })
     {
         return Err(ExportError::Unsupported(
             "anotasi diubah di luar subset pasif yang didukung.",
@@ -54,6 +60,9 @@ pub(crate) fn validate(dict: &Map<String, Value>) -> Result<(), ExportError> {
         || dict.get("/CA").and_then(Value::as_f64) != Some(if a.highlight { 0.5 } else { 1. })
     {
         return Err(ExportError::Inspection);
+    }
+    if a.signature.is_some() {
+        return Ok(());
     }
     if a.rectangles {
         if dict
@@ -167,6 +176,59 @@ pub(crate) fn patch(doc: &Value, plan: &ExportPlan, work: &Path) -> Result<Value
                 .iter()
                 .map(|p| [x + f64::from(p[0]) * w, y + (1. - f64::from(p[1])) * h])
                 .collect();
+            if let Some(image) = &a.signature {
+                let rect = [points[0][0], points[1][1], points[1][0], points[0][1]];
+                let annot_ref = format!("{next} 0 R");
+                next += 1;
+                let ap_ref = format!("{next} 0 R");
+                next += 1;
+                let image_ref = format!("{next} 0 R");
+                next += 1;
+                let mask_ref = format!("{next} 0 R");
+                next += 1;
+                let rgb = work.join(format!("signature-{next}.rgb"));
+                let alpha = work.join(format!("signature-{next}.alpha"));
+                let ap = work.join(format!("signature-{next}.ap"));
+                std::fs::write(
+                    &rgb,
+                    image
+                        .rgba
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .flat_map(|p| p[..3].iter().copied())
+                        .collect::<Vec<_>>(),
+                )
+                .map_err(|_| ExportError::Io)?;
+                std::fs::write(
+                    &alpha,
+                    image
+                        .rgba
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .map(|p| p[3])
+                        .collect::<Vec<_>>(),
+                )
+                .map_err(|_| ExportError::Io)?;
+                std::fs::write(
+                    &ap,
+                    format!(
+                        "q {} 0 0 {} {} {} cm /Sig Do Q",
+                        rect[2] - rect[0],
+                        rect[3] - rect[1],
+                        rect[0],
+                        rect[1]
+                    ),
+                )
+                .map_err(|_| ExportError::Io)?;
+                updates.insert(format!("obj:{annot_ref}"),json!({"value":{"/Type":"/Annot","/Subtype":"/Stamp","/Rect":rect,"/NM":format!("u:{}",a.name()),"/C":[0,0,0],"/CA":1,"/F":4,"/P":page_ref,"/AP":{"/N":ap_ref}}}));
+                updates.insert(format!("obj:{ap_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Form","/BBox":rect,"/Resources":{"/XObject":{"/Sig":image_ref}}},"datafile":ap.to_str().ok_or(ExportError::Io)?}}));
+                updates.insert(format!("obj:{image_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Image","/Width":image.width,"/Height":image.height,"/ColorSpace":"/DeviceRGB","/BitsPerComponent":8,"/SMask":mask_ref},"datafile":rgb.to_str().ok_or(ExportError::Io)?}}));
+                updates.insert(format!("obj:{mask_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Image","/Width":image.width,"/Height":image.height,"/ColorSpace":"/DeviceGray","/BitsPerComponent":8},"datafile":alpha.to_str().ok_or(ExportError::Io)?}}));
+                annots.push(json!(annot_ref));
+                continue;
+            }
             let margin = if a.rectangles {
                 0.
             } else {

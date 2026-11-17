@@ -1,0 +1,465 @@
+//! Local visual signatures. No certificate field or template persistence.
+use crate::*;
+use gpui::component::{
+    ActiveTheme, Disableable,
+    button::{Button, ButtonVariants},
+    popover::Popover,
+};
+use pdf_domain::{
+    PageId,
+    annotation::{Annotation, SignatureImage},
+};
+
+#[derive(Default)]
+pub(super) struct SignatureState {
+    pub open: bool,
+    pub drawing: bool,
+    pub strokes: Vec<Vec<[f32; 2]>>,
+    pub asset: Option<Arc<SignatureImage>>,
+    pub preview: Option<Arc<RenderImage>>,
+    pub placing: bool,
+    pub error: Option<String>,
+    pub gesture_bounds: Option<Bounds<gpui::Pixels>>,
+    pub gesture: Option<(PageId, Annotation, [f32; 2], bool)>,
+}
+impl DocumentSession {
+    pub(super) fn signature_button(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let owner = cx.entity();
+        Popover::new("signature-popup")
+            .trigger(
+                Button::new("signature")
+                    .ghost()
+                    .icon(gpui::assets::IconName::Signature)
+                    .label("Tanda tangan")
+                    .disabled(self.edits_locked()),
+            )
+            .open(self.annotation.signature.open)
+            .on_open_change(cx.listener(|s, open, _, cx| {
+                s.annotation_popup_changed(*open, cx);
+                s.annotation.signature.open = *open;
+                s.annotation.signature.drawing = false;
+                s.annotation.draft = None;
+                cx.notify();
+            }))
+            .content(move |_, _, cx| owner.update(cx, |s, cx| s.signature_panel(cx)))
+            .into_any_element()
+    }
+    fn signature_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let weak = cx.weak_entity();
+        let strokes = self.annotation.signature.strokes.clone();
+        let pad = gpui::canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
+                for stroke in &strokes {
+                    let mut path = gpui::PathBuilder::stroke(px(2.));
+                    for (i, p) in stroke.iter().enumerate() {
+                        let p = bounds.origin
+                            + gpui::point(bounds.size.width * p[0], bounds.size.height * p[1]);
+                        if i == 0 {
+                            path.move_to(p);
+                        } else {
+                            path.line_to(p);
+                        }
+                    }
+                    if let Ok(path) = path.build() {
+                        window.paint_path(path, gpui::rgb(0x191919));
+                    }
+                }
+                let down = weak.clone();
+                window.on_mouse_event(move |e: &gpui::MouseDownEvent, phase, _, cx| {
+                    if phase == gpui::DispatchPhase::Bubble
+                        && e.button == gpui::MouseButton::Left
+                        && bounds.contains(&e.position)
+                    {
+                        let _ = down.update(cx, |s, cx| {
+                            if !s.annotation.signature.open {
+                                return;
+                            }
+                            if s.annotation.signature.strokes.len() >= 128 {
+                                return;
+                            }
+                            s.annotation.signature.drawing = true;
+                            s.annotation.signature.asset = None;
+                            s.annotation.signature.preview = None;
+                            s.annotation.signature.error = None;
+                            s.annotation
+                                .signature
+                                .strokes
+                                .push(vec![pad_point(bounds, e.position)]);
+                            cx.notify();
+                        });
+                    }
+                });
+                let movement = weak.clone();
+                window.on_mouse_event(move |e: &gpui::MouseMoveEvent, phase, _, cx| {
+                    if phase == gpui::DispatchPhase::Bubble
+                        && e.pressed_button == Some(gpui::MouseButton::Left)
+                    {
+                        let _ = movement.update(cx, |s, cx| {
+                            if !s.annotation.signature.open || !s.annotation.signature.drawing {
+                                return;
+                            }
+                            if let Some(stroke) = s.annotation.signature.strokes.last_mut()
+                                && stroke.len() < 1024
+                            {
+                                stroke.push(pad_point(bounds, e.position));
+                                cx.notify();
+                            }
+                        });
+                    }
+                });
+                window.on_mouse_event(move |e: &gpui::MouseUpEvent, phase, _, cx| {
+                    if phase == gpui::DispatchPhase::Bubble && e.button == gpui::MouseButton::Left {
+                        let _ = weak.update(cx, |s, cx| {
+                            s.annotation.signature.drawing = false;
+                            cx.notify();
+                        });
+                    }
+                });
+            },
+        )
+        .w_full()
+        .h(px(180.));
+        let mut panel = gpui::div()
+            .w(px(440.))
+            .flex()
+            .flex_col()
+            .gap_3()
+            .p_2()
+            .child("Buat tanda tangan")
+            .child("Gambar di area berikut atau impor PNG/JPEG.")
+            .child(
+                gpui::div()
+                    .id("signature-pad")
+                    .role(gpui::Role::Group)
+                    .aria_label("Area gambar tanda tangan")
+                    .w_full()
+                    .bg(gpui::rgb(0xffffff))
+                    .border_1()
+                    .border_color(cx.theme().border)
+                    .child(pad),
+            );
+        if let Some(preview) = &self.annotation.signature.preview {
+            panel = panel.child(
+                gpui::div()
+                    .bg(gpui::rgb(0xffffff))
+                    .child(gpui::img(preview.clone()).h(px(90.)).max_w_full()),
+            );
+        }
+        if let Some(error) = &self.annotation.signature.error {
+            panel = panel.child(error.clone());
+        }
+        panel.child(gpui::div().flex().gap_2()
+            .child(Button::new("signature-undo").ghost().label("Undo goresan").disabled(self.annotation.signature.strokes.is_empty())
+                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.strokes.pop();cx.notify();})))
+            .child(Button::new("signature-clear").ghost().label("Hapus semua")
+                .on_click(cx.listener(|s,_,_,cx|{let open=s.annotation.signature.open;s.annotation.signature=SignatureState{open,..Default::default()};cx.notify();})))
+            .child(Button::new("signature-import").ghost().label("Impor gambar")
+                .on_click(cx.listener(|s,_,_,cx|s.import_signature(cx)))))
+            .child(Button::new("signature-use").label("Gunakan tanda tangan")
+                .disabled(self.annotation.signature.asset.is_none() && self.annotation.signature.strokes.iter().all(|s|s.len()<2))
+                .on_click(cx.listener(|s,_,window,cx|{
+                    if s.annotation.signature.asset.is_none(){s.annotation.signature.asset=draw_asset(&s.annotation.signature.strokes).map(Arc::new);}
+                    if s.annotation.signature.asset.is_some(){
+                        s.annotation_popup(false);s.annotation.signature.placing=true;s.annotation.signature.open=false;
+                        s.annotation.tool=crate::annotations::Tool::Select;
+                        s.status="Klik atau drag di halaman untuk menempatkan tanda tangan. Esc membatalkan.".into();
+                        s.focus.focus(window,cx);
+                    }
+                    cx.notify();
+                }))).into_any_element()
+    }
+    fn import_signature(&mut self, cx: &mut Context<Self>) {
+        if self.edits_locked() || self.opening {
+            return;
+        }
+        let picker = cx.prompt_for_paths(gpui::PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Impor tanda tangan PNG atau JPEG".into()),
+        });
+        self.opening = true;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let result = picker.await;
+            let path = match result {
+                Ok(Ok(Some(paths))) => paths.into_iter().next(),
+                _ => None,
+            };
+            if let Some(path) = path {
+                let task = cx
+                    .background_executor()
+                    .spawn(async move { load_asset(&path) });
+                let result = task.await;
+                let _ = this.update(cx, |s, cx| {
+                    s.opening = false;
+                    match result {
+                        Ok(asset) => {
+                            s.annotation.signature.preview = asset_preview(&asset);
+                            s.annotation.signature.asset = Some(Arc::new(asset));
+                            s.annotation.signature.strokes.clear();
+                            s.annotation.signature.error = None;
+                        }
+                        Err(e) => s.annotation.signature.error = Some(e),
+                    }
+                    cx.notify();
+                });
+            } else {
+                let _ = this.update(cx, |s, cx| {
+                    s.opening = false;
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
+    }
+    pub(super) fn signature_pointer(
+        &mut self,
+        page: PageId,
+        p: [f32; 2],
+        start: bool,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.annotation.signature.placing {
+            let Some(asset) = self.annotation.signature.asset.clone() else {
+                return false;
+            };
+            let Some(w) = self.workspace.as_ref() else {
+                return false;
+            };
+            let Some(index) = w.pages().iter().position(|a| a.id == page) else {
+                return false;
+            };
+            let Ok(g) = w.geometry(index) else {
+                return false;
+            };
+            let (page_width, page_height) = if g.quarter_turns % 2 == 1 {
+                (g.height_points, g.width_points)
+            } else {
+                (g.width_points, g.height_points)
+            };
+            let ratio = asset.height as f32 / asset.width as f32 * page_width / page_height;
+            let width = 0.3_f32.min(0.25 / ratio);
+            let height = width * ratio;
+            let left = (p[0] - width / 2.).clamp(0., 1. - width);
+            let top = (p[1] - height / 2.).clamp(0., 1. - height);
+            drop(w);
+            if start {
+                let id = self
+                    .workspace
+                    .as_mut()
+                    .map(|mut w| w.allocate_annotation_id())
+                    .unwrap_or(1);
+                let a = Annotation {
+                    id,
+                    highlight: false,
+                    color: [0, 0, 0],
+                    width: 1.,
+                    points: vec![[left, top], [left + width, top + height]],
+                    rectangles: false,
+                    signature: Some(asset),
+                };
+                self.annotation.selected = Some((page, id));
+                self.annotation.signature.gesture = Some((page, a, p, false));
+                cx.notify();
+                self.annotation.signature.placing = false;
+            }
+            return true;
+        }
+        if self.annotation.tool != crate::annotations::Tool::Select {
+            return false;
+        }
+        if start {
+            let hit = self.workspace.as_ref().and_then(|w| {
+                w.annotations(page)
+                    .iter()
+                    .rev()
+                    .find(|a| {
+                        a.signature.is_some()
+                            && p[0] >= a.points[0][0] - 0.015
+                            && p[0] <= a.points[1][0] + 0.015
+                            && p[1] >= a.points[0][1] - 0.015
+                            && p[1] <= a.points[1][1] + 0.015
+                    })
+                    .cloned()
+            });
+            if let Some(a) = hit {
+                let resize =
+                    (p[0] - a.points[1][0]).abs() < 0.02 && (p[1] - a.points[1][1]).abs() < 0.02;
+                self.annotation.selected = Some((page, a.id));
+                self.annotation.signature.gesture = Some((page, a, p, resize));
+                cx.notify();
+                return true;
+            }
+        } else if let Some((gesture_page, a, previous, resize)) =
+            &mut self.annotation.signature.gesture
+        {
+            if *gesture_page != page {
+                return true;
+            }
+            if *resize {
+                let width = a.points[1][0] - a.points[0][0];
+                let height = a.points[1][1] - a.points[0][1];
+                let ratio = height / width;
+                let max = (1. - a.points[0][0]).min((1. - a.points[0][1]) / ratio);
+                let width = (p[0] - a.points[0][0]).clamp(0.02_f32.min(max), max);
+                a.points[1] = [a.points[0][0] + width, a.points[0][1] + width * ratio];
+            } else {
+                let dx = (p[0] - previous[0]).clamp(-a.points[0][0], 1. - a.points[1][0]);
+                let dy = (p[1] - previous[1]).clamp(-a.points[0][1], 1. - a.points[1][1]);
+                for point in &mut a.points {
+                    point[0] += dx;
+                    point[1] += dy;
+                }
+            }
+            *previous = p;
+            cx.notify();
+            return true;
+        }
+        false
+    }
+}
+fn pad_point(bounds: Bounds<gpui::Pixels>, p: gpui::Point<gpui::Pixels>) -> [f32; 2] {
+    [
+        (f32::from(p.x - bounds.origin.x) / f32::from(bounds.size.width)).clamp(0., 1.),
+        (f32::from(p.y - bounds.origin.y) / f32::from(bounds.size.height)).clamp(0., 1.),
+    ]
+}
+fn draw_asset(strokes: &[Vec<[f32; 2]>]) -> Option<SignatureImage> {
+    let mut rgba = vec![0; 512 * 256 * 4];
+    for stroke in strokes {
+        for pair in stroke.windows(2) {
+            let (p, q) = (pair[0], pair[1]);
+            let dx = (q[0] - p[0]) * 512.;
+            let dy = (q[1] - p[1]) * 256.;
+            let steps = dx.abs().max(dy.abs()).ceil() as usize;
+            for i in 0..=steps {
+                let t = i as f32 / steps.max(1) as f32;
+                let x = (p[0] * 511. + dx * t) as i32;
+                let y = (p[1] * 255. + dy * t) as i32;
+                for oy in -1..=1 {
+                    for ox in -1..=1 {
+                        let (x, y) = (x + ox, y + oy);
+                        if (0..512).contains(&x) && (0..256).contains(&y) {
+                            let at = (y as usize * 512 + x as usize) * 4;
+                            rgba[at..at + 4].copy_from_slice(&[25, 25, 25, 255]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    crop_asset(image::RgbaImage::from_raw(512, 256, rgba)?)
+}
+fn crop_asset(image: image::RgbaImage) -> Option<SignatureImage> {
+    let mut bounds = [image.width(), image.height(), 0, 0];
+    for (x, y, p) in image.enumerate_pixels() {
+        if p[3] > 0 {
+            bounds[0] = bounds[0].min(x);
+            bounds[1] = bounds[1].min(y);
+            bounds[2] = bounds[2].max(x + 1);
+            bounds[3] = bounds[3].max(y + 1);
+        }
+    }
+    if bounds[0] >= bounds[2] || bounds[1] >= bounds[3] {
+        return None;
+    }
+    let cropped = image::imageops::crop_imm(
+        &image,
+        bounds[0],
+        bounds[1],
+        bounds[2] - bounds[0],
+        bounds[3] - bounds[1],
+    )
+    .to_image();
+    Some(SignatureImage {
+        width: cropped.width(),
+        height: cropped.height(),
+        rgba: cropped.into_raw(),
+    })
+}
+fn load_asset(path: &std::path::Path) -> Result<SignatureImage, String> {
+    use image::ImageDecoder;
+    if std::fs::metadata(path)
+        .map_err(|_| "Gambar tidak dapat dibaca.")?
+        .len()
+        > 8 * 1024 * 1024
+    {
+        return Err("Gambar maksimal 8 MiB.".into());
+    }
+    let mut reader = image::ImageReader::open(path)
+        .map_err(|_| "Gambar tidak dapat dibaca.")?
+        .with_guessed_format()
+        .map_err(|_| "Format gambar tidak dikenali.")?;
+    if !matches!(
+        reader.format(),
+        Some(image::ImageFormat::Png | image::ImageFormat::Jpeg)
+    ) {
+        return Err("Gunakan PNG atau JPEG.".into());
+    }
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(8192);
+    limits.max_image_height = Some(8192);
+    limits.max_alloc = Some(64 * 1024 * 1024);
+    reader.limits(limits);
+    let mut decoder = reader
+        .into_decoder()
+        .map_err(|_| "Gambar rusak atau terlalu besar.")?;
+    if decoder.total_bytes() > 64 * 1024 * 1024 {
+        return Err("Gambar memerlukan memori decode lebih dari 64 MiB.".into());
+    }
+    let orientation = decoder
+        .orientation()
+        .map_err(|_| "Orientasi gambar tidak dapat dibaca.")?;
+    let mut image = image::DynamicImage::from_decoder(decoder)
+        .map_err(|_| "Gambar rusak atau terlalu besar.")?;
+    image.apply_orientation(orientation);
+    let image = if image.width() > 512 || image.height() > 256 {
+        image.thumbnail(512, 256).to_rgba8()
+    } else {
+        image.to_rgba8()
+    };
+    crop_asset(image).ok_or_else(|| "Gambar sepenuhnya transparan.".into())
+}
+fn asset_preview(asset: &SignatureImage) -> Option<Arc<RenderImage>> {
+    let mut rgba = asset.rgba.clone();
+    for p in rgba.as_chunks_mut::<4>().0.iter_mut() {
+        p.swap(0, 2);
+    }
+    let image = image::RgbaImage::from_raw(asset.width, asset.height, rgba)?;
+    Some(Arc::new(RenderImage::new(smallvec::smallvec![
+        image::Frame::new(image)
+    ])))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn draw_crop_and_import_are_bounded_and_preserve_alpha() -> anyhow::Result<()> {
+        assert!(draw_asset(&[]).is_none());
+        let asset = draw_asset(&[vec![[0.2, 0.3], [0.7, 0.6]]])
+            .ok_or_else(|| anyhow::anyhow!("empty draw"))?;
+        assert!(asset.valid());
+        assert!(asset.width < 512 && asset.height < 256);
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("alpha.png");
+        let mut image = image::RgbaImage::new(40, 30);
+        image.put_pixel(15, 10, image::Rgba([0, 40, 120, 128]));
+        image.save(&path)?;
+        let imported = load_asset(&path).map_err(anyhow::Error::msg)?;
+        assert_eq!((imported.width, imported.height), (1, 1));
+        assert_eq!(imported.rgba, [0, 40, 120, 128]);
+        let jpeg = dir.path().join("image.jpg");
+        image::RgbImage::from_pixel(1000, 400, image::Rgb([255, 255, 255])).save(&jpeg)?;
+        let imported = load_asset(&jpeg).map_err(anyhow::Error::msg)?;
+        assert!(imported.valid());
+        assert_eq!(imported.width, 512);
+        std::fs::write(&path, b"invalid image")?;
+        assert!(load_asset(&path).is_err());
+        image::RgbaImage::new(10, 10).save(&path)?;
+        assert!(load_asset(&path).is_err());
+        Ok(())
+    }
+}

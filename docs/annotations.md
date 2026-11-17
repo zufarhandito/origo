@@ -1,7 +1,7 @@
 # Anotator PDF
 
 Implementasi inti, 17 November 2026. Pemilik mengotorisasi anotator terlebih dahulu;
-tanda tangan draw/import tetap ditunda. Dasar UX: [riset kompetitor](research/pdf-annotations-and-signatures.md).
+tanda tangan draw/import kini tersedia melalui [Tanda tangan](signatures.md). Dasar UX: [riset kompetitor](research/pdf-annotations-and-signatures.md).
 
 ## Penggunaan
 
@@ -52,6 +52,6 @@ yang melampaui batas ditolak sebagai satu transaksi. Model tidak menyimpan isi t
 ## Belum tersedia
 
 Komentar/sticky notes, kotak teks, shape, underline/strikethrough, pindah/resize anotasi,
-partial eraser, OCR, import edit anotasi pihak lain, dan tanda tangan draw/gambar.
+partial eraser, OCR, import edit anotasi pihak lain, dan dukungan sertifikat digital. Tanda tangan visual tersedia terpisah.
 Kesesuaian penampilan ekspor telah diuji dengan PDFium; pengujian interaktif di
 Edge/Chrome/Firefox/Acrobat belum dilakukan. Lihat [pengujian](testing.md).

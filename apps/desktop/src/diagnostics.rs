@@ -20,6 +20,11 @@ impl DocumentSession {
     pub(super) fn diagnostics(&self) -> Value {
         let native = self.renderer.session_stats();
         let mut result = json!({
+            "signaturePanel": self.annotation.signature.open,
+            "signaturePlacing": self.annotation.signature.placing,
+            "signatureStrokes": self.annotation.signature.strokes.len(),
+            "signatureAsset": self.annotation.signature.asset.is_some(),
+            "signatureError": self.annotation.signature.error.is_some(),
             "annotationPanel": self.annotation.open,
             "annotationPopup": self.annotation.popup_open,
             "annotationTextOnly": self.annotation.text_only,
@@ -61,6 +66,21 @@ impl DocumentSession {
             "optimizeAfterBytes": self.export.optimization.map_or(0, |s| s.output_bytes),
         });
         if let Some(w) = self.workspace.as_ref() {
+            result["signatureRects"] = json!(
+                w.pages()
+                    .iter()
+                    .flat_map(|p| w.annotations(p.id))
+                    .filter(|a| a.signature.is_some())
+                    .map(|a| a.points.clone())
+                    .collect::<Vec<_>>()
+            );
+            result["signatureCount"] = json!(
+                w.pages()
+                    .iter()
+                    .flat_map(|p| w.annotations(p.id))
+                    .filter(|a| a.signature.is_some())
+                    .count()
+            );
             result["annotationCount"] = json!(
                 w.pages()
                     .iter()
