@@ -20,6 +20,8 @@ impl DocumentSession {
     pub(super) fn diagnostics(&self) -> Value {
         let native = self.renderer.session_stats();
         let mut result = json!({
+            "annotationPanel": self.annotation.open,
+            "annotationSelected": self.annotation.selected.is_some(),
             "pageCount": self.navigation.count, "activePage": self.navigation.current + 1,
             "zoomPercent": self.zoom_percent(), "fullRenders": self.stats.full,
             "thumbnailRenders": self.stats.thumbnails, "staleResults": self.stats.stale,
@@ -57,6 +59,12 @@ impl DocumentSession {
             "optimizeAfterBytes": self.export.optimization.map_or(0, |s| s.output_bytes),
         });
         if let Some(w) = self.workspace.as_ref() {
+            result["annotationCount"] = json!(
+                w.pages()
+                    .iter()
+                    .map(|p| w.annotations(p.id).len())
+                    .sum::<usize>()
+            );
             result["sourceCount"] = json!(w.sources().len());
             result["selectedPages"] = json!(w.selected().len());
             result["dirty"] = json!(w.is_dirty());

@@ -97,6 +97,7 @@ impl DocumentSession {
         clear_read_selection: bool,
         cx: &mut Context<Self>,
     ) {
+        self.annotation.draft = None;
         let top = self.page_list.logical_scroll_top();
         let old_height = self
             .page_list
@@ -282,6 +283,7 @@ impl DocumentSession {
                 fingerprint: info.fingerprint,
                 geometries: info.pages,
                 export_support: pdf_application::ExportSupport::NotPreflighted,
+                annotations: info.annotations,
             })
         });
         cx.spawn(async move |this, cx| {

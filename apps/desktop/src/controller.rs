@@ -77,6 +77,7 @@ impl DocumentSession {
         if !self.export.running {
             self.export.notice = None;
         }
+        self.annotation = annotations::AnnotationState::default();
         self.mode = ViewerMode::Read;
         self.page_dragging = false;
         self.gesture_zoom.reset();
@@ -473,6 +474,14 @@ impl DocumentSession {
             return;
         };
         let request = RenderRequest {
+            annotations: Some(
+                workspace
+                    .annotations(pdf_domain::PageId {
+                        source: job.key.source,
+                        serial: u32::from(job.key.index),
+                    })
+                    .to_vec(),
+            ),
             path: source.path.clone(),
             page_index: job.key.index,
             target_width: job.key.width,

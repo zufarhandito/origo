@@ -1,5 +1,40 @@
 # Documentation handover — 17 November 2026
 
+## Anotator inti ? 17 November 2026
+
+`cargo clippy --workspace --all-targets --locked --offline -- -D warnings` dan
+`cargo test --workspace --locked --offline` lulus: **61 tests** (25 application,
+9 domain, 5 platform, 10 desktop, 12 QPDF). Tes tambahan memeriksa transaksi highlight
+multi-page/history/PageId, metadata bounded, multiply highlight tanpa penggelapan pada
+self-crossing, dan penolakan action pada anotasi inline maupun indirect.
+
+`target/tab-background-check/release/pdf-smoke.exe --annotation-smoke` lulus:
+objek Ink/Highlight asli terlihat via native renderer tanpa overlay, model pulih saat
+reopen, penghapusan tersimpan (termasuk full-source Extract), dirty/history/receipt,
+render flag isolation, kecocokan raster editor vs output pada empat orientasi, dan
+hash/bytes sumber tetap. Default native smoke juga lulus: M1, text, search, Save As/
+Extract, tagged/whole-source cases, Split, Optimize, PNG termasuk failure/cancel/race.
+Semua input pengujian sintetis; tidak membuka PDF privat pengguna.
+
+Build release workspace terisolasi lulus di `target/tab-background-check/release`.
+UI anotator **7 kasus lulus** (`scripts/annotation-ui-smoke.ps1 -Profile release
+-ExecutablePath target/tab-background-check/release/pdf-studio.exe`): draw/dirty,
+Undo/Redo per goresan, stabilo/highlight teks, shared history dua view, close-cancel,
+reopen/erase dan save/reopen deletion. Bukti lokal ignored:
+`.research/annotation-ui-1d60b5ae446f40a5a87d9b4fcd4ca0e1/cases.json`.
+Capture dua panel diperiksa secara visual; tool row membungkus dan kedua view serta
+thumbnail menampilkan anotasi yang sama. Clippy akhir setelah penguatan smoke rotasi
+juga lulus. Script UI menerima executable terisolasi tanpa mengganti proses pengguna.
+
+Regresi UI release juga lulus: **9 kasus same-document** di
+`.research/same-document-ui-e015b4fcc9434f8292dc251428f87ea5` dan **14 kasus Find**
+di `.research/search-ui-bf37e2c4ddc348d8ae3a7be8b93e947d`. Total UI sesi ini 30 kasus.
+Suite comparison/session-restore/profil performa tidak diulang pada fitur ini.
+
+Uji ini tidak membuktikan editing anotasi eksternal atau interoperabilitas UI di
+Edge/Chrome/Firefox/Acrobat. Tanda tangan tidak diimplementasikan atau diuji.
+
+
 - Docs-only checkpoint from source HEAD `70287a7`; no product build/tests were rerun.
 - Rechecked recorded manifests: same-document 9, comparison 10, Find 14 and session
   restore 8 cases; all entries passed. Same-document profile summary still reports

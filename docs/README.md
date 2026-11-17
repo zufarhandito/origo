@@ -25,7 +25,8 @@ Commits dan push ke tujuan repo yang disepakati.
 Pematangan multi-tab **1–4B sudah selesai**, termasuk fix background tab aktif.
 [Roadmap/riset](research/multitab-roadmap.md) menyimpan keputusan dan daftar acceptance;
 [progres](PROGRESS.md) memetakan hasil ke commit. Group tab/tab vertikal tetap backlog;
-task berikutnya belum dipilih. Jangan menganggap daftar backlog sebagai izin eksekusi.
+anotator inti kini tersedia melalui [Anotasi](annotations.md). Tanda tangan ditunda.
+Jangan menganggap daftar backlog sebagai izin eksekusi.
 
 Implementasi bertahap **17 November 2026** mencakup commit `615e57e` (tahap 1),
 `7c9db9a` (2), `bf51fb6` (3), `73e2409` (4A), `a1647e0` (4B), dan `70287a7`
@@ -47,6 +48,10 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 
 ## Peta dokumentasi
 
+Riset terbaru: [anotasi PDF dan tanda tangan draw/import](research/pdf-annotations-and-signatures.md)
+(17 November 2026). Berisi perbandingan kompetitor, usulan UX dan gap ekspor;
+anotator inti sudah diotorisasi dan diimplementasikan; tanda tangan ditunda.
+
 | Kelompok | Dokumen |
 |---|---|
 | Konteks aktif | [Handoff](handoff/PROJECT_HANDOFF.md), [prompt chat baru](handoff/NEXT_CHAT_PROMPT.md) |
@@ -56,6 +61,7 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 | Multi-tab aktif | [Perilaku tab](multitab.md), [hardening dan hasil profil](multitab-hardening.md) |
 | Keputusan multi-tab | [Riset kompetitor, acceptance selesai dan backlog](research/multitab-roadmap.md) |
 | Arsitektur/keputusan | [Arsitektur](architecture.md), [keputusan](decisions.md), [ADR](adr/) |
+| Anotator aktif | [Highlight, pen/stabilo dan edit ulang](annotations.md) |
 | Viewer | [Buku dan benchmark](books.md), [seleksi teks](text-selection.md) |
 | Pencarian PDF aktif | [Cari kata/frasa](search.md), default tidak case-sensitive |
 | Pengaturan halaman | [Organizer](organizer.md), [perubahan belum disimpan](unsaved-changes.md) |

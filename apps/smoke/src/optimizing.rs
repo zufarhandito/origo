@@ -81,6 +81,7 @@ fn roundtrip(
     let after = renderer.inspect(&output)?;
     for index in 0..plan.pages().len() {
         let a = renderer.render_page(&RenderRequest {
+            annotations: None,
             path: baseline.clone(),
             page_index: index as u16,
             target_width: 512,
@@ -88,6 +89,7 @@ fn roundtrip(
             fingerprint: Some(before.fingerprint),
         })?;
         let b = renderer.render_page(&RenderRequest {
+            annotations: None,
             path: output.clone(),
             page_index: index as u16,
             target_width: 512,

@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod annotations;
 mod export;
 mod preflight;
 mod structure;

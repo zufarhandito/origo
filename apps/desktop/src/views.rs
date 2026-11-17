@@ -269,6 +269,20 @@ impl DocumentSession {
                 .when(thumbnail, |this| this.child(format!("{}", index + 1)))
                 .into_any_element(),
         };
+        let draft = self
+            .annotation
+            .draft
+            .clone()
+            .filter(|(id, _)| *id == page_id);
+        let selected_annotation = self
+            .annotation
+            .selected
+            .filter(|(id, _)| *id == page_id)
+            .and_then(|(_, id)| {
+                self.workspace
+                    .as_ref()
+                    .and_then(|w| w.annotations(page_id).iter().find(|a| a.id == id).cloned())
+            });
         let overlay = if !thumbnail {
             let text = self.text.pages.get(&index);
             if text.is_none() && !self.text.errors.contains_key(&index) {
@@ -300,6 +314,18 @@ impl DocumentSession {
             canvas(
                 |_, _, _| {},
                 move |bounds, _, window, _| {
+                    if let Some((_, a)) = &draft {
+                        annotations::paint_draft(
+                            a,
+                            geometry.quarter_turns,
+                            geometry.width_points,
+                            bounds,
+                            window,
+                        );
+                    }
+                    if let Some(a) = &selected_annotation {
+                        annotations::paint_selection(a, geometry.quarter_turns, bounds, window);
+                    }
                     for (rect, active) in &search_highlights {
                         let highlight = Bounds::new(
                             bounds.origin
@@ -348,6 +374,16 @@ impl DocumentSession {
                                     if !this.document_input_allowed(event.position, window) {
                                         return false;
                                     }
+                                    if this.annotation_pointer(
+                                        index,
+                                        bounds,
+                                        event.position,
+                                        true,
+                                        window,
+                                        cx,
+                                    ) {
+                                        return true;
+                                    }
                                     this.select_text(
                                         index,
                                         bounds,
@@ -371,6 +407,19 @@ impl DocumentSession {
                                 && input_clip.contains(&event.position)
                             {
                                 let _ = weak.update(cx, |this, cx| {
+                                    if event.pressed_button == Some(MouseButton::Left)
+                                        && this.document_input_allowed(event.position, window)
+                                        && this.annotation_pointer(
+                                            index,
+                                            bounds,
+                                            event.position,
+                                            false,
+                                            window,
+                                            cx,
+                                        )
+                                    {
+                                        return;
+                                    }
                                     // Hover/repaint events can carry no button. End the
                                     // press on mouse-up, not on synthetic hover updates.
                                     if event.pressed_button == Some(MouseButton::Left)
@@ -535,6 +584,8 @@ impl Render for DocumentSession {
 
         let reading_toolbar = (self.mode != ViewerMode::Convert && !self.split_presentation)
             .then(|| self.reading_toolbar(window, cx));
+        let annotation_bar =
+            (has_document && self.mode == ViewerMode::Read).then(|| self.annotation_bar(cx));
         let search_bar = (has_document && self.search.open && self.mode != ViewerMode::Convert)
             .then(|| self.search_bar(cx));
 
@@ -576,6 +627,7 @@ impl Render for DocumentSession {
                             && event.button == MouseButton::Left
                         {
                             let _ = release_weak.update(cx, |this, cx| {
+                                this.finish_annotation(cx);
                                 this.text.dragging = false;
                                 this.text.pending = None;
                                 this.text.sentence_anchor = None;
@@ -806,6 +858,7 @@ impl Render for DocumentSession {
             })
             .children(reading_toolbar)
             .children(search_bar)
+            .children(annotation_bar)
 
             .child(body)
             .child(

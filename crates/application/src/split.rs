@@ -296,6 +296,7 @@ mod tests {
                 modified_ns: 1,
             },
             export_support: ExportSupport::NotPreflighted,
+            annotations: vec![],
             geometries: vec![
                 PageGeometry {
                     width_points: 100.,

@@ -285,6 +285,7 @@ mod tests {
                 quarter_turns: 0,
             }],
             export_support: ExportSupport::NotPreflighted,
+            annotations: vec![],
         })?;
         Ok(ExportPlan::capture(&w, 1, ExportScope::All)?)
     }

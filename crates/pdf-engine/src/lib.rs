@@ -214,6 +214,7 @@ fn worker(
             let result = match &job.operation {
                 Operation::Inspect | Operation::InspectOutput => {
                     Output::Inspected(InspectedDocument {
+                        annotations: read_document_annotations(document)?,
                         path: job.path.clone(),
                         fingerprint: before,
                         pages: document
@@ -226,12 +227,24 @@ fn worker(
                 Operation::Render(request) => {
                     renders += 1;
                     counters.renders.fetch_add(1, Ordering::Relaxed);
-                    Output::Rendered(render(document, request, limits)?)
+                    Output::Rendered(with_annotations(
+                        document,
+                        request.page_index,
+                        request.annotations.as_deref(),
+                        request.rotation_delta,
+                        || render(document, request, limits),
+                    )?)
                 }
                 Operation::RenderExact(request) => {
                     renders += 1;
                     counters.renders.fetch_add(1, Ordering::Relaxed);
-                    Output::Rendered(render_exact(document, request, limits)?)
+                    Output::Rendered(with_annotations(
+                        document,
+                        request.page_index,
+                        request.annotations.as_deref(),
+                        request.rotation_delta,
+                        || render_exact(document, request, limits),
+                    )?)
                 }
                 Operation::Text(request) => {
                     renders += 1;
@@ -529,4 +542,109 @@ fn render(
         page_count: document.pages().len() as u16,
         clockwise_quarter_turns: (geometry.quarter_turns + request.rotation_delta) % 4,
     })
+}
+
+fn read_annotations(
+    page: &PdfPage<'_>,
+) -> Result<Vec<pdf_domain::annotation::Annotation>, RenderError> {
+    let mut result = Vec::new();
+    for a in page.annotations().iter() {
+        if !matches!(
+            a.annotation_type(),
+            PdfPageAnnotationType::Ink | PdfPageAnnotationType::Highlight
+        ) {
+            continue;
+        }
+        if let Some(a) = a
+            .name()
+            .as_deref()
+            .and_then(pdf_domain::annotation::Annotation::from_name)
+        {
+            result.push(a);
+        }
+        if result.len() > pdf_domain::annotation::MAX_PAGE_ANNOTATIONS {
+            return Err(RenderError::ResourceLimit);
+        }
+    }
+    Ok(result)
+}
+fn with_annotations(
+    document: &PdfDocument<'_>,
+    index: u16,
+    annotations: Option<&[pdf_domain::annotation::Annotation]>,
+    rotation: u8,
+    render: impl FnOnce() -> Result<RenderedPage, RenderError>,
+) -> Result<RenderedPage, RenderError> {
+    let Some(annotations) = annotations else {
+        return render();
+    };
+    let page = document
+        .pages()
+        .get(i32::from(index))
+        .map_err(|_| RenderError::InvalidPage)?;
+    let mut hidden = Vec::new();
+    let mut hide_failed = false;
+    for mut a in page.annotations().iter() {
+        if matches!(
+            a.annotation_type(),
+            PdfPageAnnotationType::Ink | PdfPageAnnotationType::Highlight
+        ) && a
+            .name()
+            .as_deref()
+            .and_then(pdf_domain::annotation::Annotation::from_name)
+            .is_some()
+        {
+            let previous = a.is_hidden();
+            let failed = a.set_is_hidden(true).is_err();
+            hidden.push((a, previous));
+            if failed {
+                hide_failed = true;
+                break;
+            }
+        }
+    }
+    let result = if hide_failed {
+        Err(RenderError::InvalidPdf)
+    } else {
+        render()
+    };
+    let mut restore_failed = false;
+    for (mut a, previous) in hidden {
+        restore_failed |= a.set_is_hidden(previous).is_err();
+    }
+    if restore_failed {
+        return Err(RenderError::InvalidPdf);
+    }
+    let mut result = result?;
+    let g = geometry(&page)?;
+    let width = if rotation % 2 == 1 {
+        g.height_points
+    } else {
+        g.width_points
+    };
+    pdf_application::annotation::composite(
+        &mut result.rgba,
+        result.width,
+        result.height,
+        width,
+        (g.quarter_turns + rotation) % 4,
+        annotations,
+    );
+    Ok(result)
+}
+
+fn read_document_annotations(
+    document: &PdfDocument<'_>,
+) -> Result<Vec<Vec<pdf_domain::annotation::Annotation>>, RenderError> {
+    let mut result = Vec::new();
+    let mut points = 0;
+    for page in document.pages().iter() {
+        let annotations = read_annotations(&page)?;
+        points += annotations.iter().map(|a| a.points.len()).sum::<usize>();
+        if points > 65536 {
+            return Err(RenderError::ResourceLimit);
+        }
+        result.push(annotations);
+    }
+    Ok(result)
 }

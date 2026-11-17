@@ -4540,6 +4540,7 @@ dependencies = [
 name = "pdf-domain"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "thiserror 2.0.17",
 ]
 
@@ -4548,6 +4549,7 @@ name = "pdf-engine"
 version = "0.1.0"
 dependencies = [
  "pdf-application",
+ "pdf-domain",
  "pdfium-render",
 ]
 
@@ -4930,6 +4932,7 @@ dependencies = [
  "anyhow",
  "dunce",
  "pdf-application",
+ "pdf-domain",
  "pdf-platform",
  "serde_json",
 ]

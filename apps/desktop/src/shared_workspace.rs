@@ -99,6 +99,7 @@ mod tests {
                 3
             ],
             export_support: ExportSupport::NotPreflighted,
+            annotations: vec![],
         };
         let left = SharedWorkspace::default();
         left.install(Workspace::new(source)?);

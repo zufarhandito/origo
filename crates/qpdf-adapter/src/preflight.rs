@@ -17,6 +17,15 @@ fn object<'a>(
 fn forbidden(v: &Value, source_copy: bool) -> Result<(), ExportError> {
     match v {
         Value::Object(dict) => {
+            if crate::annotations::owned(dict).is_some() {
+                crate::annotations::validate(dict)?;
+                for (key, value) in dict {
+                    if key != "/Type" {
+                        forbidden(value, source_copy)?;
+                    }
+                }
+                return Ok(());
+            }
             for (key, value) in dict {
                 if matches!(
                     key.as_str(),
@@ -382,8 +391,47 @@ fn inspect(
     }
     let (bookmarks_loss, checked_bookmarks) =
         bookmarks::inspect(catalog, objects, &tree_pages, outlines)?;
+    let mut owned_pages = HashSet::new();
+    for page in &tree_pages {
+        let dict = object(objects, &Value::String(page.clone()))?
+            .as_object()
+            .ok_or(ExportError::Inspection)?;
+        if let Some(list) = dict.get("/Annots") {
+            let list = if list.is_array() {
+                list
+            } else {
+                object(objects, list)?
+            };
+            let list = list.as_array().ok_or(ExportError::Inspection)?;
+            if list.iter().all(|r| {
+                let v = if r.is_object() {
+                    Ok(r)
+                } else {
+                    object(objects, r)
+                };
+                v.ok()
+                    .and_then(Value::as_object)
+                    .is_some_and(|d| crate::annotations::owned(d).is_some())
+            }) {
+                for r in list {
+                    let v = if r.is_object() {
+                        r
+                    } else {
+                        object(objects, r)?
+                    };
+                    forbidden(v, allow_structure)?;
+                }
+                owned_pages.insert(page.clone());
+            }
+        }
+    }
     let checked_ink = if allow_structure {
-        ink::inspect(objects, &tree_pages)?
+        let other_pages: Vec<_> = tree_pages
+            .iter()
+            .filter(|p| !owned_pages.contains(*p))
+            .cloned()
+            .collect();
+        ink::inspect(objects, &other_pages)?
     } else {
         HashSet::new()
     };
@@ -391,7 +439,10 @@ fn inspect(
         if checked_bookmarks.contains(id) || checked_ink.contains(id) {
             continue;
         }
-        if allow_structure && tree_pages.iter().any(|p| id == &format!("obj:{p}")) {
+        if tree_pages
+            .iter()
+            .any(|p| id == &format!("obj:{p}") && (allow_structure || owned_pages.contains(p)))
+        {
             let mut page = value
                 .get("value")
                 .and_then(Value::as_object)
@@ -437,6 +488,37 @@ mod tests {
     use super::*;
     fn json() -> Value {
         serde_json::json!({"version":2,"encrypt":{"encrypted":false},"acroform":{"hasacroform":false,"fields":[]},"outlines":[],"pages":[{"object":"3 0 R"}],"qpdf":[{"jsonversion":2},{"trailer":{"value":{"/Root":"1 0 R"}},"obj:1 0 R":{"value":{"/Type":"/Catalog","/Pages":"2 0 R"}},"obj:2 0 R":{"value":{"/Type":"/Pages","/Count":1,"/Kids":["3 0 R"]}},"obj:3 0 R":{"value":{"/Type":"/Page","/Parent":"2 0 R"}}}]})
+    }
+    #[test]
+    fn annotation_marker_never_bypasses_inline_or_indirect_active_content() {
+        let a = pdf_domain::annotation::Annotation {
+            id: 1,
+            highlight: false,
+            color: [0, 0, 0],
+            width: 2.,
+            points: vec![[0.1, 0.2], [0.3, 0.4]],
+            rectangles: false,
+        };
+        let annotation = serde_json::json!({"/Type":"/Annot","/Subtype":"/Ink","/NM":format!("u:{}",a.name()),"/Rect":[0,0,100,100],"/C":[0,0,0],"/CA":1,"/F":4,"/InkList":[[10,20,30,40]]});
+        for indirect in [false, true] {
+            let mut v = json();
+            if indirect {
+                v["qpdf"][1]["obj:4 0 R"] = serde_json::json!({"value":annotation});
+                v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!(["4 0 R"]);
+            } else {
+                v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!([annotation]);
+            }
+            assert!(inspect_json(&v, 1).is_ok());
+            let node = if indirect {
+                &mut v["qpdf"][1]["obj:4 0 R"]["value"]
+            } else {
+                &mut v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]
+            };
+            node["/A"] = serde_json::json!({"/S":"/JavaScript","/JS":"u:unsafe"});
+            assert!(inspect_json(&v, 1).is_err());
+            assert!(inspect_extract(&v, 1).is_err());
+            assert!(inspect_source_copy(&v, 1).is_err());
+        }
     }
     #[test]
     fn schema_cycles_counts_and_unsafe_objects_fail_closed() {

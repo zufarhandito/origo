@@ -13,6 +13,7 @@ use pdf_application::{
 };
 use pdf_engine::PdfiumRenderer;
 use std::{collections::HashMap, ops::Range, path::PathBuf, sync::Arc};
+mod annotations;
 mod chrome;
 mod controller;
 mod conversion;
@@ -39,6 +40,7 @@ use navigation::{Direction, Navigation};
 actions!(
     pdf_studio,
     [
+        DeleteAnnotation,
         Open,
         CloseTab,
         NextTab,
@@ -91,6 +93,7 @@ struct RenderStats {
     max_bitmap_bytes: usize,
 }
 struct DocumentSession {
+    annotation: annotations::AnnotationState,
     tab_id: shell::TabId,
     view_id: shell::ViewId,
     document_owner: Option<gpui::WeakEntity<DocumentSession>>,
@@ -211,6 +214,7 @@ fn main() -> anyhow::Result<()> {
                 KeyBinding::new("ctrl-shift-o", ImportPdf, Some("PdfViewer")),
                 KeyBinding::new("ctrl-z", UndoEdit, Some("PdfViewer")),
                 KeyBinding::new("ctrl-y", RedoEdit, Some("PdfViewer")),
+                KeyBinding::new("delete", DeleteAnnotation, Some("PdfViewer")),
                 KeyBinding::new("delete", DeletePages, Some("PageOrganizer")),
                 KeyBinding::new("ctrl-a", SelectPages, Some("PageOrganizer")),
                 KeyBinding::new("alt-up", MoveEarlier, Some("PageOrganizer")),
@@ -403,6 +407,7 @@ impl DocumentSession {
                 workspace_instance: 0,
                 mode: ViewerMode::Read,
                 page_dragging: false,
+                annotation: annotations::AnnotationState::default(),
                 text: text_selection::TextState::default(),
                 search: search::SearchState::default(),
                 search_input,

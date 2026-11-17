@@ -676,6 +676,7 @@ impl WindowShell {
                             s.update(cx, |s, cx| {
                                 s.active = false;
                                 s.visible_for_render = false;
+                                s.annotation.draft = None;
                                 s.invalidate_work();
                                 s.clear_bitmaps(cx);
                             });

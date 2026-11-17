@@ -60,6 +60,7 @@ pub enum ExportScope {
 }
 #[derive(Clone)]
 pub struct ExportPage {
+    pub annotations: Vec<pdf_domain::annotation::Annotation>,
     pub entry: PageEntry,
     pub geometry: PageGeometry,
 }
@@ -93,6 +94,7 @@ impl ExportPlan {
                 sources.push(source.clone());
             }
             pages.push(ExportPage {
+                annotations: workspace.annotations(p.id).to_vec(),
                 entry: *p,
                 geometry: workspace
                     .geometry(index)
@@ -160,6 +162,12 @@ impl ExportPlan {
                 page.entry.source_id == self.sources[0].id
                     && usize::from(page.entry.source_page_index) == index
                     && page.entry.rotation_delta == 0
+                    && page.annotations
+                        == self.sources[0]
+                            .annotations
+                            .get(index)
+                            .cloned()
+                            .unwrap_or_default()
             })
     }
     pub fn is_single_source_extract(&self) -> bool {
@@ -259,7 +267,7 @@ pub struct PreflightReport {
     pub tags_loss: bool,
     pub policy_version: u32,
 }
-pub const EXPORT_POLICY_VERSION: u32 = 4;
+pub const EXPORT_POLICY_VERSION: u32 = 5;
 impl PreflightReport {
     pub fn requires_acknowledgement(&self) -> bool {
         self.metadata_loss || self.bookmarks_loss || self.tags_loss
@@ -437,7 +445,9 @@ pub fn finish_export<T: OutputTransaction>(
         .inspect_output(transaction.output())
         .map_err(|_| ExportError::Validation)?;
     control.checkpoint()?;
-    if info.pages.len() != plan.pages.len()
+    if plan.pages.iter().enumerate().any(|(i, p)| {
+        info.annotations.get(i).map(Vec::as_slice).unwrap_or(&[]) != p.annotations.as_slice()
+    }) || info.pages.len() != plan.pages.len()
         || info.pages.iter().zip(&plan.pages).any(|(actual, p)| {
             actual.quarter_turns != p.geometry.quarter_turns
                 || (actual.width_points - p.geometry.width_points).abs() > 0.1
@@ -507,6 +517,7 @@ mod tests {
                 3
             ],
             export_support: ExportSupport::NotPreflighted,
+            annotations: vec![],
         })?)
     }
     #[test]
@@ -717,6 +728,7 @@ mod tests {
     impl PdfInspector for Inspector {
         fn inspect(&self, path: &Path) -> Result<InspectedDocument, RenderError> {
             Ok(InspectedDocument {
+                annotations: vec![],
                 path: path.into(),
                 fingerprint: SourceFingerprint {
                     bytes: 1,

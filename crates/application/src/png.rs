@@ -164,6 +164,7 @@ pub fn finish_png<T: BatchTransaction>(
         let source = resolve_source(transaction.sources(), page.entry.source_id)?;
         let started = Instant::now();
         let result = renderer.render_exact(&ExactRenderRequest {
+            annotations: Some(page.annotations.clone()),
             path: source.path.clone(),
             page_index: page.entry.source_page_index,
             rotation_delta: page.entry.rotation_delta,
@@ -271,6 +272,7 @@ mod tests {
                 modified_ns: 1,
             },
             export_support: ExportSupport::NotPreflighted,
+            annotations: vec![],
             geometries: vec![
                 PageGeometry {
                     width_points: 72.,

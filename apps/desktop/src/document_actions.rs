@@ -3,6 +3,7 @@ impl DocumentSession {
     pub(super) fn document_actions(element: gpui::Div, cx: &mut Context<Self>) -> gpui::Div {
         element
             .key_context("PdfViewer")
+            .on_action(cx.listener(|this, _: &DeleteAnnotation, _, cx| this.delete_annotation(cx)))
             .on_action(cx.listener(|this, _: &FindText, window, cx| this.show_search(window, cx)))
             .on_action(cx.listener(|this, _: &FindNext, window, cx| {
                 if this.search.open {
@@ -25,6 +26,13 @@ impl DocumentSession {
             }))
             .on_action(cx.listener(|this, _: &ClearTextSelection, window, cx| {
                 if this.edits_locked() {
+                    return;
+                }
+                if this.annotation.draft.take().is_some() || this.annotation.open {
+                    this.annotation.selected = None;
+                    this.annotation.tool = annotations::Tool::Select;
+                    this.annotation.open = false;
+                    cx.notify();
                     return;
                 }
                 if this.search.open {

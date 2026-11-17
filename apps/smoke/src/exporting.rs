@@ -53,6 +53,7 @@ pub fn verify_tagged_extract(
     verify(&plan, &output, renderer)?;
     let info = renderer.inspect(&output)?;
     let expected = renderer.render_page(&RenderRequest {
+        annotations: None,
         path: path.into(),
         page_index: page_index as u16,
         target_width: 512,
@@ -60,6 +61,7 @@ pub fn verify_tagged_extract(
         fingerprint: Some(plan.sources()[0].fingerprint),
     })?;
     let actual = renderer.render_page(&RenderRequest {
+        annotations: None,
         path: output.clone(),
         page_index: 0,
         target_width: 512,
@@ -155,6 +157,7 @@ pub(super) fn verify(plan: &ExportPlan, path: &Path, renderer: &PdfiumRenderer) 
             "M3 source/page text identity at {index}"
         );
         let expected = renderer.render_page(&RenderRequest {
+            annotations: None,
             path: source.path.clone(),
             page_index: page.entry.source_page_index,
             target_width: 256,
@@ -162,6 +165,7 @@ pub(super) fn verify(plan: &ExportPlan, path: &Path, renderer: &PdfiumRenderer) 
             fingerprint: Some(source.fingerprint),
         })?;
         let actual = renderer.render_page(&RenderRequest {
+            annotations: None,
             path: path.into(),
             page_index: index as u16,
             target_width: 256,
@@ -463,6 +467,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         fingerprint: fingerprint(&encrypted)?,
         geometries: info.pages.clone(),
         export_support: ExportSupport::NotPreflighted,
+        annotations: vec![],
     };
     ensure!(
         matches!(
@@ -479,6 +484,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
         fingerprint: fingerprint(&corrupt)?,
         geometries: info.pages,
         export_support: ExportSupport::NotPreflighted,
+        annotations: vec![],
     };
     ensure!(
         exporter

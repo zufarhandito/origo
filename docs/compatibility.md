@@ -1,5 +1,13 @@
 # Current compatibility
 
+Text highlights, freehand pen/marker, colors, select/delete and Undo/Redo are available
+under **Anotasi**. Standard PDF Ink/Highlight objects persist through safe Save As;
+PDF Studio metadata enables reopening/editing its own annotations. Generic third-party
+annotation editing is not supported. Policy v5 admits this bounded passive subset,
+with action rejection and round-trip validation. Other export restrictions remain.
+Signature placement is deferred. See [annotations](annotations.md) and
+[competitor research](research/pdf-annotations-and-signatures.md).
+
 Two different open PDFs can be shown side by side with the GPUI Kit Dock splitter.
 Both visible panes render; focus selects the shared toolbar/organizer target.
 Hidden documents retain edits and reading state while releasing caches. The window

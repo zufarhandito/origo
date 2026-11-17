@@ -5,6 +5,7 @@ use pdf_application::{
 use pdf_engine::PdfiumRenderer;
 use qpdf_adapter::QpdfProbe;
 use std::path::PathBuf;
+mod annotations;
 mod books;
 mod exporting;
 mod optimizing;
@@ -37,6 +38,7 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
     );
     for (index, width) in [(0, 256), (99, 256), (25, 1600), (3, 8192)] {
         let rendered = renderer.render_page(&RenderRequest {
+            annotations: None,
             path: path.clone(),
             page_index: index,
             target_width: width,
@@ -77,6 +79,7 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
     ensure!(
         matches!(
             renderer.render_page(&RenderRequest {
+                annotations: None,
                 path,
                 page_index: 0,
                 target_width: 256,
@@ -103,6 +106,9 @@ fn main() -> Result<()> {
         std::fs::write(dir.join("long.pdf"), synthetic::pdf(1000, false))?;
         std::fs::write(dir.join("blank.pdf"), synthetic::blank_pdf())?;
         return Ok(());
+    }
+    if std::env::args().nth(1).as_deref() == Some("--annotation-smoke") {
+        return annotations::run(&root, &PdfiumRenderer::new(&root.join("sidecars")));
     }
     if std::env::args().nth(1).as_deref() == Some("--search-smoke") {
         return search::run(&root, &PdfiumRenderer::new(&root.join("sidecars")));

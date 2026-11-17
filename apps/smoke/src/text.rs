@@ -66,6 +66,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
             })?;
             rotated.rotate(turns);
             let raster = renderer.render_page(&pdf_application::RenderRequest {
+                annotations: None,
                 path: path.clone(),
                 page_index,
                 target_width: 900,

@@ -1,9 +1,10 @@
 # Progres PDF Studio
 
-Checkpoint **17 November 2026**, implementasi sampai `70287a7`. Sesi pembaruan ini
-docs-only; hasil pengujian di bawah berasal dari pekerjaan implementasi sebelumnya.
-[Handoff](handoff/PROJECT_HANDOFF.md) menyimpan instruksi lanjut/status Git aktual;
-[testing](testing.md) menyimpan bukti dan batas setiap run.
+Checkpoint **17 November 2026**: anotator inti diimplementasikan setelah persetujuan
+pemilik. Highlight teks, pen/stabilo, pilih/hapus/warna, shared history, unsaved guard
+dan Save As/reopen tersedia. Tanda tangan ditunda. Lihat [anotator](annotations.md),
+[handoff](handoff/PROJECT_HANDOFF.md) dan [testing](testing.md) untuk batas dan bukti.
+Angka/commit multi-tab di bawah adalah checkpoint historis sebelum anotator.
 
 ## Multi-tab yang sudah selesai
 

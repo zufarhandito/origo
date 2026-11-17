@@ -1,4 +1,6 @@
-//! Pure document identity and invariants. No native engines, UI or filesystem access.
+pub mod annotation;
+use annotation::Annotation;
+// Pure document identity and invariants. No native engines, UI or filesystem access.
 use std::{
     collections::{HashSet, VecDeque},
     path::PathBuf,
@@ -35,6 +37,7 @@ pub struct SourceDocument {
     pub fingerprint: SourceFingerprint,
     pub geometries: Vec<PageGeometry>,
     pub export_support: ExportSupport,
+    pub annotations: Vec<Vec<Annotation>>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PageEntry {
@@ -58,6 +61,11 @@ pub enum DomainError {
 
 #[derive(Clone, Debug)]
 pub enum Command {
+    AnnotateMany(Vec<(PageId, Vec<Annotation>)>),
+    Annotate {
+        page: PageId,
+        annotations: Vec<Annotation>,
+    },
     Rotate {
         ids: Vec<PageId>,
         turns: u8,
@@ -73,6 +81,7 @@ pub enum Command {
     Import(SourceDocument),
 }
 struct Change {
+    annotations: Vec<(PageId, Vec<Annotation>, Vec<Annotation>)>,
     before: Vec<(usize, PageEntry)>,
     after: Vec<(usize, PageEntry)>,
     selection_before: HashSet<PageId>,
@@ -82,6 +91,8 @@ struct Change {
     source: Option<SourceDocument>,
 }
 pub struct Workspace {
+    next_annotation_id: u64,
+    annotations: std::collections::HashMap<PageId, Vec<Annotation>>,
     sources: Vec<SourceDocument>,
     pages: Vec<PageEntry>,
     selected: HashSet<PageId>,
@@ -93,7 +104,21 @@ pub struct Workspace {
 }
 impl Workspace {
     fn validate_source(source: &SourceDocument) -> Result<(), DomainError> {
-        if source.geometries.is_empty()
+        if source.annotations.len() > source.geometries.len()
+            || source.annotations.iter().any(|a| {
+                a.iter().map(|a| a.points.len()).sum::<usize>() > 8192
+                    || a.len() > annotation::MAX_PAGE_ANNOTATIONS
+                    || a.iter().any(|a| !a.valid())
+                    || a.iter().map(|a| a.id).collect::<HashSet<_>>().len() != a.len()
+            })
+            || source
+                .annotations
+                .iter()
+                .flatten()
+                .map(|a| a.points.len())
+                .sum::<usize>()
+                > 65536
+            || source.geometries.is_empty()
             || source.geometries.len() > u16::MAX as usize
             || source.geometries.iter().any(|g| {
                 !g.width_points.is_finite()
@@ -123,7 +148,21 @@ impl Workspace {
     pub fn new(source: SourceDocument) -> Result<Self, DomainError> {
         Self::validate_source(&source)?;
         let pages = Self::entries(&source);
+        let next_annotation_id = source
+            .annotations
+            .iter()
+            .flatten()
+            .map(|a| a.id)
+            .max()
+            .unwrap_or(0)
+            .saturating_add(1);
         Ok(Self {
+            next_annotation_id,
+            annotations: pages
+                .iter()
+                .enumerate()
+                .filter_map(|(i, p)| source.annotations.get(i).map(|a| (p.id, a.clone())))
+                .collect(),
             sources: vec![source],
             pages,
             selected: HashSet::new(),
@@ -133,6 +172,17 @@ impl Workspace {
             next_revision: 1,
             clean_revision: 0,
         })
+    }
+    pub fn allocate_annotation_id(&mut self) -> u64 {
+        let id = self.next_annotation_id;
+        self.next_annotation_id = self.next_annotation_id.saturating_add(1);
+        id
+    }
+    pub fn annotations(&self, page: PageId) -> &[Annotation] {
+        self.annotations
+            .get(&page)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
     pub fn source(&self) -> &SourceDocument {
         &self.sources[0]
@@ -185,10 +235,99 @@ impl Workspace {
         !self.redo.is_empty()
     }
     pub fn execute(&mut self, command: Command) -> Result<bool, DomainError> {
+        let command = match command {
+            Command::Annotate { page, annotations } => {
+                Command::AnnotateMany(vec![(page, annotations)])
+            }
+            c => c,
+        };
+        if let Command::AnnotateMany(changes) = command {
+            let mut seen = HashSet::new();
+            let mut edits = Vec::new();
+            for (page, annotations) in changes {
+                if !seen.insert(page)
+                    || !self.pages.iter().any(|p| p.id == page)
+                    || annotations.iter().map(|a| a.points.len()).sum::<usize>() > 8192
+                    || annotations.len() > annotation::MAX_PAGE_ANNOTATIONS
+                    || annotations.iter().any(|a| !a.valid())
+                    || annotations
+                        .iter()
+                        .map(|a| a.id)
+                        .collect::<HashSet<_>>()
+                        .len()
+                        != annotations.len()
+                {
+                    return Err(DomainError::InvalidReference);
+                }
+                let before = self.annotations(page).to_vec();
+                if before != annotations {
+                    edits.push((page, before, annotations));
+                }
+            }
+            let total = self
+                .annotations
+                .iter()
+                .filter(|(p, _)| !edits.iter().any(|(changed, _, _)| changed == *p))
+                .flat_map(|(_, a)| a)
+                .map(|a| a.points.len())
+                .sum::<usize>()
+                + edits
+                    .iter()
+                    .flat_map(|(_, _, a)| a)
+                    .map(|a| a.points.len())
+                    .sum::<usize>();
+            if total > 65536 {
+                return Err(DomainError::ResourceLimit);
+            }
+            if edits.is_empty() {
+                return Ok(false);
+            }
+            let c = Change {
+                annotations: edits,
+                before: vec![],
+                after: vec![],
+                selection_before: self.selected.clone(),
+                selection_after: self.selected.clone(),
+                revision_before: self.revision,
+                revision_after: self.next_revision,
+                source: None,
+            };
+            self.next_revision += 1;
+            self.apply(&c, true);
+            self.redo.clear();
+            self.undo.push_back(c);
+            while self.undo.len() > 128
+                || self
+                    .undo
+                    .iter()
+                    .flat_map(|c| &c.annotations)
+                    .map(|(_, b, a)| b.iter().chain(a).map(|a| a.points.len()).sum::<usize>())
+                    .sum::<usize>()
+                    > 1_000_000
+            {
+                self.undo.pop_front();
+            }
+            return Ok(true);
+        }
         let mut source = None;
         let (ids, target, turns, delete) = match command {
             Command::Import(s) => {
                 Self::validate_source(&s)?;
+                if self
+                    .annotations
+                    .values()
+                    .flatten()
+                    .map(|a| a.points.len())
+                    .sum::<usize>()
+                    + s.annotations
+                        .iter()
+                        .flatten()
+                        .map(|a| a.points.len())
+                        .sum::<usize>()
+                    > 65536
+                {
+                    return Err(DomainError::ResourceLimit);
+                }
                 if self
                     .sources
                     .iter()
@@ -228,6 +367,9 @@ impl Workspace {
                 (ids, None, turns, false)
             }
             Command::Delete { ids } => (ids, None, 0, true),
+            Command::Annotate { .. } | Command::AnnotateMany(_) => {
+                return Err(DomainError::InvalidReference);
+            }
         };
         let wanted: HashSet<_> = ids.iter().copied().collect();
         if wanted.len() != ids.len()
@@ -280,6 +422,7 @@ impl Workspace {
             self.selected.clone()
         };
         let change = Change {
+            annotations: vec![],
             before,
             after,
             selection_before: self.selected.clone(),
@@ -298,6 +441,10 @@ impl Workspace {
         Ok(true)
     }
     fn apply(&mut self, c: &Change, forward: bool) {
+        for (page, before, after) in &c.annotations {
+            self.annotations
+                .insert(*page, if forward { after } else { before }.clone());
+        }
         let (remove, insert) = if forward {
             (&c.before, &c.after)
         } else {
@@ -310,9 +457,24 @@ impl Workspace {
         }
         if let Some(s) = &c.source {
             if forward {
+                for (i, p) in Self::entries(s).iter().enumerate() {
+                    if let Some(a) = s.annotations.get(i) {
+                        self.annotations.insert(p.id, a.clone());
+                    }
+                }
+                self.next_annotation_id = self.next_annotation_id.max(
+                    s.annotations
+                        .iter()
+                        .flatten()
+                        .map(|a| a.id)
+                        .max()
+                        .unwrap_or(0)
+                        .saturating_add(1),
+                );
                 self.sources.push(s.clone());
             } else {
                 self.sources.retain(|v| v.id != s.id);
+                self.annotations.retain(|p, _| p.source != s.id);
             }
         }
         self.selected = if forward {
@@ -349,6 +511,55 @@ impl Workspace {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn annotation_batch_is_atomic_and_follows_pages_and_clean_revision() -> Result<(), DomainError>
+    {
+        let mut w = Workspace::new(small(1))?;
+        let first = w.pages()[0].id;
+        let second = w.pages()[1].id;
+        let a = Annotation {
+            id: 1,
+            highlight: false,
+            color: [0, 0, 0],
+            width: 2.,
+            points: vec![[0.1, 0.2], [0.3, 0.4]],
+            rectangles: false,
+        };
+        w.execute(Command::AnnotateMany(vec![
+            (first, vec![a.clone()]),
+            (second, vec![a.clone()]),
+        ]))?;
+        assert!(w.is_dirty());
+        assert!(w.undo());
+        assert!(w.annotations(first).is_empty());
+        assert!(w.annotations(second).is_empty());
+        assert!(!w.is_dirty());
+        assert!(w.redo());
+        let revision = w.revision();
+        assert!(w.mark_exported(revision));
+        w.execute(Command::Move {
+            ids: vec![first],
+            target: 2,
+        })?;
+        assert_eq!(w.annotations(first), std::slice::from_ref(&a));
+        w.execute(Command::Delete { ids: vec![first] })?;
+        assert!(w.undo());
+        assert_eq!(w.annotations(first), std::slice::from_ref(&a));
+        let before = w.revision();
+        let mut bad = a.clone();
+        bad.points[0][0] = f32::NAN;
+        assert!(
+            w.execute(Command::AnnotateMany(vec![
+                (first, vec![]),
+                (second, vec![bad])
+            ]))
+            .is_err()
+        );
+        assert_eq!(w.revision(), before);
+        assert_eq!(w.annotations(first), [a]);
+        assert!(!w.mark_exported(revision));
+        Ok(())
+    }
     fn source(id: u64, geometry: PageGeometry) -> SourceDocument {
         SourceDocument {
             id: SourceId(id),
@@ -359,6 +570,7 @@ mod tests {
             },
             geometries: vec![geometry; 100],
             export_support: ExportSupport::NotPreflighted,
+            annotations: vec![],
         }
     }
     fn small(id: u64) -> SourceDocument {

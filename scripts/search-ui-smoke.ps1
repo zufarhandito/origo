@@ -1,6 +1,6 @@
-param([ValidateSet('debug','release')][string]$Profile='release')
+﻿param([ValidateSet('debug','release')][string]$Profile='release',[string]$ExecutablePath)
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -TestName 'search-ui' -Fixture '.research/search-fixtures/search.pdf'
+. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -ExecutablePath $ExecutablePath -TestName 'search-ui' -Fixture '.research/search-fixtures/search.pdf'
 $cases=New-Object Collections.Generic.List[object]
 function Pass([string]$Name) {
     $cases.Add([pscustomobject]@{Case=$Name;Status='passed'})

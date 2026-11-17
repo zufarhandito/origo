@@ -1,5 +1,5 @@
-﻿param([ValidateSet('debug','release')][string]$Profile='debug')
-. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -TestName 'same-document-ui' -IsolatedState
+﻿param([ValidateSet('debug','release')][string]$Profile='debug',[string]$ExecutablePath)
+. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -ExecutablePath $ExecutablePath -TestName 'same-document-ui' -IsolatedState
 $cases=New-Object Collections.Generic.List[object]
 function Pass([string]$Name){Capture ($Name+'.png');$cases.Add([pscustomobject]@{Case=$Name;Status='passed'});$cases.ToArray()|ConvertTo-Json|Set-Content -Encoding UTF8 (Join-Path $directory 'cases.json');Write-Host "PASS same document: $Name"}
 function In-Pane([string]$Side,[string]$Control){

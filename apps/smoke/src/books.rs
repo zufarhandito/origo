@@ -34,6 +34,7 @@ pub fn run(root: &Path) -> Result<()> {
                 };
                 let start = Instant::now();
                 let page = renderer.render_page(&RenderRequest {
+                    annotations: None,
                     path: path.clone(),
                     fingerprint: Some(info.fingerprint),
                     page_index: index as u16,
@@ -65,6 +66,7 @@ pub fn run(root: &Path) -> Result<()> {
             ensure!(
                 matches!(
                     renderer.render_page(&RenderRequest {
+                        annotations: None,
                         path: path.clone(),
                         fingerprint: Some(wrong),
                         page_index: 0,

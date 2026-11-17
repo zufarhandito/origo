@@ -234,3 +234,19 @@ conversion-roadmap.md reserves separate
 structural-PDF, raster, text, reflow/Office and OCR adapter boundaries, sharing snapshots
 and output transactions when implemented. Only complete PDF Save As can advance a clean
 revision; a derived conversion output will not mark the virtual PDF plan saved.
+
+## Annotation authoring (17 November 2026)
+
+Workspace owns bounded per-PageId annotation lists, baseline source lists and a shared
+ID allocator. Atomic AnnotateMany history transactions preserve multi-page selection
+and shared-view revisions. View-local tool/draft/selection state never enters session
+restore. Export/Png snapshots carry annotation lists with page identity.
+
+PDFium reads the versioned model from annotation NM. During editor rendering it
+hides only recognized owned objects, renders the original page, restores flags even
+on failure, then applies the bounded raster compositor. Unknown annotations remain
+native. QPDF patches page Annots after assembly with standard Ink/Highlight objects
+and vector AP streams; Optimize runs afterwards. Preflight validates the passive
+closed schema before generic exemptions, including inline annotation dictionaries.
+Output inspection checks annotation round-trip equality before publication. Policy
+version is 5. See [behavior and limitations](annotations.md).

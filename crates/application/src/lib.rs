@@ -3,6 +3,7 @@ pub use pdf_domain::{
     ExportSupport, PageGeometry, SourceDocument, SourceFingerprint, SourceId, Workspace,
 };
 use std::path::{Path, PathBuf};
+pub mod annotation;
 pub mod export;
 pub mod png;
 pub mod search;
@@ -25,6 +26,7 @@ pub enum RenderError {
 }
 
 pub struct InspectedDocument {
+    pub annotations: Vec<Vec<pdf_domain::annotation::Annotation>>,
     pub path: PathBuf,
     pub fingerprint: SourceFingerprint,
     pub pages: Vec<PageGeometry>,
@@ -49,12 +51,14 @@ pub fn open_document(
         fingerprint: info.fingerprint,
         geometries: info.pages,
         export_support: ExportSupport::NotPreflighted,
+        annotations: info.annotations,
     })
     .map_err(|_| RenderError::InvalidPdf)
 }
 
 #[derive(Clone, Debug)]
 pub struct RenderRequest {
+    pub annotations: Option<Vec<pdf_domain::annotation::Annotation>>,
     pub path: PathBuf,
     pub page_index: u16,
     pub target_width: u32,
@@ -75,6 +79,7 @@ pub trait PageRenderer {
     fn render_page(&self, request: &RenderRequest) -> Result<RenderedPage, RenderError>;
     fn render(&self, source: &Path, page: u16) -> Result<RenderedPage, RenderError> {
         self.render_page(&RenderRequest {
+            annotations: None,
             path: source.into(),
             page_index: page,
             target_width: 1200,
@@ -87,6 +92,7 @@ pub trait PageRenderer {
 /// Export-quality dimensions; independent of viewer zoom, DPR and preview limits.
 #[derive(Clone, Debug)]
 pub struct ExactRenderRequest {
+    pub annotations: Option<Vec<pdf_domain::annotation::Annotation>>,
     pub path: PathBuf,
     pub page_index: u16,
     pub rotation_delta: u8,
@@ -105,6 +111,7 @@ mod tests {
     impl PdfInspector for Fake {
         fn inspect(&self, source: &Path) -> Result<InspectedDocument, RenderError> {
             Ok(InspectedDocument {
+                annotations: vec![],
                 path: source.into(),
                 fingerprint: SourceFingerprint {
                     bytes: 123,

@@ -87,6 +87,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
                 let geometry = source.geometries[usize::from(page.entry.source_page_index)];
                 let (width, height) = dimensions(geometry, dpi)?;
                 let base = renderer.render_exact(&ExactRenderRequest {
+                    annotations: None,
                     path: source.path.clone(),
                     page_index: page.entry.source_page_index,
                     rotation_delta: 0,
@@ -266,6 +267,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     ensure!(
         renderer
             .render_exact(&ExactRenderRequest {
+                annotations: None,
                 path: a,
                 page_index: 0,
                 rotation_delta: 0,

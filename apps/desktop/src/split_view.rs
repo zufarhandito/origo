@@ -405,6 +405,9 @@ impl WindowShell {
                     }
                     s.active = focused;
                     s.visible_for_render = visible;
+                    if !visible {
+                        s.annotation.draft = None;
+                    }
                     s.split_presentation = split;
                     if !visible {
                         s.search.pause();

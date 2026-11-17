@@ -245,6 +245,7 @@ impl PdfExporter for QpdfExporter {
             output
         };
         self.write_job(&job(plan, sources, target)?, work, "job.json", control)?;
+        self.write_annotations(target, work, plan, control)?;
         if plan.scope() == ExportScope::Optimized {
             self.check(&baseline, control)?;
             self.write_job(
@@ -275,6 +276,51 @@ impl PdfExporter for QpdfExporter {
     }
 }
 impl QpdfExporter {
+    fn write_annotations(
+        &self,
+        output: &Path,
+        work: &Path,
+        plan: &ExportPlan,
+        control: &ExportControl,
+    ) -> Result<(), ExportError> {
+        if !plan.pages().iter().any(|p| !p.annotations.is_empty())
+            && !plan
+                .sources()
+                .iter()
+                .any(|s| s.annotations.iter().any(|a| !a.is_empty()))
+        {
+            return Ok(());
+        }
+        control.checkpoint()?;
+        let patch = crate::annotations::patch(&self.output_json(output, control)?, plan, work)?;
+        let bytes = serde_json::to_vec(&patch).map_err(|_| ExportError::Inspection)?;
+        if bytes.len() > JSON_LIMIT {
+            return Err(ExportError::ResourceLimit);
+        }
+        let file = work.join("annotation-patch.json");
+        std::fs::write(&file, bytes).map_err(|_| ExportError::Io)?;
+        let edited = work.join("annotated.pdf");
+        let mut option = OsString::from("--update-from-json=");
+        option.push(file);
+        if self
+            .invoke(
+                &[
+                    output.as_os_str().to_owned(),
+                    option,
+                    edited.as_os_str().to_owned(),
+                ],
+                65536,
+                control,
+            )?
+            .code
+            != Some(0)
+        {
+            return Err(ExportError::Engine);
+        }
+        self.check(&edited, control)?;
+        std::fs::copy(edited, output).map_err(|_| ExportError::Io)?;
+        control.checkpoint()
+    }
     fn write_job(
         &self,
         job: &Value,
@@ -302,6 +348,7 @@ impl QpdfExporter {
                 "--json=2".into(),
                 "--json-stream-data=none".into(),
                 "--json-key=qpdf".into(),
+                "--json-key=pages".into(),
                 path.as_os_str().to_owned(),
             ],
             JSON_LIMIT,

@@ -1,5 +1,14 @@
 # ADR-0003: conservative structural PDF export
 
+Policy v5 (17 November 2026): PDF Studio-owned Ink/Highlight annotations with bounded
+v1 NM metadata, passive closed schema and validated geometry/style are accepted in
+normal structural export. Inline and referenced objects are checked before exemption;
+active actions/unknown keys remain rejected. Export regenerates vector appearances,
+validates model round-trip, and disables whole-source copying when annotations differ
+from the source baseline. This adds no generic third-party annotation editing or
+signature support. The restrictions below remain except for this explicit subset.
+
+
 Status: implemented in M3, 11 November 2026. This supersedes the M0-only deferral.
 
 Policy v4 (15 November 2026): single-source selected-page Extract can omit tagged
