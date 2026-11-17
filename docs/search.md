@@ -34,15 +34,16 @@ accent normalization, stemming, regex, dehyphenation or reconstructed reading or
 Columns/ligatures and unusual encodings inherit PDFium's text extraction limitations.
 Scans need an existing text layer; no OCR or network operation is added.
 
-One page per active document is extracted/matched in background using the existing
+One page per visible document is extracted/matched in background using the existing
 shared PDFium worker. Search retains occurrence offsets, not a book of TextPages or
 rasters. Visible highlights reuse the existing bounded text cache. Query length is
 limited to 1024 Unicode characters; whitespace-only/oversized queries do no native work.
 Results stop at 10,000 retained occurrences and show a limit notice (`10000+`).
 The existing 200,000-character per-page extraction limit also applies.
 
-Query/source tokens reject stale completions. Switching away pauses incomplete scans;
-switching back restarts those scans. Completed compact results remain per tab. Closing
+Query/source tokens reject stale completions. Hiding a tab pauses incomplete scans;
+showing it again restarts those scans. Both visible split panels may continue scanning
+even when only one is focused. Completed compact results remain per tab. Closing
 the bar/tab stops further scheduling; an already-running native call is cooperative,
 not preemptible. Failed pages are counted explicitly as incomplete search. Source
 changes invalidate the document under the existing size/mtime policy.

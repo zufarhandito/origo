@@ -19,6 +19,7 @@ pub(super) struct WindowResources {
     pub modal_owner: AtomicU64,
     pub closing: AtomicBool,
     pub tab_picker_open: AtomicBool,
+    pub organizer_drawer: AtomicBool,
     pub tab_count: std::sync::atomic::AtomicUsize,
     pub metrics_sequence: Arc<AtomicU64>,
     pub metrics_lock: Arc<std::sync::Mutex<()>>,
@@ -38,6 +39,7 @@ struct CloseBatch {
     previous: Option<TabId>,
     external_export: Option<(TabId, u64)>,
     session_snapshot: Option<crate::local_state::SessionSnapshot>,
+    previous_split: Option<split_view::SplitView>,
 }
 pub(super) struct WindowShell {
     tabs: Vec<Tab>,
@@ -74,6 +76,8 @@ pub(super) struct WindowShell {
     session_writing: bool,
     session_queued: Option<crate::local_state::SessionSnapshot>,
     session_cleared: bool,
+    split_view: Option<split_view::SplitView>,
+    tab_picker_pairing: bool,
 }
 
 fn path_key(path: &std::path::Path) -> String {
@@ -135,6 +139,8 @@ impl WindowShell {
                 session_writing: false,
                 session_queued: None,
                 session_cleared: false,
+                split_view: None,
+                tab_picker_pairing: false,
             };
             cx.subscribe(&shell.tab_picker_input, |this, _, event, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -209,6 +215,23 @@ impl WindowShell {
         json["sessionReady"] = serde_json::json!(self.session_ready);
         json["sessionRestoreOffered"] = serde_json::json!(self.session_offer.is_some());
         json["sessionRecording"] = serde_json::json!(!self.session_cleared && self.session_ready);
+        json["splitView"] = serde_json::json!(self.split_view.is_some());
+        json["splitGeometry"] = serde_json::json!(self.split_view.as_ref().map(|s| (
+            s.origin_x,
+            s.divider_x,
+            s.width,
+            s.dragging
+        )));
+        json["visibleTabIds"] = serde_json::json!(
+            self.tabs
+                .iter()
+                .filter(|t| t
+                    .session
+                    .as_ref()
+                    .is_some_and(|s| s.read(cx).visible_for_render))
+                .map(|t| t.id.0)
+                .collect::<Vec<_>>()
+        );
         json["tabsOpening"] = serde_json::json!(self.opening);
         json["closingTabs"] = serde_json::json!(self.close.is_some());
         json["windowExportOwner"] =
@@ -225,7 +248,7 @@ impl WindowShell {
         json["inactiveCacheBytes"] = serde_json::json!(
             sessions
                 .iter()
-                .filter(|s| s["active"] == false)
+                .filter(|s| s["visible"] == false)
                 .map(|s| {
                     [
                         "pageCacheBytes",
@@ -242,7 +265,7 @@ impl WindowShell {
         json["inactiveGpuImages"] = serde_json::json!(
             sessions
                 .iter()
-                .filter(|s| s["active"] == false)
+                .filter(|s| s["visible"] == false)
                 .filter_map(|s| s["gpuImages"].as_u64())
                 .sum::<u64>()
         );
@@ -489,33 +512,16 @@ impl WindowShell {
             return;
         }
         self.tab_picker_open = false;
-        if self.active != Some(id) {
-            if let Some(session) = self.session() {
-                session.update(cx, |s, cx| {
-                    s.active = false;
-                    s.search.pause();
-                    s.invalidate_work();
-                    s.clear_bitmaps(cx);
-                    s.text.pages.clear();
-                    s.text.dragging = false;
-                    s.text.pending = None;
-                    s.text.cancel_copy();
-                    s.page_dragging = false;
-                });
-            }
-            self.active = Some(id);
-            if let Some(session) = self.session() {
-                session.update(cx, |s, cx| {
-                    s.active = true;
-                    if s.search.running {
-                        s.restart_search(cx);
-                    }
-                    s.schedule_current(cx);
-                    s.report(cx);
-                    cx.notify();
-                });
-            }
+        self.tab_picker_pairing = false;
+        if self
+            .split_view
+            .as_ref()
+            .is_some_and(|s| !s.ids.contains(&id))
+        {
+            self.split_view = None;
         }
+        self.active = Some(id);
+        self.sync_visible_sessions(cx);
         if let Some(session) = self.session() {
             let focus = session.read(cx).focus.clone();
             let handle = self.handle;
@@ -601,12 +607,15 @@ impl WindowShell {
             previous: self.active,
             external_export: None,
             session_snapshot,
+            previous_split: self.split_view.clone(),
         });
         self.advance_close(cx);
         false
     }
     fn cancel_close(&mut self, cx: &mut Context<Self>) {
-        let previous = self.close.take().and_then(|b| b.previous);
+        let batch = self.close.take();
+        let previous = batch.as_ref().and_then(|b| b.previous);
+        self.split_view = batch.and_then(|b| b.previous_split);
         self.resources.closing.store(false, Ordering::SeqCst);
         let mut prompt = false;
         for tab in &self.tabs {
@@ -654,12 +663,20 @@ impl WindowShell {
                 if !batch.window {
                     self.remember_closed(&batch.ids, cx);
                 }
+                if self
+                    .split_view
+                    .as_ref()
+                    .is_some_and(|s| s.ids.iter().any(|id| batch.ids.contains(id)))
+                {
+                    self.split_view = None;
+                }
                 for tab in &self.tabs {
                     if batch.ids.contains(&tab.id)
                         && let Some(s) = &tab.session
                     {
                         s.update(cx, |s, cx| {
                             s.active = false;
+                            s.visible_for_render = false;
                             s.invalidate_work();
                             s.clear_bitmaps(cx);
                         });
@@ -686,6 +703,18 @@ impl WindowShell {
                     .or(batch
                         .previous
                         .filter(|id| self.tabs.iter().any(|t| t.id == *id)))
+                    .or_else(|| {
+                        batch
+                            .previous_split
+                            .as_ref()
+                            .and_then(|split| {
+                                split
+                                    .ids
+                                    .iter()
+                                    .find(|id| self.tabs.iter().any(|t| t.id == **id))
+                            })
+                            .copied()
+                    })
                     .or_else(|| self.tabs.first().map(|t| t.id))
                 {
                     self.activate(id, cx);
@@ -791,6 +820,8 @@ enum MenuAction {
     Open,
     Reopen,
     ClearSession,
+    Compare,
+    ExitCompare,
     Save,
     Close,
     Quit,
@@ -828,6 +859,8 @@ impl WindowShell {
         match action {
             Reopen => self.reopen_tab(cx),
             ClearSession => self.clear_session_history(cx),
+            Compare => self.choose_comparison(window, cx),
+            ExitCompare => self.exit_comparison(cx),
             Open => self.choose_open(cx),
             Close => {
                 self.begin_close(false, cx);
@@ -928,6 +961,21 @@ impl WindowShell {
         if matches!(action, Reopen) {
             return !self.opening && !self.closed_tabs.is_empty() && self.tabs.len() < MAX_TABS;
         }
+        if matches!(action, ExitCompare) {
+            return self.split_view.is_some();
+        }
+        if matches!(action, Compare) {
+            return !self.opening
+                && self
+                    .session()
+                    .is_some_and(|s| s.read(cx).workspace.is_some())
+                && self.tabs.iter().any(|t| {
+                    Some(t.id) != self.active
+                        && t.session
+                            .as_ref()
+                            .is_some_and(|s| s.read(cx).workspace.is_some())
+                });
+        }
         if matches!(action, Quit | Light | Dark | Help | About | ClearSession) {
             return true;
         }
@@ -992,11 +1040,16 @@ mod tab_recovery;
 use tab_recovery::ClosedTab;
 #[path = "session_restore.rs"]
 mod session_restore;
+#[path = "split_view.rs"]
+mod split_view;
 
 impl Render for WindowShell {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use MenuAction::*;
         let colors = cx.theme().colors;
+        self.resources
+            .organizer_drawer
+            .store(false, Ordering::SeqCst);
         if self.close.is_some() || self.modal(cx) {
             self.tab_picker_open = false;
         }
@@ -1202,6 +1255,8 @@ impl Render for WindowShell {
                 &[
                     ("Thumbnail", Sidebar),
                     ("Panel alat", Panel),
+                    ("Bandingkan dua PDF…", Compare),
+                    ("Keluar tampilan berdampingan", ExitCompare),
                     ("Halaman pertama", First),
                     ("Halaman sebelumnya", Previous),
                     ("Halaman berikutnya", Next),
@@ -1348,9 +1403,13 @@ impl Render for WindowShell {
                         ),
                 )
             })
-            .when_some(session.clone(), |el, s| {
-                el.child(div().flex_1().min_h_0().child(s))
+            .when(self.split_view.is_some(), |el| {
+                el.child(self.render_comparison(window, cx))
             })
+            .when_some(
+                session.clone().filter(|_| self.split_view.is_none()),
+                |el, s| el.child(div().flex_1().min_h_0().child(s)),
+            )
             .when(session.is_none(), |el| {
                 el.child(
                     div()

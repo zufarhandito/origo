@@ -70,6 +70,13 @@ impl DocumentSession {
             self.focus.focus(window, cx);
         }
         self.report(cx);
+        if self.split_presentation {
+            let owner = self.owner.clone();
+            let open = mode == ViewerMode::Organize;
+            cx.defer(move |cx| {
+                let _ = owner.update(cx, |shell, cx| shell.set_comparison_organizer(open, cx));
+            });
+        }
         cx.notify();
     }
     pub(super) fn select_all_pages(&mut self, all: bool, cx: &mut Context<Self>) {

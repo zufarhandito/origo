@@ -1,5 +1,10 @@
 # Current compatibility
 
+Two different open PDFs can be shown side by side with the GPUI Kit Dock splitter.
+Both visible panes render; focus selects the shared toolbar/organizer target.
+Hidden documents retain edits and reading state while releasing caches. The window
+cache budgets and safe-export policies remain unchanged. See [multi-tab](multitab.md).
+
 Ctrl+F searches the active workspace with a compact in-tab bar, counts, highlights
 and next/previous navigation. Default matching is case-insensitive and treats a phrase
 as a contiguous sequence; same-page whitespace/linebreaks are normalized. Optional case

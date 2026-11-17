@@ -1,3 +1,32 @@
+# Verification — multi-tab tahap 4A, 17 November 2026
+
+- Two different PDFs use the native GPUI Kit 0.9.1 Dock and real splitter; one
+  shared toolbar/organizer follows focus. Hidden sessions release raster/text/GPU
+  caches; each visible pane receives half the existing window budgets.
+- Final `scripts/check.ps1` passed: fmt, denied-warning Clippy, **56 unit tests**
+  and release workspace build.
+- Final release comparison suite passed **10 named cases** at
+  `.research/comparison-ui-54f5ce182f384dffbfaa018d990996b6`: independent navigation/
+  search, selection/history/input focus, splitter movement and minimum width while
+  dragging, cross-document page-drop rejection, narrow dark drawer, exit/reentry,
+  guarded dirty close, export receipt origin, source-change isolation and unchanged
+  source bytes. Initial trials exposed cached Dock accessibility and transient
+  resize issues; fixed before this successful run. No toolchain sources were edited.
+- Release regressions passed: tabs `413f4894b02d4d20859697fb6275b559`, hardening
+  `66229f4a8e4a4c38b776fd5e783e3cfc`, M2 `73f615f04b2944eb96dadfcf28dae27e`,
+  search (14 cases) `a98cb02f93f44929aef3de400164760f`; each prefix identifies its
+  matching ignored `.research/*-ui-*` or `.research/tabs-hardening-*` fixture directory.
+- Generated-book profile (8 PDFs × 1,000 pages, 3 rounds, high zoom) passed at
+  `.research/comparison-memory-3b7feb0803a144d3893c703e26bf8a59`: 28 samples,
+  maximum private bytes 485,273,600, warmed private growth 966,656 bytes, handle
+  growth 8. The stricter final profile holds both panes at 400% simultaneously:
+  `.research/comparison-memory-947dca5ad8a348abab627931a42da1e7`, **31 samples**,
+  maximum private bytes **533,323,776**, warmed growth **1,433,600 bytes**,
+  handle growth **31**, GPU growth **−4,096 bytes**. All configured guards passed,
+  idle caches/native residency returned to zero, and source hashes were unchanged.
+  Budgets are cache limits, not process caps; this is a bounded three-round trial.
+- No new physical mixed-DPI, hostile-native isolation, remote CI or binary publication claim.
+
 # Verification — multi-tab tahap 3, 17 November 2026
 
 - `scripts/check.ps1` passed: fmt, denied-warning Clippy, **55 unit tests**, release

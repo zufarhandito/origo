@@ -4,7 +4,7 @@ Tanggal riset/keputusan: **17 November 2026**. Baseline dokumentasi: `9478ddc`.
 Audiens: pemilik, pengembang, dan agen yang melanjutkan PDF Studio di Windows.
 
 Dokumen ini menjadi sumber tunggal riset dan TODO multi-tab berikutnya. Status
-tahap 1–3: **sudah diimplementasikan**; tahap 4 masih belum diimplementasikan. Persetujuan urutan
+tahap 1–3 dan 4A: **sudah diimplementasikan**; tahap 4B dikerjakan berikutnya. Persetujuan urutan
 dan perilaku di sini tidak berarti implementasi fitur sudah dimulai. Pekerjaan yang
 menghasilkan dokumen ini hanya dokumentasi.
 
@@ -31,7 +31,7 @@ history, posisi baca dan Find sudah tersedia. Lihat [perilaku aktual](../multita
 [hardening/profil](../multitab-hardening.md), [Find](../search.md), dan
 [arsitektur](../architecture.md).
 
-Saat ini hanya tab aktif menjadwalkan render. Tab tersembunyi menyimpan workspace,
+Pada baseline riset hanya tab aktif menjadwalkan render. Tab tersembunyi menyimpan workspace,
 edit/history, seleksi dan viewport dalam RAM, tetapi melepas cache raster/teks dan
 residency GPU. Tidak ada session restore/crash recovery. Kondisi ini berasal dari
 inspeksi kode lokal, bukan dugaan tentang perilaku kompetitor.
@@ -54,7 +54,7 @@ berlaku. Rekomendasi historis di bawah bukan klaim semua tahap sudah selesai.
 | 1 — Pengelolaan tab | Drag urutan, bintang kuning, posisi tombol +, menu klik kanan | Diimplementasikan; lihat multitab.md/testing.md |
 | 2 — Navigasi/pemulihan tab | Buka ulang tab tertutup, pencarian dalam Daftar tab | Diimplementasikan; lihat multitab.md/testing.md |
 | 3 — Melanjutkan pekerjaan | Pemulihan sesi terakhir dan posisi baca | Diimplementasikan; lihat multitab.md/testing.md |
-| 4A — Dua dokumen | Dua PDF berdampingan dengan Dock GPUI Kit dan pembatas resize | Disetujui; belum dikerjakan |
+| 4A — Dua dokumen | Dua PDF berdampingan dengan Dock GPUI Kit dan pembatas resize | Diimplementasikan; lihat multitab.md/testing.md |
 | 4B — Satu dokumen, dua tampilan | Posisi baca terpisah pada workspace dokumen yang sama | Disetujui; belum dikerjakan |
 | Backlog | Group tab dan tab vertikal | Dicatat untuk nanti; tanpa jadwal |
 
@@ -65,8 +65,8 @@ berlaku. Rekomendasi historis di bawah bukan klaim semua tahap sudah selesai.
 - [x] 2.1 Buka ulang tab tertutup.
 - [x] 2.2 Cari tab dalam Daftar tab.
 - [x] 3.1 Pulihkan sesi dan posisi baca.
-- [ ] 4A.1 Dua PDF berdampingan memakai Dock GPUI Kit.
-- [ ] 4A.2 Organizer, seleksi, fokus, ekspor dan resource bounds saat split.
+- [x] 4A.1 Dua PDF berdampingan memakai Dock GPUI Kit.
+- [x] 4A.2 Organizer, seleksi, fokus, ekspor dan resource bounds saat split.
 - [ ] 4B.1 Dua tampilan PDF yang sama.
 
 Pin tab, hover preview, urutan recently used/MRU, dan multi-window dievaluasi dari
@@ -317,6 +317,35 @@ close dirty/cancel, keluar split, clipping drawer, serta CPU/GPU/cache bounds.
 Tambahkan regresi sumber berubah pada satu panel tanpa merusak dokumen lain.
 
 ### 3.9 Dua tampilan PDF yang sama
+
+**Rancangan integrasi lokal untuk tahap 4B (belum diimplementasikan pada checkpoint 4A):**
+
+- Satu model `Workspace` dalam shared handle, termasuk history/revisi/seleksi halaman.
+  Shared handle juga mengoordinasikan identitas sumber impor dan status inspeksi impor.
+  Clone handle tidak menyalin workspace/history. Invalidation sumber mengosongkan model
+  bersama, bukan hanya salah satu view.
+- Bedakan `TabId` dokumen dan `ViewId` tampilan. Satu tab memiliki actor dokumen utama
+  serta maksimal satu view tambahan yang state bacanya boleh disimpan saat tersembunyi.
+  Actor utama tetap hidup sampai dokumen ditutup, walau view utamanya sedang tidak terlihat.
+- Export/PNG/Split PDF/unsaved transition tetap milik actor utama. Aksi dari view kedua
+  meneruskan permintaan sebelum menangkap plan; progress/control/notice dapat diproyeksikan
+  ke view lain, tetapi job/receipt tidak digandakan. Close view tidak memutus job dokumen.
+- Observer revisi memperbarui jumlah halaman, cache, token teks dan Find view lain tanpa
+  membersihkan seleksi halaman bersama. Pertahankan anchor `PageId` masing-masing view;
+  jika halaman itu dihapus, pilih indeks terdekat yang masih ada.
+- Viewport, query/opsi/hasil Find, seleksi teks dan shift-selection anchor adalah state view.
+  View pilihan terakhir menjadi tampilan tunggal dan sumber posisi baca sesi/reopen.
+  Actor tersembunyi tetap harus mengembalikan fokus dialog ke view yang terlihat.
+- Semua views diperiksa untuk loading/modal dan dihitung dalam diagnostics/cache/queue.
+  Maksimal dua view terlihat; budget window tidak bertambah. Dokumen tetap dihitung sekali
+  untuk batas 8 tab, riwayat closed-tab, guard close dan restore sesi baca.
+- Tambahkan aksi eksplisit membuka view kedua dan menutup view. Tab ×/Ctrl+W menutup
+  dokumen dengan guard; menutup salah satu view mempertahankan dokumen dan edit bersama.
+
+Ini keputusan implementasi internal, bukan bukti perilaku kompetitor atau klaim bahwa
+tahap 4B sudah selesai. Verifikasi harus mencakup import dari kedua view, Undo/Redo,
+search invalidation, halaman terhapus, ekspor setelah view asal ditutup, close batch
+cancel/save/discard, source changed, serta profil resource dua view.
 
 **Bukti kompetitor:** Acrobat mendokumentasikan split satu dokumen dengan navigasi
 dan zoom independen, serta beberapa window untuk dokumen yang sama. Firefox

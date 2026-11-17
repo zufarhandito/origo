@@ -15,12 +15,17 @@ impl DocumentSession {
     // Canvas listeners are window-global: clipping alone does not exclude the
     // tool drawer painted over the page, or a modal owned by another document.
     fn document_input_allowed(&self, position: gpui::Point<gpui::Pixels>, window: &Window) -> bool {
-        self.active
+        self.visible_for_render
             && !self
                 .resources
                 .tab_picker_open
                 .load(std::sync::atomic::Ordering::SeqCst)
             && !self.error_popup
+            && !(self
+                .resources
+                .organizer_drawer
+                .load(std::sync::atomic::Ordering::SeqCst)
+                && position.x >= window.viewport_size().width - px(280.))
             && self
                 .resources
                 .modal_owner
@@ -163,11 +168,14 @@ impl DocumentSession {
                             .border_color(c.primary)
                             .child("Letakkan di akhir")
                             .on_drop(cx.listener(|this, drag: &organizer::PageDrag, _, cx| {
+                                if drag.0 != this.tab_id {
+                                    return;
+                                }
                                 if let Some(w) = &this.workspace {
                                     let target = w.pages().len();
                                     this.edit(
                                         pdf_domain::Command::Move {
-                                            ids: drag.0.clone(),
+                                            ids: drag.1.clone(),
                                             target,
                                         },
                                         cx,
@@ -450,21 +458,34 @@ impl DocumentSession {
                 )
                 .when(organizing && !self.opening && !self.edits_locked(), |el| {
                     let weak = cx.weak_entity();
-                    el.on_drag(organizer::PageDrag(drag_ids), move |_, _, _, cx| {
-                        let _ = weak.update(cx, |this, cx| {
-                            this.page_dragging = true;
-                            cx.notify();
-                        });
-                        cx.new(|_| organizer::DragLabel)
-                    })
+                    let document = self.tab_id;
+                    el.on_drag(
+                        organizer::PageDrag(document, drag_ids),
+                        move |_, _, _, cx| {
+                            let _ = weak.update(cx, |this, cx| {
+                                this.page_dragging = true;
+                                cx.notify();
+                            });
+                            cx.new(|_| organizer::DragLabel)
+                        },
+                    )
                     .drag_over::<organizer::PageDrag>(
-                        move |style, _, _, _| style.border_t_2().border_color(colors.primary),
+                        move |style, drag, _, _| {
+                            if drag.0 == document {
+                                style.border_t_2().border_color(colors.primary)
+                            } else {
+                                style
+                            }
+                        },
                     )
                 })
                 .on_drop(cx.listener(move |this, drag: &organizer::PageDrag, _, cx| {
+                    if drag.0 != this.tab_id {
+                        return;
+                    }
                     this.edit(
                         pdf_domain::Command::Move {
-                            ids: drag.0.clone(),
+                            ids: drag.1.clone(),
                             target: index,
                         },
                         cx,
@@ -511,8 +532,8 @@ impl Render for DocumentSession {
         let organizing = self.mode == ViewerMode::Organize;
         let dragging_pages = organizing && self.page_dragging && cx.has_active_drag();
 
-        let reading_toolbar =
-            (self.mode != ViewerMode::Convert).then(|| self.reading_toolbar(window, cx));
+        let reading_toolbar = (self.mode != ViewerMode::Convert && !self.split_presentation)
+            .then(|| self.reading_toolbar(window, cx));
         let search_bar = (has_document && self.search.open && self.mode != ViewerMode::Convert)
             .then(|| self.search_bar(cx));
 
@@ -553,10 +574,14 @@ impl Render for DocumentSession {
                         if phase == gpui::DispatchPhase::Capture
                             && event.button == MouseButton::Left
                         {
-                            let _ = release_weak.update(cx, |this, _| {
+                            let _ = release_weak.update(cx, |this, cx| {
                                 this.text.dragging = false;
                                 this.text.pending = None;
                                 this.text.sentence_anchor = None;
+                                if this.page_dragging {
+                                    this.page_dragging = false;
+                                    cx.notify();
+                                }
                             });
                         }
                     });
@@ -629,7 +654,8 @@ impl Render for DocumentSession {
                 .child(Scrollbar::vertical(&self.page_list))
                 .child(Scrollbar::horizontal(&self.horizontal));
             let sidebar = self.thumbnail_sidebar(dragging_pages, cx);
-            let panel = organizing.then(|| self.organizer_toolbar(cx));
+            let panel =
+                (organizing && !self.split_presentation).then(|| self.organizer_toolbar(cx));
             let narrow = window.viewport_size().width < px(1100.);
             div()
                 .flex_1()
@@ -701,6 +727,7 @@ impl Render for DocumentSession {
                 )
                 .into_any_element()
         };
+        Self::document_actions(
         div()
             .size_full()
             .flex()
@@ -709,78 +736,7 @@ impl Render for DocumentSession {
             .text_color(c.foreground)
             .font_family("Segoe UI")
             .track_focus(&self.focus)
-            .key_context("PdfViewer")
-            .on_action(cx.listener(|this, _: &FindText, window, cx| this.show_search(window, cx)))
-            .on_action(cx.listener(|this, _: &FindNext, window, cx| {
-                if this.search.open { this.move_search(false, cx); } else { this.show_search(window, cx); }
-            }))
-            .on_action(cx.listener(|this, _: &FindPrevious, window, cx| {
-                if this.search.open { this.move_search(true, cx); } else { this.show_search(window, cx); }
-            }))
-            .on_action(cx.listener(|this, _: &CopyText, _, cx| {
-                if this.mode != ViewerMode::Convert {
-                    this.copy_text(cx);
-                }
-            }))
-            .on_action(cx.listener(|this, _: &ClearTextSelection, window, cx| {
-                if this.edits_locked() { return; }
-                if this.search.open { this.close_search(window, cx); return; }
-                if this.mode == ViewerMode::Convert {
-                    this.set_mode(ViewerMode::Read, window, cx);
-                    return;
-                }
-                cx.stop_active_drag(window);
-                this.page_dragging = false;
-                if this.mode == ViewerMode::Organize {
-                    this.set_mode(ViewerMode::Read, window, cx);
-                } else {
-                    this.clear_selection(cx);
-                }
-            }))
-            .on_mouse_up(
-                gpui::MouseButton::Left,
-                cx.listener(|this, _, _, cx| {
-                    if this.page_dragging {
-                        this.page_dragging = false;
-                        cx.notify();
-                    }
-                }),
-            )
-            .on_action(cx.listener(Self::open))
-            .on_action(cx.listener(|this, _: &SaveAs, _, cx| {
-                this.start_export(pdf_application::export::ExportScope::All, cx)
-            }))
-            .on_action(cx.listener(|this, _: &ExtractPages, _, cx| {
-                this.start_export(pdf_application::export::ExportScope::Selected, cx)
-            }))
-            .on_action(cx.listener(|this, _: &ImportPdf, _, cx| this.import_pdf(cx)))
-            .on_action(cx.listener(|this, _: &UndoEdit, _, cx| this.history(false, cx)))
-            .on_action(cx.listener(|this, _: &RedoEdit, _, cx| this.history(true, cx)))
-            .on_action(
-                cx.listener(|this, _: &FirstPage, _, cx| this.navigate(Direction::First, cx)),
-            )
-            .on_action(
-                cx.listener(|this, _: &PreviousPage, _, cx| this.navigate(Direction::Previous, cx)),
-            )
-            .on_action(cx.listener(|this, _: &NextPage, _, cx| this.navigate(Direction::Next, cx)))
-            .on_action(cx.listener(|this, _: &LastPage, _, cx| this.navigate(Direction::Last, cx)))
-            .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.zoom_step(25, cx)))
-            .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.zoom_step(-25, cx)))
-            .on_action(cx.listener(|this, _: &FitWidth, _, cx| this.set_zoom(Zoom::FitWidth, cx)))
-            .on_action(cx.listener(|this, _: &FitPage, _, cx| this.set_zoom(Zoom::FitPage, cx)))
-            .on_action(cx.listener(|this, _: &ToggleSidebar, _, cx| {
-                this.sidebar = !this.sidebar;
-                cx.notify();
-            }))
-            .on_action(cx.listener(|this, _: &FocusPage, window, cx| {
-                if this.mode == ViewerMode::Convert {
-                    this.set_mode(ViewerMode::Read, window, cx);
-                }
-                this.jump.update(cx, |state, cx| {
-                    state.set_value("", window, cx);
-                    state.focus(window, cx);
-                });
-            }))
+        , cx)
             .when(self.export.running && self.export.optimizing, |el| {
                 el.child(div().px_4().py_2().text_sm().child("Optimasi lossless tanpa penurunan kualitas gambar. Ukuran hasil dapat tetap sama atau lebih besar; sumber tetap utuh."))
             })

@@ -85,7 +85,7 @@ impl DocumentSession {
         );
         self.search.running =
             self.search.open && self.search.query.is_some() && self.workspace.is_some();
-        if self.search.running && self.active {
+        if self.search.running && self.visible_for_render {
             self.search.delayed = true;
             let token = self.search.token;
             let timer = cx
@@ -105,7 +105,7 @@ impl DocumentSession {
         cx.notify();
     }
     pub(super) fn pump_search(&mut self, cx: &mut Context<Self>) {
-        if !self.active
+        if !self.visible_for_render
             || !self.search.open
             || !self.search.running
             || self.search.busy
@@ -152,7 +152,7 @@ impl DocumentSession {
                 this.search.busy = false;
                 if this.search.token == token
                     && this.source_sequence == source_sequence
-                    && this.active
+                    && this.visible_for_render
                     && this.search.open
                 {
                     this.search.scanned += 1;
@@ -180,7 +180,7 @@ impl DocumentSession {
                             this.search.current = None;
                             this.invalidate_work();
                             this.clear_bitmaps(cx);
-                            this.text = text_selection::TextState::default();
+                            this.text = text_selection::TextState::new(this.text_budget);
                             this.workspace = None;
                             this.navigation = Navigation::default();
                             this.source_sequence += 1;
@@ -308,6 +308,7 @@ impl DocumentSession {
                 cx.stop_propagation();
             }))
             .flex()
+            .when(self.split_presentation, |el| el.flex_wrap())
             .items_center()
             .gap_2()
             .px_3()
@@ -316,7 +317,7 @@ impl DocumentSession {
             .border_b_1()
             .border_color(cx.theme().border)
             .child(
-                gpui::div().w(px(240.)).flex_shrink_0().child(
+                gpui::div().w(px(240.)).max_w_full().flex_shrink_0().child(
                     Input::new(&self.search_input)
                         .small()
                         .aria_label("Cari dalam PDF"),
@@ -329,6 +330,9 @@ impl DocumentSession {
                     .aria_label(label.clone())
                     .flex_1()
                     .min_w_0()
+                    .when(self.split_presentation, |el| {
+                        el.min_w(px(50.)).flex_shrink_0()
+                    })
                     .text_xs()
                     .child(label),
             )

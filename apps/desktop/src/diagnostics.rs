@@ -43,7 +43,7 @@ impl DocumentSession {
             "selectedChars": self.text.selection.filter(|s| s.anchor.page == s.focus.page)
                 .map_or(0, |s| s.anchor.character.abs_diff(s.focus.character) + 1),
             "organizing": self.mode == ViewerMode::Organize, "pageDragging": self.page_dragging,
-            "navCommands": self.stats.navigation_commands, "tabId": self.tab_id.0, "active": self.active,
+            "navCommands": self.stats.navigation_commands, "tabId": self.tab_id.0, "active": self.active, "visible": self.visible_for_render,
             "conversionHubVisible": self.mode == ViewerMode::Convert,
             "exporting": self.export.running, "exportsCompleted": self.export.completed,
             "exportSuccess": self.export.success, "exportPages": self.export.pages,

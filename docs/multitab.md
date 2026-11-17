@@ -94,6 +94,35 @@ nama tab dan history; nama output dilaporkan pada hasil ekspor.
 - Suite UI memakai `--state-dir` dalam folder fixture ignored; preferensi pengguna
   tidak digunakan untuk menyimpan metadata sintetis. Direktori override tahap 1 tetap berlaku.
 
+## Dua PDF berdampingan — tahap 4A
+
+- Tampilan → **Bandingkan dua PDF…** memilih pasangan dari tab terbuka. Kedua PDF
+  tetap memiliki tab, workspace, seleksi, history, query dan posisi baca sendiri.
+  Header/border menandai panel fokus. Klik panel atau fokus input mengalihkan sasaran.
+- Memakai **Dock GPUI Kit 0.9.1**, dua panel horizontal dan splitter resize, dengan
+  minimum panel 320 logical px. Layout docking dikunci; resize tetap tersedia.
+  Renderer panel tidak memakai cache subtree agar native accessibility tetap lengkap
+  setelah fokus/dialog berubah dalam integrasi ini. Dependency/toolchain tidak dipatch.
+- Satu toolbar dan satu organizer mengikuti PDF fokus. Organizer menyebut dokumen
+  sasaran; seleksi A tidak diganti oleh seleksi B. Pada jendela sempit organizer
+  menjadi drawer dan canvas kedua PDF menolak input di bawah overlay tersebut.
+- Ctrl+A/Delete pada input tetap aksi teks; shortcut halaman mengikuti fokus thumbnail.
+  Drag halaman lintas PDF ditolak, tanpa mengubah kedua workspace. Ini bukan fitur
+  memindahkan halaman antar-PDF dan bukan fitur ekspor **Alat → Split PDF**.
+- **Keluar tampilan berdampingan** atau **Tampilan tunggal** mempertahankan PDF dan
+  state dokumen. Memilih tab di luar pasangan juga kembali ke tampilan tunggal.
+  Menutup tab pasangan tetap melewati guard; keberhasilan menyisakan PDF pasangan
+  sebagai tampilan tunggal. Cancel close mengembalikan layout pasangan sebelumnya.
+- Dua panel terlihat boleh render/scan Find sekaligus; hanya satu menjadi sasaran
+  aksi bersama. Tab tersembunyi tetap berhenti menjadwalkan pekerjaan dan melepas cache.
+  Budget jendela tetap page 128 MiB, thumbnail 16 MiB, text 16 MiB dan antrean render
+  32; dua panel membaginya rata. Override budget raster yang ada tetap berlaku.
+- Resize mempertahankan anchor baca/pan relatif per panel. Ekspor tetap menangkap
+  dokumen/revisi asal; berpindah fokus tidak memindahkan job, consent atau receipt.
+  Close/zoom bawaan Dock dinonaktifkan agar tidak melewati guard aplikasi.
+- Restore sesi baca tetap menyimpan daftar dokumen/posisi, bukan layout split.
+  Dua view PDF yang sama masih tahap 4B; belum tersedia pada checkpoint 4A ini.
+
 ## Panel dan keyboard
 
 Reader tidak membuka panel alat secara default. Panel alat/Alat → Atur halaman
@@ -130,9 +159,9 @@ memakai weak entity asal dan token/generation yang sudah ada. Indeks tab tidak m
 identitas callback.
 
 Semua session memakai clone renderer yang berbagi worker/session PDFium bounded.
-Saat nonaktif, session berhenti menjadwalkan render, membuang cache raster/teks dan
+Saat tersembunyi, session berhenti menjadwalkan render, membuang cache raster/teks dan
 melepas tekstur melalui deferred window GPU release. Edit/history/seleksi/viewport
-tetap disimpan. Hanya tab aktif mempertahankan cache; default window tetap page
+tetap disimpan. Panel yang terlihat mempertahankan bagian budget cache; default window tetap page
 128 MiB, thumbnail 16 MiB dan text 16 MiB, dengan override raster yang sudah ada.
 Budget cache bukan batas seluruh process memory. Reload teks setelah switch bersifat
 async. Copy dapat memuat ulang halaman seleksi yang keluar dari cache secara bertahap

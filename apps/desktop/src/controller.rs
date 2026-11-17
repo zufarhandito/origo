@@ -80,7 +80,7 @@ impl DocumentSession {
         self.mode = ViewerMode::Read;
         self.page_dragging = false;
         self.gesture_zoom.reset();
-        self.text = text_selection::TextState::default();
+        self.text = text_selection::TextState::new(self.text_budget);
         self.invalidate_work();
         self.source_sequence += 1;
         self.workspace_instance += 1;
@@ -303,6 +303,15 @@ impl DocumentSession {
         {
             return;
         }
+        let top = self.page_list.logical_scroll_top();
+        let fraction = self
+            .workspace
+            .as_ref()
+            .filter(|_| top.item_ix == usize::from(self.navigation.current))
+            .and_then(|w| w.geometry(top.item_ix).ok())
+            .map(|g| f32::from(top.offset_in_item) / (self.zoom.size(g, self.viewport).1 + 48.));
+        let pan = f32::from(self.horizontal.offset().x)
+            / (self.content_width() - self.viewport.0).max(1.);
         self.viewport = viewport;
         self.dpr = dpr;
         if self.opening {
@@ -311,6 +320,27 @@ impl DocumentSession {
         self.trim_gpu(cx);
         self.invalidate_work();
         self.reset_layout();
+        if let Some(fraction) = fraction {
+            let index = top
+                .item_ix
+                .min(usize::from(self.navigation.count.saturating_sub(1)));
+            if let Some(height) = self
+                .workspace
+                .as_ref()
+                .and_then(|w| w.geometry(index).ok())
+                .map(|g| self.zoom.size(g, self.viewport).1 + 48.)
+            {
+                self.navigation.current = index as u16;
+                self.page_list.scroll_to(ListOffset {
+                    item_ix: index,
+                    offset_in_item: px(fraction.clamp(-1., 1.) * height),
+                });
+                self.horizontal.set_offset(gpui::point(
+                    px(pan.clamp(-1., 0.) * (self.content_width() - self.viewport.0).max(0.)),
+                    px(0.),
+                ));
+            }
+        }
         self.schedule_current(cx);
         cx.notify();
     }
@@ -359,7 +389,7 @@ impl DocumentSession {
         }
     }
     pub(super) fn schedule_current(&mut self, cx: &mut Context<Self>) {
-        if !self.active {
+        if !self.visible_for_render {
             return;
         }
         let index = usize::from(self.navigation.current);
@@ -377,7 +407,7 @@ impl DocumentSession {
         priority: u8,
         cx: &mut Context<Self>,
     ) {
-        if !self.active {
+        if !self.visible_for_render {
             return;
         }
         let Some(key) = self.key(index, kind) else {
@@ -425,7 +455,7 @@ impl DocumentSession {
         self.pump(cx);
     }
     pub(super) fn pump(&mut self, cx: &mut Context<Self>) {
-        if !self.active || self.inflight.is_some() || self.opening {
+        if !self.visible_for_render || self.inflight.is_some() || self.opening {
             return;
         }
         let Some(job) = self.queue.pop() else {
@@ -469,7 +499,7 @@ impl DocumentSession {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
                 this.inflight = None;
-                if !this.active || job.generation != this.generation {
+                if !this.visible_for_render || job.generation != this.generation {
                     this.stats.stale += 1;
                 } else {
                     match result {
@@ -502,7 +532,7 @@ impl DocumentSession {
                                 this.search.running = false;
                                 this.search.matches.clear();
                                 this.search.current = None;
-                                this.text = text_selection::TextState::default();
+                                this.text = text_selection::TextState::new(this.text_budget);
                                 this.invalidate_work();
                                 this.clear_bitmaps(cx);
                                 this.workspace = None;

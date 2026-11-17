@@ -17,6 +17,7 @@ mod chrome;
 mod controller;
 mod conversion;
 mod diagnostics;
+mod document_actions;
 mod exporting;
 mod feedback;
 mod local_state;
@@ -92,6 +93,9 @@ struct DocumentSession {
     owner: gpui::WeakEntity<shell::WindowShell>,
     resources: Arc<shell::WindowResources>,
     active: bool,
+    visible_for_render: bool,
+    split_presentation: bool,
+    text_budget: usize,
     close_approved: bool,
     split_dialog: Option<splitting::SplitDialog>,
     png_dialog: Option<png_export::PngDialog>,
@@ -288,6 +292,17 @@ impl DocumentSession {
     ) -> Entity<Self> {
         cx.new(|cx| {
             let focus = cx.focus_handle();
+            let focus_owner = owner.clone();
+            cx.on_focus_in(&focus, window, move |this: &mut DocumentSession, _, cx| {
+                let owner = focus_owner.clone();
+                let id = this.tab_id;
+                cx.defer(move |cx| {
+                    let _ = owner.update(cx, |shell, cx| {
+                        shell.focus_visible_tab(id, cx);
+                    });
+                });
+            })
+            .detach();
             cx.observe_window_activation(window, |this: &mut DocumentSession, window, _| {
                 if !window.is_window_active() {
                     this.page_dragging = false;
@@ -351,6 +366,9 @@ impl DocumentSession {
                 owner,
                 resources: resources.clone(),
                 active: false,
+                visible_for_render: false,
+                split_presentation: false,
+                text_budget: 16 * 1024 * 1024,
                 close_approved: false,
                 split_dialog: None,
                 png_dialog: None,

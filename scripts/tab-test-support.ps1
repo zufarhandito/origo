@@ -146,6 +146,13 @@ function Save-Pdf($Name,$Path){
 
 function Switch-Tab([string]$Name) {
     Invoke 'Daftar tab'
+    $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+    $field=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Cari tab'))
+    if($field){
+        $field.SetFocus()
+        $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Name)
+        Start-Sleep -Milliseconds 150
+    }
     Invoke $Name
 }
 function Menu-Action([string]$Menu,[string]$Action) {

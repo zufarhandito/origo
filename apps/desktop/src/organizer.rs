@@ -1,7 +1,7 @@
 use crate::*;
 use pdf_domain::{Command, PageId, SourceDocument};
 
-pub(super) struct PageDrag(pub Vec<PageId>);
+pub(super) struct PageDrag(pub shell::TabId, pub Vec<PageId>);
 pub(super) struct DragLabel;
 impl gpui::Render for DragLabel {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl gpui::IntoElement {
@@ -94,7 +94,7 @@ impl DocumentSession {
             w.select([]);
         }
         self.source_sequence += 1; // Reject positional text results from before this edit.
-        self.text = text_selection::TextState::default();
+        self.text = text_selection::TextState::new(self.text_budget);
         self.restart_search(cx);
         self.invalidate_work();
         self.clear_bitmaps(cx);
@@ -231,7 +231,7 @@ impl DocumentSession {
             let _ = this.update(cx, |this, cx| {
                 this.opening = false;
                 // An earlier positional text request may have completed during inspection.
-                this.text = text_selection::TextState::default();
+                this.text = text_selection::TextState::new(this.text_budget);
                 match result {
                     Ok(source) => this.edit(Command::Import(source), cx),
                     Err(e) => {

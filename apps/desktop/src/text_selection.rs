@@ -42,6 +42,12 @@ impl CopyJob {
     }
 }
 impl TextState {
+    pub(super) fn new(budget: usize) -> Self {
+        Self {
+            pages: ByteCache::new(budget),
+            ..Self::default()
+        }
+    }
     pub(super) fn copying(&self) -> bool {
         self.copy.is_some()
     }
@@ -69,7 +75,7 @@ impl Default for TextState {
 }
 impl DocumentSession {
     pub(super) fn request_text(&mut self, index: usize, cx: &mut Context<Self>) {
-        if !self.active
+        if !self.visible_for_render
             || self.opening
             || self.text.busy
             || self.text.pages.contains(&index)
@@ -106,7 +112,7 @@ impl DocumentSession {
                     return;
                 }
                 this.text.busy = false;
-                if !this.active {
+                if !this.visible_for_render {
                     return;
                 }
                 match result {
@@ -125,7 +131,7 @@ impl DocumentSession {
                             this.search.current = None;
                             this.invalidate_work();
                             this.clear_bitmaps(cx);
-                            this.text = TextState::default();
+                            this.text = TextState::new(this.text_budget);
                             this.workspace = None;
                             this.navigation = Navigation::default();
                             this.error = Some(error.to_string());

@@ -1,5 +1,14 @@
 # Architecture - desktop multi-tab
 
+Split comparison uses GPUI Kit DockArea/DockLayout with a locked two-panel layout;
+resizing stays enabled and Dock's close/zoom controls cannot remove PDF sessions.
+Uncached panel rendering preserves the native accessibility tree after modal/focus
+changes observed in this integration. WindowShell separates focused (`active`) from
+visible (`visible_for_render`) sessions. Both visible sessions schedule rendering,
+text and Find; hidden ones release residency. Visible panels divide the window cache
+and queue budgets equally. One external toolbar/organizer targets the focused PDF;
+window-global canvas listeners also exclude the shared drawer/tab-picker overlays.
+
 Reading session snapshots are versioned, bounded local JSON, separate from export
 transactions and unsaved edits. WindowShell polls metadata changes every second,
 coalescing writes to one running task plus the latest pending snapshot. Normal window
@@ -21,7 +30,7 @@ Find state belongs to each DocumentSession. A debounced query scans one workspac
 page at a time on the shared PDFium worker; application/search implements bounded
 literal phrase matching with source-character ranges. Only compact occurrences are
 retained (10,000 maximum); visible highlights reuse TextPage geometry in the existing
-16 MiB cache. Query/source tokens reject stale callbacks, inactive sessions pause
+window-wide text budget. Query/source tokens reject stale callbacks, hidden sessions pause
 incomplete scans, and page edits restart against the current plan. Search diagnostics
 exclude query/text content. See [Find behavior and limits](search.md).
 
@@ -35,9 +44,9 @@ WindowShell owns stable TabIds, active-tab/menu state, transactional multi-docum
 close and window-wide export/modal coordination. Each DocumentSession is a separate
 GPUI entity, preserving its workspace, history, input and viewport. Async completions
 target their originating weak entity; removed tabs cannot be confused with new indices.
-Sessions share a cloned PDFium renderer/worker. Inactive sessions stop scheduling,
+Sessions share a cloned PDFium renderer/worker. Hidden sessions stop scheduling,
 clear CPU raster/text caches and defer GPU release through the actual Window. Thus
-cache budgets apply to the active session across the window, not eight independent
+cache budgets apply to visible sessions across the window, not eight independent
 resident caches. Metrics writes also share a sequence/lock across sessions.
 See [multi-tab](multitab.md) for lifecycle, layout and remaining verification limits.
 

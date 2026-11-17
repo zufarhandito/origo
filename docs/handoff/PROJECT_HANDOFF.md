@@ -1,3 +1,22 @@
+# Checkpoint tahap 4A — 17 November 2026
+
+Dua PDF berdampingan sudah diimplementasikan dengan Dock GPUI Kit 0.9.1 dan
+splitter native, minimum 320 px selama drag. Satu toolbar/organizer mengikuti
+dokumen fokus; dua panel tetap merender dengan pembagian budget jendela yang lama.
+Tutup dokumen tetap transactional; ekspor/receipt milik dokumen asal. Dock memakai
+renderer uncached agar subtree aksesibilitas tetap tersedia setelah modal/fokus.
+Tes comparison final release lulus 10 kasus pada
+`.research/comparison-ui-54f5ce182f384dffbfaa018d990996b6`; regresi/profile ada di
+[testing](../testing.md). Check final lulus 56 unit tests/fmt/Clippy/release build;
+profil final 3 putaran, 8 PDF × 1.000 halaman, kedua panel zoom 400% lulus 31 sampel
+di `.research/comparison-memory-947dca5ad8a348abab627931a42da1e7`.
+
+Tahap 1, 2, 3 ada di `615e57e`, `7c9db9a`, `bf51fb6`. Tahap berikutnya yang tetap
+diotorisasi adalah 4B: dua view satu workspace. Rancangannya berada di roadmap.
+Jangan menganggap tahap 4B selesai. Proses pengguna PID 30316 tetap dipertahankan.
+Push masih tertahan penolakan automatic approval review dari sesi sebelumnya;
+konfirmasi tujuan/payload telah ditanyakan kembali, belum ada jawaban eksplisit.
+
 # Sesi aktif — implementasi multi-tab bertahap, 17 November 2026
 
 Pemilik telah mengotorisasi eksekusi tahap 1 → 2 → 3 → 4A → 4B, satu per satu.

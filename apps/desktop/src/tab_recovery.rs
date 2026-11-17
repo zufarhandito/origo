@@ -81,6 +81,13 @@ impl WindowShell {
         let query = self.tab_picker_input.read(cx).value().to_lowercase();
         self.tabs
             .iter()
+            .filter(|t| {
+                !self.tab_picker_pairing
+                    || (Some(t.id) != self.active
+                        && t.session
+                            .as_ref()
+                            .is_some_and(|s| s.read(cx).workspace.is_some()))
+            })
             .filter(|t| t.path.to_string_lossy().to_lowercase().contains(&query))
             .map(|t| t.id)
             .collect()
@@ -90,6 +97,7 @@ impl WindowShell {
             return;
         }
         self.tab_picker_open = !self.tab_picker_open;
+        self.tab_picker_pairing = false;
         self.tab_picker_selected = 0;
         if self.tab_picker_open {
             self.tab_picker_input.update(cx, |input, cx| {
@@ -122,8 +130,7 @@ impl WindowShell {
                 if let Some(id) = ids.get(self.tab_picker_selected).copied()
                     && self.tabs.iter().any(|t| t.id == id && t.session.is_some())
                 {
-                    self.tab_picker_open = false;
-                    self.switch(id, cx);
+                    self.select_picker_tab(id, window, cx);
                 }
             }
             "escape" => self.toggle_tab_picker(window, cx),
@@ -223,9 +230,8 @@ impl WindowShell {
                                         .flex_1()
                                         .label(tab.path.display().to_string())
                                         .disabled(tab.session.is_none())
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.tab_picker_open = false;
-                                            this.switch(id, cx);
+                                        .on_click(cx.listener(move |this, _, window, cx| {
+                                            this.select_picker_tab(id, window, cx);
                                         })),
                                 )
                                 .child(div().text_xs().child(status)),
