@@ -4,7 +4,7 @@ Tanggal riset/keputusan: **17 November 2026**. Baseline dokumentasi: `9478ddc`.
 Audiens: pemilik, pengembang, dan agen yang melanjutkan PDF Studio di Windows.
 
 Dokumen ini menjadi sumber tunggal riset dan TODO multi-tab berikutnya. Status
-seluruh fitur dalam daftar kerja: **belum diimplementasikan**. Persetujuan urutan
+tahap 1: **sudah diimplementasikan**; tahap 2–4 masih belum diimplementasikan. Persetujuan urutan
 dan perilaku di sini tidak berarti implementasi fitur sudah dimulai. Pekerjaan yang
 menghasilkan dokumen ini hanya dokumentasi.
 
@@ -36,21 +36,32 @@ edit/history, seleksi dan viewport dalam RAM, tetapi melepas cache raster/teks d
 residency GPU. Tidak ada session restore/crash recovery. Kondisi ini berasal dari
 inspeksi kode lokal, bukan dugaan tentang perilaku kompetitor.
 
+## Keputusan implementasi sesi aktif
+
+Pemilik meminta seluruh tahap dikerjakan berurutan. Tahap 1 memakai favorit permanen
+lokal berdasarkan canonical path; rename/move dianggap file berbeda. Klik kanan
+mempertahankan tab aktif; reorder loading diperbolehkan dan close batch menguncinya.
+Tahap 2: riwayat maksimal 20 tab tertutup, hanya selama proses berjalan, tanpa edit
+yang sudah dibuang. Tahap 3 menawarkan restore sesi baca, bukan autosave edit.
+Tahap 4A memilih pasangan PDF dari tab terbuka. Tahap 4B berbagi seleksi halaman dan
+workspace; pencarian/seleksi teks/viewport/zoom terpisah. Batas dan acceptance lain
+berlaku. Rekomendasi historis di bawah bukan klaim semua tahap sudah selesai.
+
 ## 2. TODO dan urutan yang disetujui
 
 | Tahap | Daftar kerja | Status |
 |---|---|---|
-| 1 — Pengelolaan tab | Drag urutan, bintang kuning, posisi tombol +, menu klik kanan | Disetujui; belum dikerjakan |
+| 1 — Pengelolaan tab | Drag urutan, bintang kuning, posisi tombol +, menu klik kanan | Diimplementasikan; lihat multitab.md/testing.md |
 | 2 — Navigasi/pemulihan tab | Buka ulang tab tertutup, pencarian dalam Daftar tab | Disetujui; belum dikerjakan |
 | 3 — Melanjutkan pekerjaan | Pemulihan sesi terakhir dan posisi baca | Disetujui; belum dikerjakan |
 | 4A — Dua dokumen | Dua PDF berdampingan dengan Dock GPUI Kit dan pembatas resize | Disetujui; belum dikerjakan |
 | 4B — Satu dokumen, dua tampilan | Posisi baca terpisah pada workspace dokumen yang sama | Disetujui; belum dikerjakan |
 | Backlog | Group tab dan tab vertikal | Dicatat untuk nanti; tanpa jadwal |
 
-- [ ] 1.1 Drag untuk mengubah urutan tab.
-- [ ] 1.2 Bintang kuning untuk dokumen prioritas.
-- [ ] 1.3 Tombol + langsung setelah tab terakhir.
-- [ ] 1.4 Menu klik kanan tab.
+- [x] 1.1 Drag untuk mengubah urutan tab.
+- [x] 1.2 Bintang kuning untuk dokumen prioritas.
+- [x] 1.3 Tombol + langsung setelah tab terakhir.
+- [x] 1.4 Menu klik kanan tab.
 - [ ] 2.1 Buka ulang tab tertutup.
 - [ ] 2.2 Cari tab dalam Daftar tab.
 - [ ] 3.1 Pulihkan sesi dan posisi baca.
@@ -107,7 +118,7 @@ tersedia juga di menu klik kanan dan terlihat dalam Daftar tab. Bintang tidak
 mengubah posisi tab, isi PDF, dirty state atau history. Simpan favorit lokal agar
 tetap diingat ketika file dibuka lagi; tidak ada upload otomatis.
 
-**Keputusan lanjutan:** favorit permanen versus penanda selama tab terbuka belum
+**Keputusan awal (digantikan keputusan implementasi di bawah):** favorit permanen versus penanda selama tab terbuka belum
 dijawab secara eksplisit. Permanen adalah rekomendasi, bukan keputusan terkunci.
 Jika permanen dipilih, tetapkan identitas file, perilaku rename/move/file hilang,
 serta penanganan gagal tulis preferensi.
@@ -379,7 +390,7 @@ split; semua identitas/state tetap benar. Kriteria final menunggu prioritisasi.
   aktual pada setiap fitur. Source/test upstream bukan bukti aplikasi kita lulus.
 - Sesudah fitur selesai, buat Conventional Commit dan push sesuai instruksi pemilik;
   laporkan SHA/hasil sebenarnya. Catat blocker bila push ditolak, tanpa workaround.
-- Dokumen ini belum mengubah API, dependency atau kode aplikasi. Rencana UI lama
+- Dokumen awal ini tidak mengubah kode; implementasi tahap 1 kini dicatat di multitab.md. Rencana UI lama
   tetap historis. Indeks/handoff cukup menautkan dokumen ini, tanpa menduplikasi riset.
 
 Validasi untuk pekerjaan dokumentasi: cocokkan keputusan percakapan dan kondisi

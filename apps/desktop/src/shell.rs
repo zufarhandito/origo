@@ -2,10 +2,10 @@
 use crate::*;
 use gpui::assets::IconName;
 use gpui::component::{
-    ActiveTheme, Disableable, Theme, ThemeMode, TitleBar, WindowExt,
-    button::{Button, ButtonVariants},
-    menu::{DropdownMenu, PopupMenuItem},
-    tab::{Tab as DocumentTab, TabBar},
+    ActiveTheme, Disableable, Selectable, Theme, ThemeMode, TitleBar, WindowExt,
+    button::{Button, ButtonCustomVariant, ButtonVariants},
+    menu::{ContextMenuExt, DropdownMenu, PopupMenuItem},
+    tab::Tab as DocumentTab,
 };
 use gpui::{AnyElement, Render, div};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -53,6 +53,12 @@ pub(super) struct WindowShell {
     opening: bool,
     close: Option<CloseBatch>,
     notice: Option<String>,
+    favorites: std::collections::BTreeSet<String>,
+    favorites_ready: bool,
+    favorites_revision: u64,
+    favorites_writer: Arc<std::sync::Mutex<u64>>,
+    pending_preferences: usize,
+    state_dir: Option<PathBuf>,
 }
 
 fn path_key(path: &std::path::Path) -> String {
@@ -62,15 +68,15 @@ fn capacity(count: usize, added: usize) -> bool {
     added <= MAX_TABS.saturating_sub(count)
 }
 impl WindowShell {
-    pub fn new(
-        window: &mut Window,
-        cx: &mut App,
-        sidecars: PathBuf,
-        page_budget: usize,
-        thumbnail_budget: usize,
-        metrics: Option<PathBuf>,
-        initial: Option<PathBuf>,
-    ) -> Entity<Self> {
+    pub fn new(window: &mut Window, cx: &mut App, options: ShellOptions) -> Entity<Self> {
+        let ShellOptions {
+            sidecars,
+            page_budget,
+            thumbnail_budget,
+            metrics,
+            state_dir,
+            initial,
+        } = options;
         cx.new(|cx| {
             let weak = cx.weak_entity();
             window.on_window_should_close(cx, move |_, cx| {
@@ -93,7 +99,14 @@ impl WindowShell {
                 opening: false,
                 close: None,
                 notice: None,
+                favorites: Default::default(),
+                favorites_ready: false,
+                favorites_revision: 0,
+                favorites_writer: Arc::default(),
+                pending_preferences: 0,
+                state_dir,
             };
+            shell.load_favorites(cx);
             shell.focus.focus(window, cx);
             if shell.metrics.is_some() {
                 cx.spawn(async move |this, cx| {
@@ -143,6 +156,16 @@ impl WindowShell {
             });
         let sum = |key: &str| sessions.iter().filter_map(|s| s[key].as_u64()).sum::<u64>();
         json["tabCount"] = serde_json::json!(self.tabs.len());
+        json["tabOrder"] = serde_json::json!(self.tabs.iter().map(|t| t.id.0).collect::<Vec<_>>());
+        json["starredTabIds"] = serde_json::json!(
+            self.tabs
+                .iter()
+                .filter(|t| self.favorites.contains(&path_key(&t.path)))
+                .map(|t| t.id.0)
+                .collect::<Vec<_>>()
+        );
+        json["favoritesReady"] = serde_json::json!(self.favorites_ready);
+        json["pendingPreferences"] = serde_json::json!(self.pending_preferences);
         json["tabsOpening"] = serde_json::json!(self.opening);
         json["closingTabs"] = serde_json::json!(self.close.is_some());
         json["windowExportOwner"] =
@@ -483,6 +506,14 @@ impl WindowShell {
         target: Option<TabId>,
         cx: &mut Context<Self>,
     ) -> bool {
+        let ids = if window {
+            self.tabs.iter().map(|t| t.id).collect()
+        } else {
+            target.or(self.active).into_iter().collect()
+        };
+        self.begin_close_ids(window, ids, cx)
+    }
+    fn begin_close_ids(&mut self, window: bool, ids: Vec<TabId>, cx: &mut Context<Self>) -> bool {
         if self.close.is_some()
             || self.opening
             || self.modal(cx)
@@ -497,15 +528,13 @@ impl WindowShell {
         if self.tabs.is_empty() {
             return window;
         }
-        let ids = if window {
-            self.tabs.iter().map(|t| t.id).collect()
-        } else {
-            target
-                .or(self.active)
-                .into_iter()
-                .filter(|id| self.tabs.iter().any(|t| t.id == *id))
-                .collect()
-        };
+        let ids: Vec<_> = ids
+            .into_iter()
+            .filter(|id| self.tabs.iter().any(|t| t.id == *id))
+            .collect();
+        if ids.is_empty() {
+            return false;
+        }
         self.resources.closing.store(true, Ordering::SeqCst);
         self.close = Some(CloseBatch {
             ids,
@@ -554,6 +583,9 @@ impl WindowShell {
                 return;
             };
             if batch.index == batch.ids.len() {
+                if self.pending_preferences != 0 {
+                    return;
+                }
                 let Some(batch) = self.close.take() else {
                     return;
                 };
@@ -675,6 +707,15 @@ impl WindowShell {
             }
         }
     }
+}
+
+pub(super) struct ShellOptions {
+    pub sidecars: PathBuf,
+    pub page_budget: usize,
+    pub thumbnail_budget: usize,
+    pub metrics: Option<PathBuf>,
+    pub state_dir: Option<PathBuf>,
+    pub initial: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy)]
@@ -868,19 +909,44 @@ impl WindowShell {
             .into_any_element()
     }
 }
+#[path = "tab_management.rs"]
+mod tab_management;
+use tab_management::{TabDrag, TabDragLabel, tab_context_menu};
+
 impl Render for WindowShell {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use MenuAction::*;
         let colors = cx.theme().colors;
-        let mut strip = TabBar::new("document-tabs")
-            .folder()
-            .max_width(px(260.))
+        let mut strip = div()
+            .id("document-tabs")
+            .role(gpui::Role::TabList)
+            .flex()
+            .items_center()
+            .overflow_x_scroll()
             .track_scroll(&self.tab_scroll)
             .min_w_0()
-            .flex_1();
-        if let Some(index) = self.tabs.iter().position(|t| Some(t.id) == self.active) {
-            strip = strip.selected_index(index);
-        }
+            .flex_shrink(1.)
+            .on_drag_move(
+                cx.listener(|this, event: &gpui::DragMoveEvent<TabDrag>, _, cx| {
+                    if this.close.is_some() || this.modal(cx) {
+                        return;
+                    }
+                    let x = event.event.position.x;
+                    let delta = if x < event.bounds.left() + px(32.) {
+                        24.
+                    } else if x > event.bounds.right() - px(32.) {
+                        -24.
+                    } else {
+                        0.
+                    };
+                    if delta != 0. {
+                        let mut offset = this.tab_scroll.offset();
+                        offset.x += px(delta);
+                        this.tab_scroll.set_offset(offset);
+                        cx.notify();
+                    }
+                }),
+            );
         for tab in &self.tabs {
             let id = tab.id;
             let name = tab.path.file_name().unwrap_or_default().to_string_lossy();
@@ -918,32 +984,118 @@ impl Render for WindowShell {
                     ""
                 }
             );
+            let weak = cx.weak_entity();
+            let starred = self.favorites.contains(&path_key(&tab.path));
+            let blocked = self.close.is_some() || self.modal(cx);
             strip = strip.child(
-                DocumentTab::new()
-                    .label(label)
-                    .disabled(tab.session.is_none())
-                    .on_click(cx.listener(move |this, _, _, cx| this.switch(id, cx)))
-                    .suffix(
-                        Button::new(("close-tab", id.0))
-                            .ghost()
-                            .icon(IconName::X)
-                            .w(px(24.))
-                            .h(px(24.))
-                            .accessibility_label(format!("Tutup tab: {name}"))
-                            .tooltip(format!("Tutup {}", tab.path.display()))
-                            .disabled(self.opening || self.close.is_some() || self.modal(cx))
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                cx.stop_propagation();
-                                this.begin_close_target(false, Some(id), cx);
-                            })),
-                    ),
+                div()
+                    .id(("document-tab", id.0))
+                    .flex_shrink_0()
+                    .child(
+                        DocumentTab::new()
+                            .folder()
+                            .selected(self.active == Some(id))
+                            .max_w(px(260.))
+                            .flex_shrink_0()
+                            .aria_label(label.clone())
+                            .child(div().max_w(px(160.)).truncate().child(label))
+                            .prefix(
+                                Button::new(("star-tab", id.0))
+                                    .ghost()
+                                    .icon(if starred {
+                                        IconName::StarFill
+                                    } else {
+                                        IconName::Star
+                                    })
+                                    .when(starred, |button| {
+                                        button.custom(
+                                            ButtonCustomVariant::new(cx)
+                                                .foreground(gpui::rgb(0xeab308).into()),
+                                        )
+                                    })
+                                    .w(px(24.))
+                                    .h(px(24.))
+                                    .accessibility_label(format!(
+                                        "{}: {name}",
+                                        if starred { "Hapus bintang" } else { "Bintangi" }
+                                    ))
+                                    .disabled(blocked || !self.favorites_ready)
+                                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| {
+                                        cx.stop_propagation()
+                                    })
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        this.toggle_favorite(id, cx);
+                                    })),
+                            )
+                            .when(!blocked, |tab| {
+                                tab.on_drag(TabDrag(id), move |_, _, _, cx| {
+                                    cx.new(|_| TabDragLabel)
+                                })
+                                .drag_over::<TabDrag>(
+                                    move |style, _, _, _| {
+                                        style.border_l_2().border_color(colors.primary)
+                                    },
+                                )
+                            })
+                            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| {
+                                this.move_tab(drag.0, Some(id), cx)
+                            }))
+                            .on_click(cx.listener(move |this, _, _, cx| this.switch(id, cx)))
+                            .suffix(
+                                Button::new(("close-tab", id.0))
+                                    .ghost()
+                                    .icon(IconName::X)
+                                    .w(px(24.))
+                                    .h(px(24.))
+                                    .accessibility_label(format!("Tutup tab: {name}"))
+                                    .tooltip(format!("Tutup {}", tab.path.display()))
+                                    .disabled(
+                                        self.opening || self.close.is_some() || self.modal(cx),
+                                    )
+                                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| {
+                                        cx.stop_propagation()
+                                    })
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        this.begin_close_target(false, Some(id), cx);
+                                    })),
+                            ),
+                    )
+                    .context_menu(move |menu, _, cx| tab_context_menu(menu, weak.clone(), id, cx)),
             );
         }
+        strip = strip.child(
+            div()
+                .id("tab-drop-end")
+                .w(px(12.))
+                .h(px(32.))
+                .flex_shrink_0()
+                .drag_over::<TabDrag>(move |style, _, _, _| {
+                    style.border_l_2().border_color(colors.primary)
+                })
+                .on_drop(
+                    cx.listener(|this, drag: &TabDrag, _, cx| this.move_tab(drag.0, None, cx)),
+                ),
+        );
         let weak = cx.weak_entity();
         let entries: Vec<_> = self
             .tabs
             .iter()
-            .map(|t| (t.id, t.path.display().to_string()))
+            .map(|t| {
+                (
+                    t.id,
+                    format!(
+                        "{}{}",
+                        if self.favorites.contains(&path_key(&t.path)) {
+                            "★ "
+                        } else {
+                            ""
+                        },
+                        t.path.display()
+                    ),
+                )
+            })
             .collect();
         let tab_list = Button::new("tab-list")
             .outline()
@@ -1051,9 +1203,10 @@ impl Render for WindowShell {
                             .ghost()
                             .icon(IconName::Plus)
                             .accessibility_label("Buka PDF di tab baru")
-                            .disabled(!self.enabled(Open, cx))
+                            .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
                             .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
                     )
+                    .child(div().flex_1())
                     .child(tab_list),
             )
             .when_some(self.notice.clone(), |el, notice| {

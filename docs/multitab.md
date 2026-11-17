@@ -19,6 +19,28 @@ toolbar baca tetap satu baris. Konversi placeholder tidak masuk navigasi utama.
   Menutup tab clean nonaktif tidak memindahkan tab aktif. Daftar tab memakai satu
   tombol berlabel dengan caret.
 
+## Pengelolaan tab — tahap 1
+
+- Drag badan tab untuk menyisipkannya sebelum tab tujuan; area sesudah tab terakhir
+  menerima drop ke akhir. Tepi strip menggulir saat pointer drag bergerak di sana.
+  Escape/drop di luar sasaran tidak mengubah urutan. Ctrl+Tab, Daftar tab dan close
+  jendela mengikuti urutan visual. Loading boleh dipindah; modal/close batch mengunci reorder.
+- Bintang outline/kuning menandai prioritas tanpa mengubah dirty state, isi atau
+  urutan PDF. Favorit permanen lokal berdasarkan canonical path Windows; file yang
+  dipindah/rename dianggap berbeda. Daftar tab juga menampilkan bintang.
+- Favorit berada di `%LOCALAPPDATA%/PDF Studio/favorites.json`, maksimum 4096 entri
+  dan 1 MiB. I/O background, penggantian atomik dan close menunggu penulisan pending.
+  Metadata rusak/versi asing tidak ditimpa; tombol bintang dinonaktifkan dengan pesan.
+  Gagal simpan mempertahankan penanda sesi dan menampilkan pemberitahuan.
+- `--state-dir <absolute-directory>` mengisolasi preferensi untuk pengujian; alternatif
+  environment `PDF_STUDIO_STATE_DIR` berlaku jika argumen tersebut tidak diberikan.
+  Metadata lokal memuat lokasi file; tidak menjadi bagian diagnostics atau upload.
+- Tombol + langsung setelah deretan tab; tetap di luar area scroll saat overflow.
+  Pada kapasitas penuh + dinonaktifkan; Open menu/shortcut tetap dapat memfokuskan duplikat.
+- Klik kanan tidak mengaktifkan tab. Menu menargetkan identitas tab yang diklik:
+  Bintangi/Hapus bintang, Pindahkan ke awal/akhir, Tutup tab, Tutup tab lainnya,
+  Tutup tab di kanan. Close banyak tab memakai guard transactional yang sama.
+
 History, dirty revision, seleksi, halaman, zoom, scroll/pan, dan mode alat milik
 masing-masing dokumen. Tema berlaku untuk jendela. Save As mempertahankan sumber,
 nama tab dan history; nama output dilaporkan pada hasil ekspor.
@@ -69,7 +91,7 @@ dengan buffer hasil maksimal 1 MiB; pindah tab membatalkan job copy yang belum s
 
 Batas sumber 1024 halaman/128 MiB berlaku per workspace. PDFium tetap in-process,
 tanpa hard native timeout/sandbox. Tidak ada session restore, detach/multi-window,
-drag reorder tab, converter baru, OCR, atau content editing.
+converter baru, OCR, atau content editing.
 
 ## Verifikasi
 

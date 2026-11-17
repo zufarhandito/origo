@@ -4593,6 +4593,7 @@ dependencies = [
  "qpdf-adapter",
  "serde_json",
  "smallvec",
+ "tempfile",
 ]
 
 [[package]]

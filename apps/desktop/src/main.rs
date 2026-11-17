@@ -19,6 +19,7 @@ mod conversion;
 mod diagnostics;
 mod exporting;
 mod feedback;
+mod local_state;
 mod png_export;
 mod search;
 mod shell;
@@ -153,6 +154,7 @@ fn main() -> anyhow::Result<()> {
         .join("sidecars");
     let mut initial = None;
     let mut metrics = None;
+    let mut state_dir = None;
     let mut args = std::env::args_os().skip(1);
     while let Some(arg) = args.next() {
         if arg == "--metrics" {
@@ -160,10 +162,19 @@ fn main() -> anyhow::Result<()> {
                 Some(PathBuf::from(args.next().ok_or_else(|| {
                     anyhow::anyhow!("--metrics requires a path")
                 })?));
+        } else if arg == "--state-dir" {
+            let path = PathBuf::from(
+                args.next()
+                    .ok_or_else(|| anyhow::anyhow!("--state-dir requires a path"))?,
+            );
+            anyhow::ensure!(path.is_absolute(), "--state-dir requires an absolute path");
+            state_dir = Some(path);
         } else if initial.is_none() {
             initial = Some(PathBuf::from(arg));
         } else {
-            anyhow::bail!("Usage: pdf-studio [file.pdf] [--metrics diagnostics.json]");
+            anyhow::bail!(
+                "Usage: pdf-studio [file.pdf] [--metrics diagnostics.json] [--state-dir directory]"
+            );
         }
     }
     let page_budget = cache_budget("PDF_STUDIO_PAGE_CACHE_MIB", 128, 128, 512)?;
@@ -237,11 +248,14 @@ fn main() -> anyhow::Result<()> {
                     shell::WindowShell::new(
                         window,
                         cx,
-                        sidecars.clone(),
-                        page_budget,
-                        thumbnail_budget,
-                        metrics.clone(),
-                        initial.clone(),
+                        shell::ShellOptions {
+                            sidecars: sidecars.clone(),
+                            page_budget,
+                            thumbnail_budget,
+                            metrics: metrics.clone(),
+                            state_dir: state_dir.clone().or_else(local_state::directory),
+                            initial: initial.clone(),
+                        },
                     )
                 },
             );

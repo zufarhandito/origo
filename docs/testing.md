@@ -1,3 +1,22 @@
+# Verification — multi-tab tahap 1, 17 November 2026
+
+- `scripts/check.ps1` passed: fmt, denied-warning Clippy, **54 unit tests**, and
+  release workspace build. New test covers atomic favorite replacement and corrupt input.
+- Release `tab-management-ui-smoke.ps1` passed at
+  `.research/tab-management-ui-f13f40c143784158b1e400954c92e095`: plus placement,
+  persistent stars including process restart, inactive context target, menu reorder,
+  real drag/cancel, dirty batch cancel/discard, source hashes. State directory isolated.
+- Release existing tabs suite passed at `.research/tabs-ui-3d85455896204a9c9803d2203cb79ed0`:
+  isolation, viewport/history, duplicate/multi/partial/capacity Open, Save As, Optimize,
+  close batch and cache limits. Original test coverage retained.
+- Release chrome suite passed at `.research/chrome-ui-fd05eef2ed4a480cbe9a7303230c9728`:
+  reader/organizer, two themes, four widths, toolbar containment and page input.
+- Earlier trial runs failed in the test launcher/drag harness; one run failed to find
+  a native picker after empty state. Final restart test and existing empty-state/Open
+  regression passed. Failed runs are not counted as successful evidence.
+- User's existing release process preserved; its executable renamed within target/release
+  before build. It continues using the older build. No physical mixed-DPI claim.
+
 # Latest verification - active-PDF text search, 17 November 2026
 
 Owner approved Find in the active PDF, with an in-tab compact bar. The explicit

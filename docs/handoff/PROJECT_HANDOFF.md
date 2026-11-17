@@ -1,3 +1,14 @@
+# Sesi aktif — implementasi multi-tab bertahap, 17 November 2026
+
+Pemilik telah mengotorisasi eksekusi tahap 1 → 2 → 3 → 4A → 4B, satu per satu.
+Tahap 1 diimplementasikan: drag reorder, bintang kuning permanen lokal, + setelah
+strip, menu konteks dan transactional subset close. Lihat multitab.md/testing.md
+untuk kontrak dan bukti. Tahap berikutnya belum diimplementasikan pada checkpoint ini.
+Pilihan produk yang dikunci dicatat pada research/multitab-roadmap.md.
+Git/push diperiksa kembali saat checkpoint; status lama di bawah adalah historis.
+Penolakan push sebelumnya tetap belum dijawab dengan konfirmasi tujuan/payload.
+Jangan mengklaim push sukses atau melewati penolakan tersebut.
+
 # Handoff terkini — desktop multi-tab, PNG dan pencarian teks, 17 November 2026
 
 ## Checkpoint handover terbaru — 17 November 2026
