@@ -1,6 +1,6 @@
 # Progres PDF Studio
 
-Checkpoint aktif: tanda tangan visual draw/PNG/JPEG, klik/drag penempatan,
+Checkpoint aktif **46eba59**, sudah di-push ke origin/main: tanda tangan visual draw/PNG/JPEG, klik/drag penempatan,
 move/resize proporsional, delete, history dan Save As/reopen sudah diimplementasikan
 setelah anotator dan toolbar ikon. Detail [signatures](signatures.md),
 [handoff](handoff/PROJECT_HANDOFF.md), [testing](testing.md). Tidak ada template

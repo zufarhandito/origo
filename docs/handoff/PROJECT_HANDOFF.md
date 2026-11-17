@@ -47,10 +47,11 @@ interaktif Edge/Chrome/Firefox/Acrobat dan perangkat stylus/touch belum diuji.
 Awal task `main` bersih, HEAD `9617dae`, remote origin
 `https://github.com/zufarhandito/origo.git`. Riwayat anotator: `8a40b73`, handoff
 `7b8a658`, toolbar `9617dae`, semuanya sudah di-push sebelumnya.
-Commit fitur ini direncanakan `feat(signatures): add local drawing and image stamps`;
-periksa git log/laporan akhir untuk SHA serta hasil push aktual. Jangan mengklaim
-push atau CI sebelum hasilnya ada. Instruksi pemilik: fitur selesai harus commit
-Conventional Commit lalu push; tidak mengizinkan force-push atau unggah data privat.
+Commit fitur **46eba59**: `feat(signatures): add local drawing and image stamps`.
+Push ke `origin/main` **berhasil**, respons remote `9617dae..46eba59 main -> main`.
+Tidak ada force-push, binary/PDF/data privat yang dikirim. Ini bukan bukti CI remote.
+Catatan SHA/push ditambahkan melalui commit dokumentasi sesudah fitur.
+
 
 Build teruji dibuat di `target/tab-background-check/release`. `run.cmd` memakai
 `target/release/pdf-studio.exe`; pemasangan hanya setelah mengecek tidak ada proses
@@ -58,5 +59,6 @@ pengguna memakai target. Jangan menutup proses/dokumen pengguna untuk build.
 Multi-tab tahap 1-4B tetap tersedia; lihat [multitab](../multitab.md) untuk kontraknya.
 
 Build teruji sudah disalin ke target/release setelah memastikan tidak dipakai proses.
-Hash binary terisolasi/terpasang cocok. UI final: 11 signature + 9 anotator lulus;
+Hash binary terisolasi/terpasang cocok:
+`DE500A33722080B96E82628B5B6A928ABAEF3CCA91BBBB762101B6F5091CF946`. UI final: 11 signature + 9 anotator lulus;
 path bukti dan batas ada di testing.
