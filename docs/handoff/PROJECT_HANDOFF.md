@@ -47,10 +47,11 @@ sama: `CD67BA1CE09D953E1D8D43D74D91B9F81FB6AE43C63825F0768B4BDD886E5396`.
 
 Awal sesi: `main`, HEAD `47d3632`, cache `origin/main` `a1647e0` (2 ahead).
 Remote diverifikasi: `https://github.com/zufarhandito/origo.git`, branch `main`.
-Commit fitur memakai `feat(annotations): add editable PDF highlights and ink`.
-Pada saat penulisan dokumen ini commit/push belum dijalankan; cocokkan dengan git log
-serta laporan akhir sesi untuk SHA/hasil aktual. Tidak ada izin force-push atau
-unggah binary/PDF/data privat. Penolakan review historis tidak boleh di-bypass.
+Commit fitur **`8a40b73`**: `feat(annotations): add editable PDF highlights and ink`.
+`git push origin main` **berhasil**, respons remote `a1647e0..8a40b73 main -> main`.
+Ini mencakup dua commit lokal pendahulu yang sudah ada. Tidak ada force-push atau
+unggah binary/PDF/data privat. Keberhasilan push bukan bukti CI remote lulus.
+Catatan ini ditambahkan melalui commit dokumentasi setelah push fitur.
 
 Multi-tab tahap 1?4B dan fix background tetap tersedia; detail kontrak di
 [multi-tab](../multitab.md), hasil historis di [progres](../PROGRESS.md). Instruksi

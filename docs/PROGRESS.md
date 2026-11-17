@@ -1,6 +1,7 @@
 # Progres PDF Studio
 
-Checkpoint **17 November 2026**: anotator inti diimplementasikan setelah persetujuan
+Checkpoint **17 November 2026**: anotator inti commit **`8a40b73`**, sudah di-push
+ke `origin/main` (remote `a1647e0..8a40b73`). Diimplementasikan setelah persetujuan
 pemilik. Highlight teks, pen/stabilo, pilih/hapus/warna, shared history, unsaved guard
 dan Save As/reopen tersedia. Tanda tangan ditunda. Lihat [anotator](annotations.md),
 [handoff](handoff/PROJECT_HANDOFF.md) dan [testing](testing.md) untuk batas dan bukti.
