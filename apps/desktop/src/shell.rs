@@ -18,6 +18,7 @@ pub(super) struct WindowResources {
     pub export_owner: AtomicU64,
     pub modal_owner: AtomicU64,
     pub closing: AtomicBool,
+    pub tab_picker_open: AtomicBool,
     pub tab_count: std::sync::atomic::AtomicUsize,
     pub metrics_sequence: Arc<AtomicU64>,
     pub metrics_lock: Arc<std::sync::Mutex<()>>,
@@ -59,6 +60,12 @@ pub(super) struct WindowShell {
     favorites_writer: Arc<std::sync::Mutex<u64>>,
     pending_preferences: usize,
     state_dir: Option<PathBuf>,
+    closed_tabs: std::collections::VecDeque<ClosedTab>,
+    reopening_tab: Option<ClosedTab>,
+    tab_picker_open: bool,
+    tab_picker_input: Entity<InputState>,
+    tab_picker_selected: usize,
+    tab_picker_scroll: ScrollHandle,
 }
 
 fn path_key(path: &std::path::Path) -> String {
@@ -105,7 +112,22 @@ impl WindowShell {
                 favorites_writer: Arc::default(),
                 pending_preferences: 0,
                 state_dir,
+                closed_tabs: Default::default(),
+                reopening_tab: None,
+                tab_picker_open: false,
+                tab_picker_input: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder("Cari nama PDF atau folder…")
+                }),
+                tab_picker_selected: 0,
+                tab_picker_scroll: ScrollHandle::new(),
             };
+            cx.subscribe(&shell.tab_picker_input, |this, _, event, cx| {
+                if matches!(event, InputEvent::Change) {
+                    this.tab_picker_selected = 0;
+                    cx.notify();
+                }
+            })
+            .detach();
             shell.load_favorites(cx);
             shell.focus.focus(window, cx);
             if shell.metrics.is_some() {
@@ -166,6 +188,8 @@ impl WindowShell {
         );
         json["favoritesReady"] = serde_json::json!(self.favorites_ready);
         json["pendingPreferences"] = serde_json::json!(self.pending_preferences);
+        json["closedTabCount"] = serde_json::json!(self.closed_tabs.len());
+        json["tabPickerOpen"] = serde_json::json!(self.tab_picker_open);
         json["tabsOpening"] = serde_json::json!(self.opening);
         json["closingTabs"] = serde_json::json!(self.close.is_some());
         json["windowExportOwner"] =
@@ -233,6 +257,7 @@ impl WindowShell {
             return;
         }
         self.opening = true;
+        self.tab_picker_open = false;
         let picker = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
@@ -316,6 +341,7 @@ impl WindowShell {
         }
         if !capacity(self.tabs.len(), paths.len()) {
             self.opening = false;
+            self.reopening_tab = None;
             self.notice = Some(format!(
                 "Maksimal 8 tab. Tersisa {} slot; tutup tab atau pilih lebih sedikit PDF.",
                 MAX_TABS - self.tabs.len()
@@ -327,7 +353,11 @@ impl WindowShell {
             self.opening = false;
             if let Some(id) = first_existing {
                 self.activate(id, cx);
+                if self.reopening_tab.take().is_some() {
+                    self.closed_tabs.pop_back();
+                }
             }
+            self.reopening_tab = None;
             self.notice = (!failures.is_empty()).then(|| failures.join("\n"));
             cx.notify();
             return;
@@ -391,6 +421,7 @@ impl WindowShell {
                                     id,
                                 );
                                 session.update(cx, |s, cx| s.install_workspace(workspace, cx));
+                                this.finish_reopen(id, &session, cx);
                                 cx.observe(&session, |_, _, cx| {
                                     let weak = cx.weak_entity();
                                     cx.defer(move |cx| {
@@ -413,6 +444,7 @@ impl WindowShell {
                         }
                     }
                     this.opening = false;
+                    this.reopening_tab = None;
                     this.resources
                         .tab_count
                         .store(this.tabs.len(), Ordering::SeqCst);
@@ -432,6 +464,7 @@ impl WindowShell {
         if !self.tabs.iter().any(|t| t.id == id && t.session.is_some()) {
             return;
         }
+        self.tab_picker_open = false;
         if self.active != Some(id) {
             if let Some(session) = self.session() {
                 session.update(cx, |s, cx| {
@@ -536,6 +569,7 @@ impl WindowShell {
             return false;
         }
         self.resources.closing.store(true, Ordering::SeqCst);
+        self.tab_picker_open = false;
         self.close = Some(CloseBatch {
             ids,
             index: 0,
@@ -589,6 +623,9 @@ impl WindowShell {
                 let Some(batch) = self.close.take() else {
                     return;
                 };
+                if !batch.window {
+                    self.remember_closed(&batch.ids, cx);
+                }
                 for tab in &self.tabs {
                     if batch.ids.contains(&tab.id)
                         && let Some(s) = &tab.session
@@ -721,6 +758,7 @@ pub(super) struct ShellOptions {
 #[derive(Clone, Copy)]
 enum MenuAction {
     Open,
+    Reopen,
     Save,
     Close,
     Quit,
@@ -756,6 +794,7 @@ impl WindowShell {
         }
         use MenuAction::*;
         match action {
+            Reopen => self.reopen_tab(cx),
             Open => self.choose_open(cx),
             Close => {
                 self.begin_close(false, cx);
@@ -853,6 +892,9 @@ impl WindowShell {
         if matches!(action, Open) {
             return !self.opening;
         }
+        if matches!(action, Reopen) {
+            return !self.opening && !self.closed_tabs.is_empty() && self.tabs.len() < MAX_TABS;
+        }
         if matches!(action, Quit | Light | Dark | Help | About) {
             return true;
         }
@@ -912,11 +954,20 @@ impl WindowShell {
 #[path = "tab_management.rs"]
 mod tab_management;
 use tab_management::{TabDrag, TabDragLabel, tab_context_menu};
+#[path = "tab_recovery.rs"]
+mod tab_recovery;
+use tab_recovery::ClosedTab;
 
 impl Render for WindowShell {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use MenuAction::*;
         let colors = cx.theme().colors;
+        if self.close.is_some() || self.modal(cx) {
+            self.tab_picker_open = false;
+        }
+        self.resources
+            .tab_picker_open
+            .store(self.tab_picker_open, Ordering::SeqCst);
         let mut strip = div()
             .id("document-tabs")
             .role(gpui::Role::TabList)
@@ -1078,39 +1129,12 @@ impl Render for WindowShell {
                     cx.listener(|this, drag: &TabDrag, _, cx| this.move_tab(drag.0, None, cx)),
                 ),
         );
-        let weak = cx.weak_entity();
-        let entries: Vec<_> = self
-            .tabs
-            .iter()
-            .map(|t| {
-                (
-                    t.id,
-                    format!(
-                        "{}{}",
-                        if self.favorites.contains(&path_key(&t.path)) {
-                            "★ "
-                        } else {
-                            ""
-                        },
-                        t.path.display()
-                    ),
-                )
-            })
-            .collect();
         let tab_list = Button::new("tab-list")
             .outline()
             .dropdown_caret(true)
             .label("Daftar tab")
-            .dropdown_menu(move |mut menu, _, _| {
-                for (id, name) in &entries {
-                    let weak = weak.clone();
-                    let id = *id;
-                    menu = menu.item(PopupMenuItem::new(name.clone()).on_click(move |_, _, cx| {
-                        let _ = weak.update(cx, |this, cx| this.switch(id, cx));
-                    }));
-                }
-                menu
-            });
+            .disabled(self.close.is_some() || self.modal(cx))
+            .on_click(cx.listener(|this, _, window, cx| this.toggle_tab_picker(window, cx)));
         let menus = div()
             .flex()
             .gap_1()
@@ -1118,6 +1142,7 @@ impl Render for WindowShell {
                 "Berkas",
                 &[
                     ("Buka PDF…  Ctrl+O", Open),
+                    ("Buka ulang tab tertutup  Ctrl+Shift+T", Reopen),
                     ("Simpan sebagai…  Ctrl+Shift+S", Save),
                     ("Tutup tab  Ctrl+W", Close),
                     ("Keluar", Quit),
@@ -1189,6 +1214,10 @@ impl Render for WindowShell {
             }))
             .on_action(cx.listener(|this, _: &NextTab, _, cx| this.cycle(false, cx)))
             .on_action(cx.listener(|this, _: &PreviousTab, _, cx| this.cycle(true, cx)))
+            .on_action(cx.listener(|this, _: &ReopenTab, _, cx| this.reopen_tab(cx)))
+            .capture_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
+                this.tab_picker_key(event, window, cx)
+            }))
             .child(TitleBar::new().child("PDF Studio"))
             .child(menus)
             .child(
@@ -1209,6 +1238,9 @@ impl Render for WindowShell {
                     .child(div().flex_1())
                     .child(tab_list),
             )
+            .when(self.tab_picker_open, |el| {
+                el.child(gpui::deferred(self.render_tab_picker(cx)).with_priority(2))
+            })
             .when_some(self.notice.clone(), |el, notice| {
                 el.child(
                     div()

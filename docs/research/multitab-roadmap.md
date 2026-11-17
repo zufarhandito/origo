@@ -4,7 +4,7 @@ Tanggal riset/keputusan: **17 November 2026**. Baseline dokumentasi: `9478ddc`.
 Audiens: pemilik, pengembang, dan agen yang melanjutkan PDF Studio di Windows.
 
 Dokumen ini menjadi sumber tunggal riset dan TODO multi-tab berikutnya. Status
-tahap 1: **sudah diimplementasikan**; tahap 2–4 masih belum diimplementasikan. Persetujuan urutan
+tahap 1–2: **sudah diimplementasikan**; tahap 3–4 masih belum diimplementasikan. Persetujuan urutan
 dan perilaku di sini tidak berarti implementasi fitur sudah dimulai. Pekerjaan yang
 menghasilkan dokumen ini hanya dokumentasi.
 
@@ -52,7 +52,7 @@ berlaku. Rekomendasi historis di bawah bukan klaim semua tahap sudah selesai.
 | Tahap | Daftar kerja | Status |
 |---|---|---|
 | 1 — Pengelolaan tab | Drag urutan, bintang kuning, posisi tombol +, menu klik kanan | Diimplementasikan; lihat multitab.md/testing.md |
-| 2 — Navigasi/pemulihan tab | Buka ulang tab tertutup, pencarian dalam Daftar tab | Disetujui; belum dikerjakan |
+| 2 — Navigasi/pemulihan tab | Buka ulang tab tertutup, pencarian dalam Daftar tab | Diimplementasikan; lihat multitab.md/testing.md |
 | 3 — Melanjutkan pekerjaan | Pemulihan sesi terakhir dan posisi baca | Disetujui; belum dikerjakan |
 | 4A — Dua dokumen | Dua PDF berdampingan dengan Dock GPUI Kit dan pembatas resize | Disetujui; belum dikerjakan |
 | 4B — Satu dokumen, dua tampilan | Posisi baca terpisah pada workspace dokumen yang sama | Disetujui; belum dikerjakan |
@@ -62,8 +62,8 @@ berlaku. Rekomendasi historis di bawah bukan klaim semua tahap sudah selesai.
 - [x] 1.2 Bintang kuning untuk dokumen prioritas.
 - [x] 1.3 Tombol + langsung setelah tab terakhir.
 - [x] 1.4 Menu klik kanan tab.
-- [ ] 2.1 Buka ulang tab tertutup.
-- [ ] 2.2 Cari tab dalam Daftar tab.
+- [x] 2.1 Buka ulang tab tertutup.
+- [x] 2.2 Cari tab dalam Daftar tab.
 - [ ] 3.1 Pulihkan sesi dan posisi baca.
 - [ ] 4A.1 Dua PDF berdampingan memakai Dock GPUI Kit.
 - [ ] 4A.2 Organizer, seleksi, fokus, ekspor dan resource bounds saat split.

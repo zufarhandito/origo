@@ -16,6 +16,10 @@ impl DocumentSession {
     // tool drawer painted over the page, or a modal owned by another document.
     fn document_input_allowed(&self, position: gpui::Point<gpui::Pixels>, window: &Window) -> bool {
         self.active
+            && !self
+                .resources
+                .tab_picker_open
+                .load(std::sync::atomic::Ordering::SeqCst)
             && !self.error_popup
             && self
                 .resources
@@ -525,17 +529,21 @@ impl Render for DocumentSession {
             let scroll_weak = weak.clone();
             let previous = self.viewport;
             let previous_dpr = self.dpr;
+            let restore_reading = self.pending_reading.is_some();
             let probe = canvas(
                 move |bounds, window, cx| {
                     let viewport = (f32::from(bounds.size.width), f32::from(bounds.size.height));
                     let dpr = window.scale_factor();
-                    if (viewport.0 - previous.0).abs() >= 2.
+                    if restore_reading
+                        || (viewport.0 - previous.0).abs() >= 2.
                         || (viewport.1 - previous.1).abs() >= 2.
                         || (dpr - previous_dpr).abs() >= 0.01
                     {
                         cx.defer(move |cx| {
-                            let _ = weak
-                                .update(cx, |this, cx| this.viewport_changed(viewport, dpr, cx));
+                            let _ = weak.update(cx, |this, cx| {
+                                this.viewport_changed(viewport, dpr, cx);
+                                this.apply_pending_reading(cx);
+                            });
                         });
                     }
                 },

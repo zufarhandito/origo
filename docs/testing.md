@@ -1,3 +1,20 @@
+# Verification — multi-tab tahap 2, 17 November 2026
+
+- `scripts/check.ps1` passed: fmt, denied-warning Clippy, **54 unit tests**, release
+  workspace build. Desktop-only behavior; no PDF engine/export policy changes.
+- Debug recovery suite passed at `.research/tab-recovery-ui-00fcc1e9828a4a0b93e9dff2b9c73b47`.
+- Release recovery suite passed **6 named cases** at
+  `.research/tab-recovery-ui-b46eedf6a76f40c48bd6d5844b57baf4`: reading position/zoom,
+  case-insensitive search/empty/keyboard, missing-source retry/changed-source reset,
+  close cancel/Discard semantics, duplicate reopen and unchanged source hashes.
+- Release stage 1 suite passed with shared existing test helpers at
+  `.research/tab-management-ui-7b845ce8fd1b412b9f22bfa835d8419f`; all stage 1 assertions retained.
+- Release existing multi-tab suite passed at `.research/tabs-ui-41b2416e87ed48ba8e70403bcb0f08c9`.
+  State/history/export/close/cache regressions remain covered with the searchable picker.
+- Test support accepts `-IsolatedState` to keep synthetic preferences under the fixture.
+  Initial debug trial found an inaccessible empty-result label; fixed and retested.
+  No new physical-input, hardware DPI, remote CI or public binary-release claim.
+
 # Verification — multi-tab tahap 1, 17 November 2026
 
 - `scripts/check.ps1` passed: fmt, denied-warning Clippy, **54 unit tests**, and

@@ -21,6 +21,7 @@ mod exporting;
 mod feedback;
 mod local_state;
 mod png_export;
+mod reading_position;
 mod search;
 mod shell;
 mod splitting;
@@ -39,6 +40,7 @@ actions!(
         CloseTab,
         NextTab,
         PreviousTab,
+        ReopenTab,
         SaveAs,
         ExtractPages,
         ImportPdf,
@@ -118,6 +120,7 @@ struct DocumentSession {
     zoom: Zoom,
     gesture_zoom: GestureZoom,
     viewport: (f32, f32),
+    pending_reading: Option<reading_position::ReadingPosition>,
     dpr: f32,
     sidebar: bool,
     generation: u64,
@@ -193,6 +196,7 @@ fn main() -> anyhow::Result<()> {
                 KeyBinding::new("ctrl-w", CloseTab, None),
                 KeyBinding::new("ctrl-tab", NextTab, None),
                 KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
+                KeyBinding::new("ctrl-shift-t", ReopenTab, None),
                 KeyBinding::new("ctrl-shift-s", SaveAs, Some("PdfViewer")),
                 KeyBinding::new("ctrl-shift-o", ImportPdf, Some("PdfViewer")),
                 KeyBinding::new("ctrl-z", UndoEdit, Some("PdfViewer")),
@@ -375,6 +379,7 @@ impl DocumentSession {
                 zoom: Zoom::default(),
                 gesture_zoom: GestureZoom::default(),
                 viewport: (900., 650.),
+                pending_reading: None,
                 dpr: window.scale_factor(),
                 sidebar: true,
                 generation: 0,

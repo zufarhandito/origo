@@ -157,5 +157,13 @@ pub(super) fn tab_context_menu(
                 }),
         );
     }
+    let disabled = !shell.enabled(MenuAction::Reopen, cx);
+    menu = menu.item(
+        PopupMenuItem::new("Buka ulang tab tertutup")
+            .disabled(disabled)
+            .on_click(move |_, _, cx| {
+                let _ = weak.update(cx, |this, cx| this.reopen_tab(cx));
+            }),
+    );
     menu
 }

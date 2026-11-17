@@ -1,5 +1,13 @@
 # Architecture - desktop multi-tab
 
+Shell tab recovery keeps at most 20 metadata-only closed-tab entries in memory.
+Only successful close batches record entries; reopening reinspects the primary source
+and creates a fresh session, or focuses an existing duplicate. ReadingPosition maps
+the viewport to the primary source page and defers offset/zoom projection until the
+new viewport is measured. Changed fingerprints reset the reading position. Tab search
+uses shell paths/status only and an overlay input, with a shared pointer-input guard
+so window-global PDF canvas listeners cannot select text behind the overlay.
+
 Find state belongs to each DocumentSession. A debounced query scans one workspace
 page at a time on the shared PDFium worker; application/search implements bounded
 literal phrase matching with source-character ranges. Only compact occurrences are

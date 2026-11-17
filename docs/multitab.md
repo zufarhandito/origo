@@ -45,6 +45,25 @@ History, dirty revision, seleksi, halaman, zoom, scroll/pan, dan mode alat milik
 masing-masing dokumen. Tema berlaku untuk jendela. Save As mempertahankan sumber,
 nama tab dan history; nama output dilaporkan pada hasil ekspor.
 
+## Reopen dan pencarian tab — tahap 2
+
+- Berkas → Buka ulang tab tertutup, menu konteks, atau Ctrl+Shift+T membuka tab
+  terakhir yang berhasil ditutup. Riwayat metadata dibatasi 20 entri, hanya selama
+  proses berjalan; close batch yang dibatalkan tidak menambah riwayat.
+- Reopen membuka sumber utama dari disk dengan identitas tab baru dan posisi strip
+  sebelumnya. Posisi baca dipetakan ke halaman sumber utama, termasuk setelah reorder
+  halaman; halaman impor memakai halaman pertama. Zoom, offset baca dan pan dipulihkan
+  setelah ukuran viewport tersedia. Sumber berubah dibuka dari halaman pertama.
+- Edit/history/seleksi/pencarian yang telah ditutup tidak menjadi backup. Khususnya,
+  Discard tetap membuang edit. Save As tidak mengganti sumber utama yang dibuka ulang.
+- Gagal reopen mempertahankan entri untuk dicoba lagi. Kapasitas penuh menonaktifkan
+  aksi; PDF yang sudah terbuka difokuskan tanpa membuat duplikat dan tanpa mereset state.
+- Daftar tab membuka overlay pencarian nama/folder tanpa mengubah ukuran viewport.
+  Filter berupa substring tanpa membedakan kapitalisasi, mengikuti urutan visual.
+  Baris menampilkan status aktif, bintang, dirty dan loading. Tab loading belum dapat dipilih.
+- Panah atas/bawah memilih hasil, Enter berpindah, Esc atau klik di luar overlay
+  menutupnya. Ctrl+F tetap pencarian isi PDF. Hasil kosong mempunyai label eksplisit.
+
 ## Panel dan keyboard
 
 Reader tidak membuka panel alat secara default. Panel alat/Alat → Atur halaman
