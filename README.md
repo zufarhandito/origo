@@ -2,7 +2,9 @@
 
 For the next development chat, start with the [documentation index](docs/README.md)
 and [current handoff](docs/handoff/PROJECT_HANDOFF.md). A [ready-to-copy prompt](docs/handoff/NEXT_CHAT_PROMPT.md)
-records progress, verification, toolchain precautions and the pending push status.
+records progress, verification, toolchain precautions and the latest Git checkpoint.
+Read [agent instructions](AGENTS.md) and the [feature workflow](docs/feature-development.md)
+for competitor-based research and Conventional Commit/push checkpoints after each feature.
 The [desktop UI and multi-tab design](docs/plans/UI_REDESIGN_MULTITAB_PLAN.md) is implemented;
 see [current multi-tab behavior](docs/multitab.md) and [organizer](docs/organizer.md).
 Unified document tabs, offscreen-copy hardening and the measured eight-book process/
@@ -31,6 +33,9 @@ the result may stay the same size or grow. See [Optimize](docs/optimize.md).
 - Drag-select text, copy with Ctrl+C or Salin, and clear with Esc. Selection follows
   zoom/scroll and intrinsic page rotation. Image-only scans need OCR (not included).
   Single-click clears without selecting; double-click selects a sentence.
+- Ctrl+F searches the active PDF with phrase matching, default case-insensitive,
+  occurrence highlights/counts and previous/next navigation. The Find bar lives
+  below the reading toolbar; see [text search](docs/search.md).
 - Book viewer follow-up: up to 1024 pages, reused native document sessions and lightweight
   previews before larger rasters. The input-file limit remains 128 MiB.
 

@@ -1,17 +1,214 @@
-# Handoff terkini — desktop multi-tab, 16 November 2026
+# Handoff terkini — desktop multi-tab, PNG dan pencarian teks, 17 November 2026
 
-## Terbaru: PDF → PNG saja
+## Instruksi kerja terbaru pemilik — riset, commit dan push
 
-Pengguna menyetujui implementasi PNG, semua/halaman terpilih, default 150 DPI dan
-opsi 300 DPI. Menu **Alat → Ekspor PNG…**, folder baru tanpa overwrite, snapshot
-origin tab, progress/cancel dan guard close dipakai. Receipt PNG tidak menandai PDF
-clean. Jalur raster ukuran tepat terpisah dari clamp viewer; encoding/decode validation
-satu halaman bergantian, batas 8192/16 Mi-piksel dan 1 GiB output batch.
-Lihat [PNG](../png.md), [architecture](../architecture.md), dan [testing](../testing.md).
-JPEG/TXT di-skip oleh pemilik. AI hanya diskusi/rencana bisnis; fitur dan file rencana
-bisnis AI belum diimplementasikan pada pekerjaan PNG. Gate rilis lama tetap terbuka.
+Saat diminta research fitur, teliti produk kompetitor (Acrobat/Reader, Firefox/PDF.js,
+Chrome PDF, Edge PDF dan produk relevan lain) memakai sumber primer. Jangan menebak
+perilaku fitur hanya dari kondisi aplikasi ini. Jabarkan bukti, perbedaan, default,
+unknown dan rekomendasi sebelum memetakan implementasi lokal. Simpan riset substantif
+di `docs/research/`; [riset Find](../research/text-search.md) menjadi contoh.
 
-## Follow-up distribusi dan verifikasi akhir
+Setiap fitur yang selesai dan lolos verifikasi harus **di-commit lalu di-push**, dengan
+**Conventional Commits**. Instruksi ini berlaku berkelanjutan; target repo saat ini
+`origin` = `https://github.com/zufarhandito/origo.git`, branch `main`. Ini menggantikan
+status belum ada izin push pada snapshot lama, tanpa mengizinkan publikasi binary,
+pengiriman data privat atau eksekusi pekerjaan yang masih plan-only. Lihat
+[panduan lengkap](../feature-development.md) dan [AGENTS.md](../../AGENTS.md).
+
+## Follow-up terbaru — pencarian teks PDF aktif
+
+Pemilik menyetujui implementasi Find setelah riset viewer lain. Ketentuan eksplisit:
+default **tidak case-sensitive** dan `hasil penelitian` dicari sebagai satu frasa,
+bukan dua kata yang tersebar. Fitur sudah diimplementasikan; checkpoint PNG di bawah
+adalah keadaan sebelum follow-up ini, termasuk pernyataan sesi hanya dokumentasi.
+
+Ctrl+F/tombol Cari teks/menu Edit membuka bar di bawah toolbar baca, di dalam tab.
+Setiap tab punya query/opsi/hasil sendiri. Ada penghitung, sorotan aktif/lainnya,
+Enter/F3 dan Shift+Enter/Shift+F3, wrap, Esc/×, serta opsi kapitalisasi/kata utuh.
+Whitespace/pergantian baris dalam satu halaman dinormalisasi; tidak lintas halaman.
+Pencarian mengikuti urutan workspace/impor dan diulang setelah edit/Undo/Redo.
+
+Pemindaian satu halaman bergantian memakai worker PDFium bersama, debounce 200 ms,
+offset hasil ringkas, query maksimum 1024 karakter dan maksimum 10.000 hasil.
+Tab nonaktif menjeda scan belum selesai; kembali mengulangnya. Token menolak hasil
+lama; native call tetap cooperative. Tidak ada OCR/upload/dependency baru atau
+perubahan kontrak ekspor/dirty state. Detail: [search](../search.md).
+
+Verifikasi: fmt/Clippy, **53 unit tests**, release workspace build, search native
+smoke dan full native smoke lulus. Final search UI **14 kasus** termasuk 1000 halaman
+pause/resume/cache, dan chrome dua tema/empat lebar lulus. Bukti run ada di
+[testing](../testing.md). Kode utama: `apps/desktop/src/search.rs`,
+`crates/application/src/search.rs`, `apps/smoke/src/search.rs`; harness
+`scripts/search-ui-smoke.ps1`. Aplikasi pengguna yang sudah berjalan dipertahankan.
+
+Fitur pencarian sudah di-commit sebagai `a74d380`,
+`feat(search): add phrase search to active PDF tabs`. Panduan riset/checkpoint dan
+handoff diperbarui dalam commit dokumentasi terpisah; lihat `git log` untuk SHA-nya
+dan periksa status/upstream aktual sebelum melanjutkan. Empat perubahan dokumentasi
+yang sudah ada saat sesi dimulai dipertahankan dalam checkpoint dokumentasi.
+Angka `2124580` di snapshot berikut adalah checkpoint PNG sebelumnya. Tidak ada
+verifikasi remote CI atau publikasi portable baru; gate rilis tetap terbuka.
+
+## Checkpoint sebelum pencarian — 17 November 2026
+
+Permintaan terakhir pemilik: **buat project handover seperti sebelumnya**. Sesi ini
+hanya memperbarui dokumentasi; implementasi terakhir adalah **PDF → PNG saja**.
+Bagian terkini ini menggantikan status Git, instruksi berikutnya, dan jumlah tes pada
+snapshot historis di bawah. Arsip tetap dipertahankan sebagai riwayat.
+
+- Saat mulai handover, working tree bersih. Branch `main`, HEAD **`2124580`**
+  (`export png`, 17 November 2026), sama dengan cache lokal `origin/main`;
+  `git rev-list --left-right --count HEAD...origin/main` menghasilkan `0 0`.
+- Commit sebelumnya `2c3033c` (portable candidate/audit), lalu `06c2a39` (migrasi
+  M3 UI/device gates). Baseline `582cd67` di bagian lama bukan HEAD terkini.
+- Tidak ada fetch, push, atau pemeriksaan remote CI dalam sesi handover ini.
+  Cache upstream bukan bukti keadaan server saat ini. Perubahan handover ini
+  belum di-commit/push oleh sesi ini; periksa Git lagi saat melanjutkan.
+
+## Implementasi terakhir: PDF → PNG
+
+Menu **Alat → Ekspor PNG…** pada tab aktif menyediakan semua/halaman terpilih,
+150 DPI (default) atau 300 DPI, dan folder baru `hasil-png`. Nama gambar
+`page-0001.png` dan seterusnya mengikuti urutan batch, termasuk halaman impor dan
+rotasi workspace. Seleksi kosong menonaktifkan opsi halaman terpilih.
+
+Plan menangkap identitas/revisi tab asal dan fingerprint sumber. Sumber tetap
+read-only; snapshot privat, preflight, validasi, source recheck dan publikasi folder
+tanpa overwrite tetap berlaku. Metadata/bookmark biasa boleh diraster dengan
+penjelasan kehilangan semantik interaktif; forms, signature, tags, annotations,
+enkripsi dan input kompleks/aktif tetap diblokir oleh preflight konservatif.
+Pengecualian whole-source/tagged Extract tidak dipakai untuk PNG.
+
+Raster berukuran tepat, terpisah dari clamp zoom/DPR viewer: latar putih opaque,
+`round(displayed_points × DPI / 72)`, maksimum 8192 piksel per sisi dan
+16 × 1024 × 1024 piksel per halaman. Render → encode → decode validation dilakukan
+satu halaman bergantian; decoded RGBA harus identik. Batas output batch 1 GiB.
+DPI menentukan dimensi piksel; encoder belum menulis metadata physical-print `pHYs`.
+
+Job memakai slot ekspor/progress/cancel bersama dan tetap dimiliki tab asal meski
+pengguna berpindah tab. Close menunggu job, lalu tetap meminta keputusan untuk
+edit PDF yang dirty. **Receipt PNG tidak menandai PDF clean**; hanya full Save As
+dengan instance/revisi yang sesuai dapat melakukannya. Cancel bersifat cooperative;
+native render yang berjalan tidak dapat diputus. Budget kerja PNG 30 menit bukan
+hard native timeout. Kegagalan/cancel membersihkan staging milik job; crash-orphan
+recovery belum tersedia.
+
+Peta kode untuk follow-up:
+
+- `apps/desktop/src/png_export.rs`: konfigurasi, picker dan job UI; integrasi menu/
+  progress berada di `shell.rs`, `views.rs`, `exporting.rs` dan `diagnostics.rs`.
+- `crates/application/src/png.rs`: plan/receipt, dimensi, resource limits dan alur
+  ekspor; `crates/pdf-engine/src/lib.rs`: exact raster pada worker native bersama.
+- `crates/platform/src/png.rs`: encoder/decoder bounded; `split.rs`: helper snapshot
+  batch dan publikasi folder yang digunakan bersama Split.
+- `apps/smoke/src/png.rs` dan `scripts/png-ui-smoke.ps1`: native/UI regression.
+
+Hanya fitur PNG pada dependency `image` yang sudah dipin 0.25.8 diaktifkan;
+versi package lock tidak dinaikkan dalam pekerjaan PNG. Baca [PNG](../png.md),
+[arsitektur](../architecture.md) dan [kompatibilitas](../compatibility.md).
+**JPEG dan TXT di-skip oleh pemilik**; OCR, AI dan converter lain belum ditambahkan.
+
+## Bukti recheck terakhir
+
+Ini hasil pekerjaan PNG yang sudah dicatat pada [testing](../testing.md), bukan
+klaim menjalankan ulang seluruh suite saat handover dokumentasi:
+
+- `scripts/check.ps1`: fmt, Clippy workspace/all-target dengan denied warnings,
+  **49 unit tests**, dan release workspace build lulus.
+- Full native smoke lulus, termasuk M1/text, M3/Extract, Split, Optimize dan PNG.
+  Final release `--png-smoke` lulus: geometri campuran, 150/300 DPI, 16 kombinasi
+  rotasi sumber/virtual, kesamaan pixel hasil decode, seleksi/urutan, blockers,
+  limit, source change, failure/cancel, collision/race dan cleanup.
+- PNG UI: **11 kasus bernama lulus pada build lokal dan 11 pada executable hasil
+  ekstraksi portable**, termasuk tab asal, cancel dari tab lain, close yang menunggu
+  job serta PNG sukses yang tetap tidak mengizinkan dirty-close tanpa keputusan.
+- Regresi tabs, **25 kasus M3**, Split dan Optimize UI lulus. Screenshot dialog
+  dan PNG berotasi diperiksa secara visual. Path bukti per-run ada di testing.
+- Kandidat internal `dist/pdf-studio-windows-x64-candidate-2c3033c-0442227c.zip`
+  lulus manifest 1103 file, checksum, x64 runtime/import checks dan lima negative
+  integrity checks. PNG UI portable diuji dengan restricted PATH dari path Unicode.
+  Marker kandidat berasal dari source dirty sebelum commit PNG; nama ZIP tersebut
+  bukan build bersih dari HEAD `2124580`. ZIP tetap ignored dan belum dipublikasikan.
+
+## Konteks AI berbayar yang ditunda
+
+Pemilik menginginkan AI **online**, dengan model disediakan aplikasi dan pelanggan
+membayar kepada pemilik. ACP/Zed hanya inspirasi integrasi; provider/model belum
+dipilih. Saat ini belum ada backend AI, akun, pembayaran, upload, atau implementasi
+fitur AI. Pemilik meminta memikirkan model bisnis dahulu, lalu beralih ke PNG.
+
+Kesepakatan bisnis dari diskusi yang perlu dibawa ke sesi berikutnya:
+
+- Audiens mahasiswa/peneliti; Indonesia lebih dahulu dengan harga Rupiah.
+- Reader/organizer gratis, trial AI terbatas sekali per akun; paket mencakup
+  pendamping baca serta riset multi-PDF: tanya jawab dengan sumber/halaman,
+  penjelasan teks, ringkasan, perbandingan dan sintesis dokumen.
+- Beta **Rp49.000 per 30 hari**, prepaid dan perpanjangan manual, tanpa autodebit.
+  Model usage termasuk paket, tanpa akun provider terpisah milik pelanggan.
+- Target biaya AI maksimum **Rp10.000 per pelanggan per 30 hari**. Alokasi operasi/
+  pembayaran Rp5.000 masih asumsi; sisa Rp34.000 bukan proyeksi laba karena biaya
+  tetap, pajak, support dan akuisisi belum dihitung.
+- Tampilkan kredit AI dan estimasi biaya kredit sebelum tugas berat. Saat kuota habis,
+  tunggu periode berikutnya; top-up belum termasuk beta. Pilot 10–20 pengguna undangan.
+- PDF tetap lokal; hanya konteks teks yang diperlukan dikirim saat fitur AI digunakan
+  dengan persetujuan pengguna. Beta tidak menyediakan library PDF cloud.
+
+Angka **100 kredit/paket**, **10 kredit trial selama 7 hari**, biaya internal
+Rp100/kredit, maksimum 5 PDF, target 5 pembayar/3 renewal dan stress biaya +25%
+adalah **usulan/asumsi untuk divalidasi**, bukan kuota produksi atau ekonomi yang
+sudah terbukti. Belum ada file `docs/plans/AI_BUSINESS_MODEL.md`; keputusan diskusi
+dicatat di handover ini agar tidak hilang. Jika melanjutkan AI, langkah berikutnya
+adalah menulis/meninjau model bisnis tersebut dan memvalidasi paket/biayanya sebelum
+implementasi teknis. Jangan menganggap handover ini sebagai instruksi membangun AI.
+
+## Sisa pekerjaan dan batas sesi berikutnya
+
+Fitur PNG sudah diimplementasikan; tidak ada persetujuan baru untuk JPEG/TXT atau
+fitur lanjutan. Pilih pekerjaan berikutnya dari arahan pemilik, bukan nomor prioritas
+historis. Jalur yang masih terbuka:
+
+- Gate fisik P4: 150/200%, mixed-monitor, physical modifier shortcuts,
+  trackpad pinch/scroll/pan dan Narrator. Bukti otomatis pada satu display 100%/DPI96
+  tidak menutup gate tersebut; lihat [device acceptance](../device-acceptance.md).
+- Acceptance pada Windows 10 22H2/11 x64 yang bersih, tanpa toolchain/engine eksternal.
+- Lisensi proyek/review redistribusi, entitlement MSVC, tiga gap notice
+  (`mac 0.1.1`, `seahash 4.1.0`, `simd_helpers 0.1.0`) dan review source MPL
+  `option-ext 0.2.0`; lihat [audit distribusi](../distribution-audit.md).
+- Review security native dan disposition empat advisory unmaintained transitive
+  (`instant`, `paste`, `rustybuzz`, `ttf-parser`). `anyhow` sudah 1.0.103 untuk
+  RUSTSEC-2026-0190. Jangan menyatakan vulnerability-free atau public-release ready.
+- Model bisnis AI tetap pekerjaan dokumen/validasi yang ditunda, seperti di atas.
+
+Tidak perlu mengulang semua test produk untuk perubahan handover saja. Untuk kode
+baru nanti, pilih check yang relevan; headed UI suite dijalankan bergantian pada
+HWND/PID fixture sendiri. Jangan menutup aplikasi/dokumen pengguna.
+
+## Menjalankan dan melanjutkan
+
+Rust dipin **1.98.1**, GPUI Kit **0.9.1**, pdfium-render **0.9.5** / PDFium **8125**,
+QPDF **12.4.2**. `run.cmd` memilih release lalu debug sebagai fallback, tanpa build.
+Command dari root repo, PowerShell:
+
+```powershell
+. ./scripts/use-build-environment.ps1
+./scripts/check.ps1
+./scripts/smoke-test.ps1
+cargo run --release --locked --offline -p pdf-smoke -- --png-smoke
+./scripts/png-ui-smoke.ps1 -Profile release
+```
+
+Helper build menyiapkan Rust serta MSVC/SDK untuk sesi shell itu. Jangan install
+ulang rutin, menghapus/memindahkan `.tools`, atau merusak registered VS/SDK junction.
+Gunakan UTF-8 eksplisit. Pertahankan perubahan pengguna dan recheck Git sebelum edit.
+`.research`, `.tools`, `sidecars`, `target` dan `dist` tetap ignored; catatan
+`.research/PROJECT_HANDOFF_PRIVATE.md` dan PDF pengguna tidak boleh dibaca/disalin
+ke dokumentasi, commit atau upload. Gunakan fixture sintetis untuk tes.
+
+[Prompt siap salin](NEXT_CHAT_PROMPT.md) memuat konteks ringkas sesi selanjutnya.
+Snapshot di bawah dan [arsip lengkap](../archive/PROJECT_HANDOFF_HISTORY.md) bersifat
+historis, termasuk status push ditolak, commit lama, dan instruksi UI pra-implementasi.
+
+## Snapshot distribusi dan verifikasi akhir
 
 Setelah checkpoint `06c2a39`, pengguna meminta prioritas berikutnya sampai terakhir,
 lalu commit/push hasilnya. Judul P6/7 tidak tersimpan di checklist; cakupan yang dipakai
@@ -30,7 +227,7 @@ review distribusi, native security, clean Windows serta tes fisik P4 masih gate 
 Jangan menyebut production release atau P4 selesai. Bukti aktual di [testing](../testing.md).
 Gunakan `git log/status` dan hasil push yang benar-benar teramati untuk status Git terkini.
 
-## Checkpoint terbaru: prioritas 3–5
+## Snapshot prioritas 3–5
 
 Pengguna meminta lanjut sampai prioritas 5 dan **recheck satu per satu**. Baseline
 Git sesi ini `582cd67` (`feat: tab`), working tree bersih dan sama dengan cache

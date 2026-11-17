@@ -3,6 +3,11 @@
 Ini indeks dokumentasi untuk pengembang dan AI. Bahasa komunikasi dengan pemilik:
 Indonesia. Jalankan command dari root repository `D:\projects\bpdf`.
 
+Aturan aktif pemilik: [panduan riset dan penyelesaian fitur](feature-development.md)
+dan [AGENTS.md](../AGENTS.md). Research fitur memakai produk kompetitor dan sumber
+primer, lalu dipetakan ke aplikasi ini. Setiap fitur selesai wajib commit Conventional
+Commits dan push ke tujuan repo yang disepakati.
+
 ## Mulai di sini untuk chat baru
 
 1. [Handoff terkini](handoff/PROJECT_HANDOFF.md): fitur nyata, hasil tes terakhir,
@@ -16,6 +21,14 @@ Indonesia. Jalankan command dari root repository `D:\projects\bpdf`.
 
 [Prompt siap salin ke chat berikutnya](handoff/NEXT_CHAT_PROMPT.md).
 
+Checkpoint handover **17 November 2026** mencatat PNG pada commit `2124580`,
+hasil 49 unit tests dan PNG UI lokal/portable, gate rilis yang terbuka, serta
+keputusan model bisnis AI yang ditunda. Detail dan status Git ada di handoff.
+
+Follow-up sesudah checkpoint: [pencarian teks PDF aktif](search.md) diimplementasikan,
+default tidak case-sensitive dan frasa berurutan, di commit `a74d380`;
+53 unit tests serta 14 kasus search UI dicatat di [testing](testing.md).
+
 Handoff terkini mengalahkan status milestone historis di arsip/blueprint. Rencana
 tidak berarti sudah diimplementasikan atau otomatis diizinkan untuk dieksekusi.
 Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
@@ -25,10 +38,12 @@ Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 | Kelompok | Dokumen |
 |---|---|
 | Konteks aktif | [Handoff](handoff/PROJECT_HANDOFF.md), [prompt chat baru](handoff/NEXT_CHAT_PROMPT.md) |
+| Alur pengembangan | [Riset kompetitor, commit dan push](feature-development.md), [contoh riset Find](research/text-search.md) |
 | Rencana UI | [Redesain desktop dan multi-tab](plans/UI_REDESIGN_MULTITAB_PLAN.md) |
 | Multi-tab aktif | [Perilaku tab](multitab.md), [hardening dan hasil profil](multitab-hardening.md) |
 | Arsitektur/keputusan | [Arsitektur](architecture.md), [keputusan](decisions.md), [ADR](adr/) |
 | Viewer | [Buku dan benchmark](books.md), [seleksi teks](text-selection.md) |
+| Pencarian PDF aktif | [Cari kata/frasa](search.md), default tidak case-sensitive |
 | Pengaturan halaman | [Organizer](organizer.md), [perubahan belum disimpan](unsaved-changes.md) |
 | Output PDF | [Save As/Extract](m3-safe-export-plan.md), [Split](split.md), [Optimize](optimize.md) |
 | Dukungan/pengujian | [Kompatibilitas](compatibility.md), [hasil pengujian](testing.md) |
