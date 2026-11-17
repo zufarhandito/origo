@@ -1,5 +1,12 @@
 # Progres PDF Studio
 
+Pembaruan toolbar: ikon + dropdown pen/highlighter, swatch warna, preview goresan,
+slider pen 0.5-12 pt dan stabilo 4-40 pt, serta toggle Hanya teks tersedia.
+Pengaturan tool terpisah; slider mode teks nonaktif. Clippy/release dan 9 kasus UI
+lulus. Build teruji dipasang ke target/release setelah memastikan tidak digunakan.
+Checkpoint Git/hash di bawah bersifat historis; periksa git log untuk commit toolbar.
+
+
 Checkpoint **17 November 2026**: anotator inti commit **`8a40b73`**, sudah di-push
 ke `origin/main` (remote `a1647e0..8a40b73`). Diimplementasikan setelah persetujuan
 pemilik. Highlight teks, pen/stabilo, pilih/hapus/warna, shared history, unsaved guard

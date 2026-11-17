@@ -7,14 +7,16 @@ tanda tangan draw/import tetap ditunda. Dasar UX: [riset kompetitor](research/pd
 
 Dalam mode Baca, buka **Anotasi** di bawah toolbar dokumen.
 
-- **Sorot teks**: drag teks untuk highlight yang mengikuti kotak teks. Seleksi teks
-  yang sudah dibuat juga bisa diterapkan melalui tombol ini. Scan tanpa text layer
-  menggunakan Stabilo; OCR belum tersedia.
-- **Pen**: gambar bebas. **Stabilo**: goresan transparan bebas.
-- Lima warna: kuning, merah, biru, hijau, hitam. Tipis/Tebal mengatur goresan berikutnya
-  (pen 2/4 pt, stabilo 12/24 pt).
-- **Pilih** lalu klik anotasi untuk memilih, mengganti warna, atau **Hapus anotasi** /
-  Delete. **Penghapus** menghapus satu objek yang diklik, bukan sebagian goresan.
+- Toolbar menggunakan ikon Pilih, Highlighter, Pen, Penghapus dan Hapus, dengan tooltip.
+  Klik ikon untuk mengaktifkan tool; panah di samping pen/highlighter membuka pengaturan.
+- Popover berisi swatch warna, preview goresan dan slider ketebalan: pen 0,5?12 pt
+  (langkah 0,5), stabilo 4?40 pt (langkah 1). Pilihan disimpan terpisah per tool/per view
+  selama dokumen terbuka; perubahan pengaturan berlaku untuk goresan berikutnya.
+- Toggle **Hanya teks** pada highlighter memilih sorotan mengikuti kotak teks.
+  Slider nonaktif pada mode ini. Jika toggle mati, highlighter menjadi stabilo bebas
+  yang juga dapat digunakan pada scan. OCR belum tersedia.
+- **Pilih** lalu klik anotasi untuk memilih, mengganti warna melalui popup, atau
+  **Hapus anotasi** / Delete. Penghapus menghapus satu objek utuh yang diklik.
 - Satu goresan atau satu seleksi teks lintas halaman adalah satu langkah Undo/Redo.
   Esc membatalkan draft dan menutup panel anotasi. Perubahan tersimpan di Workspace
   yang sama dengan pengaturan halaman; dua tampilan satu PDF berbagi anotasi/history.

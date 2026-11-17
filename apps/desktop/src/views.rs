@@ -16,6 +16,7 @@ impl DocumentSession {
     // tool drawer painted over the page, or a modal owned by another document.
     fn document_input_allowed(&self, position: gpui::Point<gpui::Pixels>, window: &Window) -> bool {
         self.visible_for_render
+            && !self.annotation.popup_open
             && !self
                 .resources
                 .tab_picker_open

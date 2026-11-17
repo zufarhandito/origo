@@ -22,7 +22,11 @@ pub(super) struct AnnotationState {
     pub open: bool,
     pub tool: Tool,
     pub color: usize,
-    pub thick: bool,
+    pub pen_color: usize,
+    pub marker_color: usize,
+    pub text_only: bool,
+    pub popup_open: bool,
+    pub sliders: Option<[gpui::Entity<gpui::component::slider::SliderState>; 2]>,
     pub draft: Option<(PageId, Annotation)>,
     pub selected: Option<(PageId, u64)>,
 }
@@ -58,75 +62,245 @@ impl DocumentSession {
                     cx.notify();
                 })),
         );
+        if self.annotation.sliders.is_none() {
+            use gpui::component::slider::{SliderEvent, SliderState};
+            let sliders = [
+                cx.new(|_| {
+                    SliderState::new()
+                        .min(0.5)
+                        .max(12.)
+                        .step(0.5)
+                        .default_value(2.)
+                }),
+                cx.new(|_| {
+                    SliderState::new()
+                        .min(4.)
+                        .max(40.)
+                        .step(1.)
+                        .default_value(12.)
+                }),
+            ];
+            for slider in &sliders {
+                cx.subscribe(slider, |_, _, event: &SliderEvent, cx| {
+                    if matches!(event, SliderEvent::Change(_)) {
+                        cx.notify();
+                    }
+                })
+                .detach();
+            }
+            self.annotation.sliders = Some(sliders);
+        }
         if self.annotation.open {
-            for (i, (tool, label)) in [
-                (Tool::Select, "Pilih"),
-                (Tool::Highlight, "Sorot teks"),
-                (Tool::Pen, "Pen"),
-                (Tool::Marker, "Stabilo"),
-                (Tool::Eraser, "Penghapus"),
+            use gpui::component::popover::Popover;
+            use gpui_kit::assets::IconName;
+            for (i, (tool, label, icon)) in [
+                (Tool::Select, "Pilih", IconName::MousePointer2),
+                (Tool::Highlight, "Highlighter", IconName::Highlighter),
+                (Tool::Pen, "Pen", IconName::Pencil),
+                (Tool::Eraser, "Penghapus", IconName::Eraser),
             ]
             .into_iter()
             .enumerate()
             {
+                let selected = self.annotation.tool == tool
+                    || (tool == Tool::Highlight && self.annotation.tool == Tool::Marker);
+                let color_index = if tool == Tool::Pen {
+                    self.annotation.pen_color
+                } else {
+                    self.annotation.marker_color
+                };
+                let c = COLORS[color_index];
+                let tint = if matches!(tool, Tool::Pen | Tool::Highlight) {
+                    gpui::rgb((u32::from(c[0]) << 16) | (u32::from(c[1]) << 8) | u32::from(c[2]))
+                        .into()
+                } else {
+                    cx.theme().foreground
+                };
                 bar = bar.child(
                     Button::new(("annotation-tool", i))
                         .ghost()
-                        .label(label)
-                        .selected(self.annotation.tool == tool)
+                        .icon(gpui::component::Icon::new(icon).text_color(tint))
+                        .tooltip(label)
+                        .accessibility_label(label)
+                        .selected(selected)
                         .disabled(self.edits_locked())
                         .on_click(cx.listener(move |s, _, window, cx| {
-                            s.annotation.tool = tool;
-                            if tool == Tool::Highlight && s.text.selection.is_some() {
-                                s.text.dragging = true;
-                                s.finish_annotation(cx);
-                            }
+                            s.annotation.tool =
+                                if tool == Tool::Highlight && !s.annotation.text_only {
+                                    Tool::Marker
+                                } else {
+                                    tool
+                                };
+                            s.annotation.color = if tool == Tool::Pen {
+                                s.annotation.pen_color
+                            } else {
+                                s.annotation.marker_color
+                            };
                             s.annotation.draft = None;
                             s.annotation.selected = None;
                             s.focus.focus(window, cx);
                             cx.notify();
                         })),
                 );
+                if matches!(tool, Tool::Pen | Tool::Highlight) {
+                    let pen = tool == Tool::Pen;
+                    let owner = cx.entity();
+                    bar = bar.child(
+                        Popover::new(("annotation-options", i))
+                            .trigger(
+                                Button::new(("annotation-dropdown", i))
+                                    .ghost()
+                                    .icon(IconName::ChevronDown)
+                                    .accessibility_label(if pen {
+                                        "Pengaturan pen"
+                                    } else {
+                                        "Pengaturan highlighter"
+                                    })
+                                    .tooltip(if pen {
+                                        "Pengaturan pen"
+                                    } else {
+                                        "Pengaturan highlighter"
+                                    })
+                                    .disabled(self.edits_locked()),
+                            )
+                            .on_open_change(cx.listener(|s, open, _, cx| {
+                                s.annotation.popup_open = *open;
+                                s.annotation.draft = None;
+                                cx.notify();
+                            }))
+                            .content(move |_, _, cx| {
+                                owner.update(cx, |s, cx| s.annotation_options(pen, cx))
+                            }),
+                    );
+                }
             }
-            for (i, label) in ["Kuning", "Merah", "Biru", "Hijau", "Hitam"]
-                .into_iter()
-                .enumerate()
-            {
-                bar = bar.child(
-                    Button::new(("annotation-color", i))
-                        .ghost()
-                        .label(label)
-                        .selected(self.annotation.color == i)
-                        .on_click(cx.listener(move |s, _, _, cx| {
-                            s.annotation.color = i;
-                            s.recolor_annotation(cx);
-                            cx.notify();
-                        })),
-                );
-            }
-            bar = bar
-                .child(
-                    Button::new("annotation-width")
-                        .ghost()
-                        .label(if self.annotation.thick {
-                            "Tebal"
-                        } else {
-                            "Tipis"
-                        })
-                        .on_click(cx.listener(|s, _, _, cx| {
-                            s.annotation.thick = !s.annotation.thick;
-                            cx.notify();
-                        })),
-                )
-                .child(
-                    Button::new("annotation-delete")
-                        .ghost()
-                        .label("Hapus anotasi")
-                        .disabled(self.annotation.selected.is_none() || self.edits_locked())
-                        .on_click(cx.listener(|s, _, _, cx| s.delete_annotation(cx))),
-                );
+            bar = bar.child(
+                Button::new("annotation-delete")
+                    .ghost()
+                    .icon(IconName::Trash)
+                    .accessibility_label("Hapus anotasi")
+                    .tooltip("Hapus anotasi")
+                    .disabled(self.annotation.selected.is_none() || self.edits_locked())
+                    .on_click(cx.listener(|s, _, _, cx| s.delete_annotation(cx))),
+            );
         }
         bar.into_any_element()
+    }
+    fn annotation_options(&mut self, pen: bool, cx: &mut Context<Self>) -> gpui::AnyElement {
+        use gpui::component::{slider::Slider, switch::Switch};
+        let index = usize::from(!pen);
+        let color = if pen {
+            self.annotation.pen_color
+        } else {
+            self.annotation.marker_color
+        };
+        let Some(sliders) = self.annotation.sliders.as_ref() else {
+            return gpui::div().into_any_element();
+        };
+        let slider = sliders[index].clone();
+        let width = slider.read(cx).value().start();
+        let mut colors = gpui::div().flex().gap_2();
+        for (i, label) in ["Kuning", "Merah", "Biru", "Hijau", "Hitam"]
+            .into_iter()
+            .enumerate()
+        {
+            let c = COLORS[i];
+            colors = colors.child(
+                Button::new(("swatch", i))
+                    .ghost()
+                    .rounded_full()
+                    .accessibility_label(label)
+                    .tooltip(label)
+                    .selected(color == i)
+                    .child(gpui::div().size(px(22.)).rounded_full().bg(gpui::rgb(
+                        (u32::from(c[0]) << 16) | (u32::from(c[1]) << 8) | u32::from(c[2]),
+                    )))
+                    .on_click(cx.listener(move |s, _, _, cx| {
+                        if pen {
+                            s.annotation.pen_color = i;
+                        } else {
+                            s.annotation.marker_color = i;
+                        }
+                        s.annotation.color = i;
+                        s.recolor_annotation(cx);
+                        cx.notify();
+                    })),
+            );
+        }
+        let c = COLORS[color];
+        let preview = gpui::canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
+                let mut path = gpui::PathBuilder::stroke(px(width));
+                for i in 0..40 {
+                    let x = i as f32 / 39.;
+                    let point = bounds.origin
+                        + gpui::point(
+                            bounds.size.width * x,
+                            bounds.size.height * (0.5 + 0.18 * (x * std::f32::consts::TAU).sin()),
+                        );
+                    if i == 0 {
+                        path.move_to(point);
+                    } else {
+                        path.line_to(point);
+                    }
+                }
+                if let Ok(path) = path.build() {
+                    window.paint_path(
+                        path,
+                        gpui::rgba(
+                            (u32::from(c[0]) << 24)
+                                | (u32::from(c[1]) << 16)
+                                | (u32::from(c[2]) << 8)
+                                | if pen { 255 } else { 128 },
+                        ),
+                    );
+                }
+            },
+        )
+        .w_full()
+        .h(px(64.));
+        let mut panel = gpui::div()
+            .w(px(240.))
+            .flex()
+            .flex_col()
+            .gap_3()
+            .p_3()
+            .child("Warna")
+            .child(colors)
+            .child(preview)
+            .child(format!("Ketebalan: {width:.1} pt"))
+            .child(
+                Slider::new(&slider)
+                    .accessibility_label("Ketebalan")
+                    .disabled(!pen && self.annotation.text_only),
+            )
+            .child(
+                gpui::div()
+                    .flex()
+                    .justify_between()
+                    .child("Tipis")
+                    .child("Tebal"),
+            );
+        if !pen {
+            panel = panel.child(
+                Switch::new("text-only")
+                    .label("Hanya teks")
+                    .checked(self.annotation.text_only)
+                    .on_change(cx.listener(|s, checked, _, cx| {
+                        s.annotation.text_only = *checked;
+                        if matches!(s.annotation.tool, Tool::Highlight | Tool::Marker) {
+                            s.annotation.tool = if *checked {
+                                Tool::Highlight
+                            } else {
+                                Tool::Marker
+                            };
+                        }
+                        cx.notify();
+                    })),
+            );
+        }
+        panel.into_any_element()
     }
     fn set_annotations(
         &mut self,
@@ -258,14 +432,18 @@ impl DocumentSession {
                 Annotation {
                     id: 1,
                     highlight,
-                    color: COLORS[self.annotation.color],
-                    width: if highlight {
-                        if self.annotation.thick { 24. } else { 12. }
-                    } else if self.annotation.thick {
-                        4.
+                    color: COLORS[if highlight {
+                        self.annotation.marker_color
                     } else {
-                        2.
-                    },
+                        self.annotation.pen_color
+                    }],
+                    width: self
+                        .annotation
+                        .sliders
+                        .as_ref()
+                        .map_or(if highlight { 12. } else { 2. }, |sliders| {
+                            sliders[usize::from(highlight)].read(cx).value().start()
+                        }),
                     points: vec![point],
                     rectangles: false,
                 },
@@ -323,7 +501,7 @@ impl DocumentSession {
                     Annotation {
                         id: 1,
                         highlight: true,
-                        color: COLORS[self.annotation.color],
+                        color: COLORS[self.annotation.marker_color],
                         width: 1.,
                         points,
                         rectangles: true,

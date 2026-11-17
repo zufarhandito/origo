@@ -15,16 +15,32 @@ function Stroke($x1,$y1,$x2,$y2){
 try {
     $null=Wait-State {param($s) $s.pageCount -eq 4 -and -not $s.textLoading}
     Menu-Action 'Tampilan' 'Sesuaikan halaman'
-    Invoke 'Anotasi';Invoke 'Pen';Invoke 'Biru'
+    Invoke 'Anotasi';Invoke 'Pen';Invoke 'Pengaturan pen';Invoke 'Biru'
+    $slider=Find 'Ketebalan'
+    $r=$slider.Current.BoundingRectangle
+    $point=New-Object OrganizerClick+Point;$point.X=[int]($r.Right-1);$point.Y=[int]($r.Y+$r.Height/2)
+    [OrganizerClick]::ScreenToClient($app.MainWindowHandle,[ref]$point)|Out-Null
+    $lp=[IntPtr](($point.Y -shl 16) -bor ($point.X -band 0xffff))
+    [OrganizerClick]::SendMessage($app.MainWindowHandle,0x200,[IntPtr]0,$lp)|Out-Null
+    [OrganizerClick]::SendMessage($app.MainWindowHandle,0x201,[IntPtr]1,$lp)|Out-Null
+    [OrganizerClick]::SendMessage($app.MainWindowHandle,0x202,[IntPtr]0,$lp)|Out-Null
+    Start-Sleep -Milliseconds 300
+    if((Find 'Ketebalan').GetCurrentPattern([Windows.Automation.RangeValuePattern]::Pattern).Current.Value -ne 12){throw 'Slider did not reach 12 pt'}
+    $null=Wait-State {param($s) $s.annotationCount -eq 0 -and -not $s.dirty}
+    Pass 'pen-options-preview';Invoke 'Pengaturan pen'
     Stroke 0.2 0.3 0.6 0.4
     $null=Wait-State {param($s) $s.annotationCount -eq 1 -and $s.dirty}
     Pass 'draw-and-dirty'
     Invoke 'Undo';$null=Wait-State {param($s) $s.annotationCount -eq 0 -and -not $s.dirty}
     Invoke 'Redo';$null=Wait-State {param($s) $s.annotationCount -eq 1 -and $s.dirty}
     Pass 'one-stroke-one-undo-redo'
-    Invoke 'Stabilo';Invoke 'Kuning';Stroke 0.2 0.45 0.6 0.45
+    Invoke 'Highlighter';Stroke 0.2 0.45 0.6 0.45
     $null=Wait-State {param($s) $s.annotationCount -eq 2}
-    Invoke 'Sorot teks';Stroke 0.11001587 0.5516052 0.35012817 0.5516052
+    Invoke 'Pengaturan highlighter';Invoke 'Hanya teks'
+    $null=Wait-State {param($s) $s.annotationTextOnly}
+    if((Find 'Ketebalan').Current.IsEnabled){throw 'Text highlight slider must be disabled'}
+    Pass 'text-only-disables-width'
+    Invoke 'Pengaturan highlighter';Stroke 0.11001587 0.5516052 0.35012817 0.5516052
     $null=Wait-State {param($s) $s.annotationCount -eq 3}
     Pass 'freehand-and-text-highlights'
     Menu-Action 'Tampilan' 'Tampilan kedua PDF ini'

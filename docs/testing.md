@@ -1,5 +1,16 @@
 # Documentation handover — 17 November 2026
 
+## Toolbar anotasi dropdown (17 November 2026)
+
+Fmt, Clippy desktop/all-targets denied warnings dan release build lulus.
+UI anotator **9 kasus lulus**: slider pen 12 pt, preview/color, pengaturan tanpa dirty,
+Hanya teks menonaktifkan slider, dua view, Undo/Redo, close guard, Save As/reopen/delete.
+Bukti ignored: `.research/annotation-ui-bc2f2b61719b4f36b5190d01e4f77d02`.
+Preview diperiksa visual; metadata PDF hasil simpan mengandung lebar pen 12 pt.
+Semua input sintetis. Suite unit/native checkpoint sebelumnya tidak diulang;
+format PDF dan model ekspor tidak berubah.
+
+
 ## Anotator inti ? 17 November 2026
 
 `cargo clippy --workspace --all-targets --locked --offline -- -D warnings` dan

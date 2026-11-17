@@ -1,5 +1,12 @@
 # Handoff terkini ? 17 November 2026
 
+Pembaruan toolbar: ikon + dropdown pen/highlighter, swatch warna, preview goresan,
+slider pen 0.5-12 pt dan stabilo 4-40 pt, serta toggle Hanya teks tersedia.
+Pengaturan tool terpisah; slider mode teks nonaktif. Clippy/release dan 9 kasus UI
+lulus. Build teruji dipasang ke target/release setelah memastikan tidak digunakan.
+Checkpoint Git/hash di bawah bersifat historis; periksa git log untuk commit toolbar.
+
+
 Permintaan terbaru pemilik: implementasikan anotator dulu; tanda tangan sesudahnya.
 **Anotator inti selesai**: highlight teks, pen/stabilo, lima warna, ketebalan goresan,
 pilih/hapus/recolor, Undo/Redo, unsaved-close guard, safe Save As dan reopen/edit.

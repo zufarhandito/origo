@@ -21,6 +21,8 @@ impl DocumentSession {
         let native = self.renderer.session_stats();
         let mut result = json!({
             "annotationPanel": self.annotation.open,
+            "annotationPopup": self.annotation.popup_open,
+            "annotationTextOnly": self.annotation.text_only,
             "annotationSelected": self.annotation.selected.is_some(),
             "pageCount": self.navigation.count, "activePage": self.navigation.current + 1,
             "zoomPercent": self.zoom_percent(), "fullRenders": self.stats.full,

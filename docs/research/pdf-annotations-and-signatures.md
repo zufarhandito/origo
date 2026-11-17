@@ -225,3 +225,14 @@ inti mencakup highlight teks, pen/stabilo, warna/ketebalan, pilih/hapus, history
 unsaved guard serta Save As/reopen edit. Detail aktual dan batas terdapat di
 [Anotasi](../annotations.md). Daftar kandidat fitur lain dalam riset bukan klaim
 fitur tersedia atau izin mengerjakan tanda tangan saat ini.
+
+
+## Penyempurnaan toolbar berdasarkan gambar pemilik
+
+17 November 2026: pemilik meminta implementasi ikon + dropdown seperti screenshot
+Edge. Pengamatan gambar: swatch bulat, preview goresan, slider Thickness dan toggle
+Text only highlight. Dokumentasi Microsoft mengonfirmasi kustomisasi warna/lebar
+ink: https://learn.microsoft.com/en-us/deployedge/microsoft-edge-pdf#inking.
+Ini bukan pengujian interaktif Edge. Adaptasi PDF Studio: slider pen 0.5-12 pt,
+stabilo 4-40 pt; mode teks menonaktifkan slider karena tinggi mengikuti kotak teks.
+Pengaturan terpisah per tool, tidak mengubah anotasi lama kecuali recolor objek terpilih.
