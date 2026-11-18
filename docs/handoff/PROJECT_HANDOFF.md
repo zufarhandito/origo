@@ -1,5 +1,17 @@
 # Handoff terkini - 17 November 2026
 
+Prioritas terbaru pemilik (18 November 2026): fitur **Cetak PDF** dan panel **Daftar
+isi** di kiri seperti Edge, dengan permintaan riset. Pada sesi ini riset keduanya
+selesai; belum ada implementasi atau print job. Scope opsional ditanyakan saat
+riset berjalan; tanpa jawaban tahap ini diambil sebagai riset dahulu. Dokumen:
+[print](../research/pdf-printing.md), [outline](../research/pdf-outline-navigation.md).
+Rekomendasi: implementasi cetak lebih dahulu sesuai urutan pemilik; outline memakai
+sidebar Thumbnail/Daftar isi dan destination lokal. Publikasi/installer tetap ditunda.
+Metode: dokumentasi/source vendor dan inspeksi repo, bukan uji UI vendor/perangkat.
+Tidak ada test produk diulang, dependency/printer/driver diubah, atau data PDF dibuka.
+Peta lama "task belum dipilih" di bawah adalah checkpoint historis sebelum arahan ini.
+
+
 Pembaruan aktif: pemilik memilih nama **Origo** dan mengotorisasi pemasangan ikon
 sementara lingkaran dari PNG-nya. Resource icon ID 1/metadata produk, title native,
 custom title bar dan About kini Origo. Aset di apps/desktop/resources/branding;

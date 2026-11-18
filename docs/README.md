@@ -51,6 +51,13 @@ Handoff terkini mengalahkan status milestone historis di arsip/blueprint. Rencan
 tidak berarti sudah diimplementasikan atau otomatis diizinkan untuk dieksekusi.
 Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 
+## Riset prioritas berikutnya
+
+18 November 2026: [cetak PDF](research/pdf-printing.md) dan
+[panel daftar isi/bookmarks](research/pdf-outline-navigation.md). Membandingkan
+sumber primer Edge/Chrome/Firefox/Acrobat dan memetakan UX/engine/acceptance Origo.
+Dokumen ini hasil riset, bukan klaim fitur sudah tersedia. Publikasi ditunda.
+
 ## Peta dokumentasi
 
 Riset terbaru: [anotasi PDF dan tanda tangan draw/import](research/pdf-annotations-and-signatures.md)
