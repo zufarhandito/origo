@@ -2,6 +2,11 @@
 
 ## Header menu dan kontrol jendela (19 November 2026)
 
+Commit fitur: **6ed7c2c** (`feat(ui): merge menus and custom window controls into one header`).
+Push ke origin/main dicoba dan gagal: Git tidak dapat membaca Username GitHub
+karena kredensial tidak tersedia dan interaktivitas dinonaktifkan. Tidak ada
+konfirmasi pengiriman remote. Build lokal sudah terpasang dan teruji.
+
 Baris logo/nama dan menu digabung menjadi satu header 34 logical px. Menu di kiri,
 ruang drag di tengah, kontrol minimize/maximize-restore/close custom GPUI di kanan.
 Hit area Windows dipisahkan sehingga menu dapat diklik tanpa menyeret jendela.
