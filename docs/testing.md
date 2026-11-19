@@ -30,7 +30,8 @@ touch, mixed DPI/multi-monitor dan interaksi stylus belum diuji pada checkpoint 
 
 Build isolated teruji: target/tab-background-check/release/pdf-studio.exe.
 SHA-256: `33A1FBBC22389913696DEEFA471040023CEA33A39BA8F10EB8115943B977095D`.
-Pemasangan launcher menunggu proses utama tidak aktif; lihat status akhir sesi.
+Build telah dipasang ke launcher setelah pemilik menutup aplikasi. Hash terpasang
+identik dengan build isolated yang diuji.
 
 
 ## Perataan kiri recent files (19 November 2026)

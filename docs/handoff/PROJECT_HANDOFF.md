@@ -4,9 +4,10 @@
 
 Commit **cf831e1**: `feat(ui): streamline workspace header and contextual tools`.
 Push origin/main berhasil: `66a1a88..cf831e1 main -> main`. Ini konfirmasi pengiriman,
-bukan klaim CI remote lulus. Build launcher belum diganti karena aplikasi utama
-masih aktif. Kartu penutupan aplikasi telah dikirim; pemasangan menunggu target
-aman/tidak aktif. Jangan menutup proses pengguna untuk mengganti executable.
+bukan klaim CI remote lulus. Pemilik kemudian menutup aplikasi. Setelah memeriksa
+target tidak aktif, build teruji sudah disalin ke target/release/pdf-studio.exe.
+Hash terpasang sama dengan build isolated di bawah; run.cmd kini memakai UI baru.
+Tidak ada proses/dokumen pengguna yang ditutup oleh agen.
 
 Menu hamburger, tab/+ /Daftar tab dan kontrol jendela kini satu header. Menu lama
 tersedia sebagai submenu; area drag terpisah dari tombol/tab. Pemicu Anotasi di
@@ -36,7 +37,8 @@ touch, mixed DPI/multi-monitor dan interaksi stylus belum diuji pada checkpoint 
 
 Build isolated teruji: target/tab-background-check/release/pdf-studio.exe.
 SHA-256: `33A1FBBC22389913696DEEFA471040023CEA33A39BA8F10EB8115943B977095D`.
-Pemasangan launcher menunggu proses utama tidak aktif; lihat status akhir sesi.
+Build telah dipasang ke launcher setelah pemilik menutup aplikasi. Hash terpasang
+identik dengan build isolated yang diuji.
 
 
 ## Perataan kiri recent files (19 November 2026)
