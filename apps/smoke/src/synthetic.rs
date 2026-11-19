@@ -366,6 +366,14 @@ pub fn export_safety_pdf(feature: &str) -> Vec<u8> {
 }
 
 pub fn outline_pdf() -> Vec<u8> {
+    outline_pdf_with_title("Bab 3 terotasi")
+}
+pub fn long_outline_pdf() -> Vec<u8> {
+    outline_pdf_with_title(
+        "Bab III identifikasi kasus dan pemetaan pengetahuan dalam sistem informasi spasial serta pembahasan hasil penelitian",
+    )
+}
+fn outline_pdf_with_title(third_title: &str) -> Vec<u8> {
     let objects=vec![
         b"<< /Type /Catalog /Pages 2 0 R /Outlines 10 0 R /Names << /Dests 17 0 R >> >>".to_vec(),
         b"<< /Type /Pages /Count 3 /Kids [4 0 R 6 0 R 8 0 R] >>".to_vec(),
@@ -380,7 +388,7 @@ pub fn outline_pdf() -> Vec<u8> {
         b"<< /Title (Bab 1) /Parent 10 0 R /Next 14 0 R /Dest [4 0 R /Fit] /First 12 0 R /Last 13 0 R /Count 2 >>".to_vec(),
         b"<< /Title (Subbab bernama) /Parent 11 0 R /Next 13 0 R /Dest (section) >>".to_vec(),
         b"<< /Title (Tautan eksternal) /Parent 11 0 R /Prev 12 0 R /A << /S /URI /URI (https://example.invalid) >> >>".to_vec(),
-        b"<< /Title (Bab 3 terotasi) /Parent 10 0 R /Prev 11 0 R /Next 15 0 R /Dest [8 0 R /XYZ 30 350 2] >>".to_vec(),
+        format!("<< /Title ({third_title}) /Parent 10 0 R /Prev 11 0 R /Next 15 0 R /Dest [8 0 R /XYZ 30 350 2] >>").into_bytes(),
         b"<< /Title (Kelompok) /Parent 10 0 R /Prev 14 0 R /First 16 0 R /Last 16 0 R /Count 1 >>".to_vec(),
         b"<< /Title <FEFF004200610062002000D800DF> /Parent 15 0 R /Dest [6 0 R /FitH 300] >>".to_vec(),
         b"<< /Names [(section) [6 0 R /XYZ 20 200 null]] >>".to_vec(),

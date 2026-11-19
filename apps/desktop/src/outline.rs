@@ -149,6 +149,16 @@ impl DocumentSession {
                         } else {
                             result
                         };
+                        s.outline.collapsed.retain(|(source, _)| *source != id);
+                        if let Ok(outline) = &result {
+                            s.outline.collapsed.extend(
+                                outline
+                                    .nodes
+                                    .iter()
+                                    .filter_map(|n| n.parent)
+                                    .map(|parent| (id, parent)),
+                            );
+                        }
                         s.outline.cache.insert(id, (fingerprint, result));
                         s.report(cx);
                         cx.notify();
@@ -289,40 +299,62 @@ impl DocumentSession {
                 };
                 let label = node.title.clone();
                 gpui::div()
+                    .w_full()
+                    .min_w_0()
                     .flex()
-                    .items_center()
+                    .items_start()
                     .pl(px((depth.min(8) * 12) as f32))
-                    .child(
-                        Button::new(gpui::SharedString::from(format!(
-                            "outline-expand-{}-{index}",
-                            source.0
-                        )))
-                        .ghost()
-                        .icon(if collapsed {
-                            gpui::assets::IconName::ChevronRight
-                        } else {
-                            gpui::assets::IconName::ChevronDown
-                        })
-                        .accessibility_label(format!(
-                            "{}: {}",
-                            if collapsed { "Buka bab" } else { "Tutup bab" },
-                            node.title
-                        ))
-                        .disabled(!children)
-                        .on_click(cx.listener(move |s, _, _, cx| {
-                            if !s.outline.collapsed.remove(&(source, index)) {
-                                s.outline.collapsed.insert((source, index));
-                            }
-                            cx.notify();
-                        })),
-                    )
+                    .when(children, |row| {
+                        row.child(
+                            Button::new(gpui::SharedString::from(format!(
+                                "outline-expand-{}-{index}",
+                                source.0
+                            )))
+                            .ghost()
+                            .icon(if collapsed {
+                                gpui::assets::IconName::ChevronRight
+                            } else {
+                                gpui::assets::IconName::ChevronDown
+                            })
+                            .accessibility_label(format!(
+                                "{}: {}",
+                                if collapsed { "Buka bab" } else { "Tutup bab" },
+                                node.title
+                            ))
+                            .w(px(32.))
+                            .h(px(32.))
+                            .flex_shrink_0()
+                            .on_click(cx.listener(
+                                move |s, _, _, cx| {
+                                    if !s.outline.collapsed.remove(&(source, index)) {
+                                        s.outline.collapsed.insert((source, index));
+                                    }
+                                    cx.notify();
+                                },
+                            )),
+                        )
+                    })
+                    .when(!children, |row| {
+                        row.child(gpui::div().w(px(32.)).h(px(32.)).flex_shrink_0())
+                    })
                     .child(
                         Button::new(gpui::SharedString::from(format!(
                             "outline-node-{}-{index}",
                             source.0
                         )))
                         .ghost()
-                        .label(label.clone())
+                        .child(
+                            gpui::div()
+                                .w_full()
+                                .min_w_0()
+                                .whitespace_normal()
+                                .text_left()
+                                .line_height(gpui::relative(1.4))
+                                .child(label.clone()),
+                        )
+                        .h_auto()
+                        .min_h(px(32.))
+                        .py_2()
                         .tooltip(reason.to_string())
                         .accessibility_label(label)
                         .selected(self.outline.selected == Some((source, index)))

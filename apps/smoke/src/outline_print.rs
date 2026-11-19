@@ -41,6 +41,10 @@ pub fn write(root: &Path) -> Result<()> {
     std::fs::create_dir_all(&dir)?;
     std::fs::write(dir.join("outline.pdf"), crate::synthetic::outline_pdf())?;
     std::fs::write(
+        dir.join("long-outline.pdf"),
+        crate::synthetic::long_outline_pdf(),
+    )?;
+    std::fs::write(
         dir.join("no-outline.pdf"),
         crate::synthetic::export_safety_pdf("plain"),
     )?;

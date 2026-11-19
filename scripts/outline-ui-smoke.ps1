@@ -4,7 +4,13 @@ $cases=New-Object Collections.Generic.List[object]
 function Pass([string]$Name){Capture ($Name+'.png');$cases.Add([pscustomobject]@{Case=$Name;Status='passed'});$cases.ToArray()|ConvertTo-Json|Set-Content -Encoding UTF8 (Join-Path $directory 'cases.json');Write-Host "PASS outline: $Name"}
 try {
  $null=Wait-State {param($s) $s.pageCount -eq 3}
- Invoke 'Daftar isi';$null=Find 'Bab 1';$null=Find 'Subbab bernama';$null=Find 'Kelompok'
+ Invoke 'Daftar isi';$null=Find 'Bab 1';$null=Find 'Kelompok'
+ $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+ foreach($name in @('Subbab bernama','Tautan eksternal')){
+  if($ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$name))){throw 'Child visible before expanding parent'}
+ }
+ $null=Find 'Buka bab: Bab 1';Pass 'initial-root-only-collapsed'
+ Invoke 'Buka bab: Bab 1';$null=Find 'Subbab bernama'
  $null=Wait-State {param($s) $s.outlineOpen -and -not $s.dirty}
  if((Find 'Tautan eksternal').Current.IsEnabled){throw 'External action must be disabled'}
  Pass 'nested-tree-and-disabled-external-action'
@@ -31,6 +37,16 @@ try {
  $null=Wait-State {param($s) $s.tabCount -eq 2 -and $s.pageCount -eq 1}
  Invoke 'Daftar isi';$null=Wait-State {param($s) $s.outlineOpen -and -not $s.dirty};Start-Sleep -Milliseconds 500
  Pass 'empty-outline-state'
+ Picker 'Buka PDF';Fill-Picker (Join-Path $root '.research/outline-print-fixtures/long-outline.pdf')
+ $null=Wait-State {param($s) $s.tabCount -eq 3 -and $s.pageCount -eq 3}
+ Invoke 'Daftar isi'
+ $title='Bab III identifikasi kasus dan pemetaan pengetahuan dalam sistem informasi spasial serta pembahasan hasil penelitian'
+ $null=Find $title;Start-Sleep -Milliseconds 300
+ $wrapped=(Find $title).Current.BoundingRectangle;$following=(Find 'Kelompok').Current.BoundingRectangle
+ if($wrapped.Height -lt 60){throw 'Long title is not wrapping into multiple lines'}
+ if($following.Y -lt $wrapped.Bottom-1){throw 'Variable-height outline rows overlap'}
+ Pass 'wrapped-long-title-no-overlap'
+ Invoke $title;$null=Wait-State {param($s) $s.activePage -eq 3 -and -not $s.dirty}
  if((Get-FileHash $a).Hash -ne $hashA){throw 'Source changed'}
  Close-Window
  Write-Host "Outline evidence: $directory"

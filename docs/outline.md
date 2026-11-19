@@ -1,5 +1,14 @@
 # Daftar isi PDF
 
+Pembaruan judul/tree 19 November: judul membungkus ke beberapa baris mengikuti
+lebar panel; tinggi item diukur otomatis dan panah sejajar bagian atas judul.
+Item tanpa anak tidak lagi menampilkan panah nonaktif. Kondisi awal hanya
+menampilkan level teratas; semua cabang dimulai tertutup. Membuka satu induk
+menampilkan anaknya, sementara cabang anak tetap tertutup sampai dibuka sendiri.
+Pilihan expand/collapse tetap per view dan tidak direset hanya karena berpindah
+ikon Thumbnail/Daftar isi; bukan perubahan pada PDF atau history edit.
+
+
 Pembaruan 19 November: pemicu Panel navigasi adalah ikon paling kiri toolbar utama.
 Pemilih Thumbnail/Daftar isi memakai dua tombol ikon GPUI-kit dengan tooltip,
 bukan segmented bertulisan; state per view,

@@ -1,5 +1,31 @@
 # Pengujian Origo
 
+## Daftar isi membungkus dan collapse awal (19 November 2026)
+
+Judul outline mengikuti lebar panel dan membungkus menjadi beberapa baris dengan
+tinggi item otomatis. Panah berada di bagian atas baris; item tanpa anak memakai
+spacer tanpa panah palsu. Saat model outline sumber pertama kali dimuat, semua
+parent ditandai collapsed: hanya level teratas terlihat. Membuka satu parent
+menampilkan anak, sedangkan parent di bawahnya tetap collapsed. State expand tetap
+per view dan tidak direset saat beralih Thumbnail/Daftar isi; source/history tetap.
+
+Fmt, Clippy desktop+smoke/all-targets denied warnings dan release build lulus.
+Native --outline-print-smoke lulus untuk regresi generator fixture/destination/
+print flags. UI outline **10 kasus** lulus: root-only initial, hierarchy/actions,
+expand/collapse, named target, crop/rotasi, switch panel, delete/Undo, split view,
+empty state dan judul panjang multiline tanpa overlap + navigasi judul tersebut.
+Bukti lokal `.research/outline-ui-41d6e3e2c8fb4ff1a2d95ee08503bbf0`.
+Capture judul panjang diperiksa visual dan hash sumber sintetis tetap sama.
+Run awal menemukan width baris mengikuti min-content sehingga wrapping belum
+terjadi; width baris kemudian dikunci ke lebar panel dan rerun lulus.
+Tidak ada unit/PDF export suite lain yang diulang untuk layout ini.
+
+Build teruji sudah dipasang ke target/release/pdf-studio.exe saat target tidak aktif.
+Hash isolated/terpasang identik:
+`DF6AD5D380A1B8883530E8BCD4BC1B077FDB16AF8C28A424965C7266C87F52DF`.
+run.cmd memakai build baru; tidak ada proses pengguna yang ditutup oleh agen.
+
+
 ## Ikon panel navigasi dan tooltip (19 November 2026)
 
 Segmented bertulisan diganti dua tombol ikon: LayoutGrid (Thumbnail), ListTree
