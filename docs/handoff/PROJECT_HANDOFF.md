@@ -20,11 +20,13 @@ pembukaan biasa; kasus tersebut belum diuji UI khusus pada checkpoint ini.
 
 Commit fitur tersedia: **c6e49ea**. Push origin/main dicoba dan ditolak karena
 Git tidak dapat membaca Username GitHub tanpa kredensial (interaktivitas disabled).
-Proses utama masih aktif saat checkpoint akhir; kartu penutupan aplikasi sudah
-dikirim. Build belum disalin ke launcher; jangan tutup proses pengguna. Build isolated teruji:
+Pemilik kemudian menutup aplikasi. Setelah memastikan target tidak aktif, build
+teruji disalin ke launcher; hash cocok dan tidak ada proses pengguna yang ditutup
+oleh agen. Build isolated teruji:
 `target/tab-background-check/release/pdf-studio.exe`, SHA-256
 `BA57376005728AA8FA1D36A0D67E33ECBC46D58FB33613DD07E5367CAD564401`.
-Pemasangan launcher menunggu proses utama tidak aktif. Status push diverifikasi
+Build sudah dipasang ke target/release/pdf-studio.exe setelah pemilik menutup
+aplikasi. Hash terpasang identik dengan build isolated di atas. Status push diverifikasi
 terpisah; cache origin/main tidak membuktikan keberhasilan pengiriman.
 
 
