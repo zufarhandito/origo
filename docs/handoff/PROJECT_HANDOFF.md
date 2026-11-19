@@ -1,5 +1,19 @@
 # Handoff terkini - 19 November 2026
 
+## Perataan kiri recent files (19 November 2026)
+
+Ikon dan nama file recent memakai baris konten selebar tombol, rata kiri pada
+posisi yang sama. Nama panjang tetap ellipsis; accessible name dan tooltip path
+utuh dipertahankan. Tombol Empty State utama tetap terpusat.
+Fmt, Clippy desktop/all-targets denied warnings dan release build lulus. Delapan
+kasus existing recent-files UI lulus, dengan capture terang/gelap diperiksa visual:
+`.research/recent-files-ui-84c1dd9530d8401f8e5ddd8efc5d6bd6`.
+Tidak ada test/unit PDF baru atau suite PDF diulang untuk styling ini.
+Build teruji sudah dipasang ke target/release/pdf-studio.exe setelah target tidak
+aktif. Hash isolated/terpasang identik:
+`D3A927C356924824BFE399C269F85EB813868E4784E50E1878642A0DF86B2A5E`.
+
+
 ## Terakhir dibuka di Empty State (19 November 2026)
 
 Lima recent PDF tampil di bawah tombol Buka PDF; maksimal 20 path disimpan dalam

@@ -3,7 +3,8 @@
 ## Terakhir dibuka (19 November 2026)
 
 Empty State menampilkan maksimal lima PDF terakhir di bawah tombol Buka PDF.
-Klik nama untuk membuka lewat alur inspeksi PDF biasa; path lengkap tersedia di
+Ikon dan nama file diratakan kiri pada posisi awal yang sama; nama panjang
+dipotong dengan elipsis. Klik nama untuk membuka lewat alur inspeksi PDF biasa; path lengkap tersedia di
 tooltip untuk membedakan nama yang sama. File hilang/rusak memakai pesan gagal
 pembukaan biasa, bukan dibaca diam-diam atau dihapus dari daftar secara otomatis.
 

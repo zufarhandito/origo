@@ -112,8 +112,21 @@ impl WindowShell {
                             .into_owned();
                         Button::new(("recent-file", index))
                             .ghost()
-                            .icon(IconName::File)
-                            .label(name.clone())
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .w_full()
+                                    .min_w_0()
+                                    .text_left()
+                                    .child(
+                                        gpui::component::Icon::new(IconName::File)
+                                            .size(px(16.))
+                                            .flex_shrink_0(),
+                                    )
+                                    .child(div().flex_1().min_w_0().truncate().child(name.clone())),
+                            )
                             .accessibility_label(format!("Buka terakhir: {name}"))
                             .tooltip(full)
                             .w_full()
