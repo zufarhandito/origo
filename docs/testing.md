@@ -1,5 +1,27 @@
 # Pengujian Origo
 
+## Koreksi header tiga baris (19 November 2026)
+
+Arahan pemilik mengembalikan multi-tab ke baris kedua: baris 1 hamburger + ruang
+drag + kontrol jendela, baris 2 tab/+ /Daftar tab, baris 3 toolbar ikon dokumen.
+Saat kosong, baris tab tetap disembunyikan. Dropdown tab kini berawal di y=68
+logical px agar tidak menimpa baris kedua. Perapian contextual annotations,
+undo/redo, separator zoom/search, label canvas dan OCR coming soon tetap berlaku.
+
+Fmt check, Clippy desktop/all-targets denied warnings dan release build lulus.
+16 kasus UI lulus: 8 workspace (termasuk posisi tiga baris dan anchor tab picker)
+dan 8 caption/menu/minimize/maximize/restore/close. Bukti lokal:
+`.research/workspace-ui-8df7183a57da4780b55c3d6274f82996` dan
+`.research/compact-titlebar-165b0aa88c9e4d2b827f41f5d14866b7`.
+Capture diperiksa visual; sumber sintetis tidak berubah. Unit/native PDF suite
+tidak diulang untuk koreksi layout ini.
+
+Build teruji sudah dipasang ke target/release/pdf-studio.exe setelah memastikan
+target tidak aktif. Hash isolated/terpasang identik:
+`B0C21C81082A7081C4190FFE18C46CA3AF171B5B3121D24590BFFFDBFF952F6B`.
+run.cmd kini memakai susunan tiga baris. Tidak ada proses pengguna yang ditutup.
+
+
 ## Workspace ringkas dan toolbar kontekstual (19 November 2026)
 
 Menu hamburger, tab/+ /Daftar tab dan kontrol jendela kini satu header. Menu lama

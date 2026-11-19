@@ -1,7 +1,7 @@
 # Branding Origo
 
-Workspace terbaru memakai menu hamburger dan tab dalam satu header, dengan kontrol
-jendela custom di kanan. Logo/nama tetap tidak ditampilkan pada header; identitas
+Workspace terbaru memakai hamburger dan kontrol jendela custom pada baris pertama,
+lalu tab pada baris kedua dan toolbar dokumen pada baris ketiga. Logo/nama tetap tidak ditampilkan pada header; identitas
 native/taskbar/About tetap Origo. Catatan menu teks di bawah bersifat historis.
 
 

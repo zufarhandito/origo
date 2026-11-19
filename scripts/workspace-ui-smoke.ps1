@@ -8,10 +8,15 @@ try {
  $null=Wait-State {param($s) $s.pageCount -eq 4 -and -not $s.textLoading}
  foreach($name in @('Halaman pertama','Halaman sebelumnya','Halaman berikutnya','Halaman terakhir','Undo','Redo','Pen','Berkas')){Missing $name}
  $menu=(Find 'Menu aplikasi').Current.BoundingRectangle;$tabs=(Find 'Daftar tab').Current.BoundingRectangle
- if([Math]::Abs($menu.Y-$tabs.Y) -gt 3){throw 'Menu and tabs occupy separate rows'}
+ if([Math]::Abs(($tabs.Y-$menu.Y)-34) -gt 3){throw 'Tabs must occupy the second row'}
+ $tools=(Find 'Anotasi').Current.BoundingRectangle
+ if($tools.Y -lt $tabs.Bottom){throw 'Main toolbar must occupy the third row'}
  $search=(Find 'Cari teks').Current.BoundingRectangle;$zoom=(Find 'Perkecil').Current.BoundingRectangle
  if($zoom.X-$search.Right -lt 12){throw 'Search and zoom need separation'}
- Pass 'compact-read-header'
+ Invoke 'Daftar tab';$picker=(Find 'Cari tab').Current.BoundingRectangle
+ if($picker.Y -lt $tabs.Bottom){throw 'Tab picker overlaps the tab row'}
+ Invoke 'Daftar tab'
+ Pass 'three-row-read-header'
  Menu-Action 'Tampilan' 'Sesuaikan halaman';Pass 'hamburger-submenu-action'
  $field=Find 'Nomor halaman tujuan';$field.SetFocus();$field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('2')
  [OutputDialog]::PostMessage($app.MainWindowHandle,0x100,[IntPtr]13,[IntPtr]0x10001)|Out-Null

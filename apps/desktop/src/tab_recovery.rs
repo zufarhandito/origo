@@ -148,7 +148,7 @@ impl WindowShell {
         div()
             .id("tab-picker")
             .absolute()
-            .top(px(34.))
+            .top(px(68.))
             .right(px(8.))
             .w(px(600.))
             .max_w_full()
@@ -159,7 +159,7 @@ impl WindowShell {
             .occlude()
             .on_mouse_down_out(
                 cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
-                    if this.tab_picker_open && event.position.y > px(34.) {
+                    if this.tab_picker_open && event.position.y > px(68.) {
                         this.toggle_tab_picker(window, cx);
                     }
                 }),

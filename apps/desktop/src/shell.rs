@@ -1363,16 +1363,6 @@ impl Render for WindowShell {
                     .border_b_1()
                     .border_color(colors.border)
                     .child(menus)
-                    .when(!self.tabs.is_empty(), |el| {
-                        el.child(strip).child(
-                            Button::new("new-tab")
-                                .ghost()
-                                .icon(IconName::Plus)
-                                .accessibility_label("Buka PDF di tab baru")
-                                .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
-                                .on_click(cx.listener(|s, _, _, cx| s.choose_open(cx))),
-                        )
-                    })
                     .child(
                         div()
                             .id("caption-drag")
@@ -1381,7 +1371,6 @@ impl Render for WindowShell {
                             .min_w(px(48.))
                             .window_control_area(gpui::WindowControlArea::Drag),
                     )
-                    .when(!self.tabs.is_empty(), |el| el.child(tab_list))
                     .children(
                         [
                             (
@@ -1432,6 +1421,29 @@ impl Render for WindowShell {
                         }),
                     ),
             )
+            .when(!self.tabs.is_empty(), |el| {
+                el.child(
+                    div()
+                        .h(px(34.))
+                        .flex_shrink_0()
+                        .flex()
+                        .items_center()
+                        .border_b_1()
+                        .border_color(colors.border)
+                        .bg(cx.theme().tokens.tab_bar)
+                        .child(strip)
+                        .child(
+                            Button::new("new-tab")
+                                .ghost()
+                                .icon(IconName::Plus)
+                                .accessibility_label("Buka PDF di tab baru")
+                                .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
+                                .on_click(cx.listener(|s, _, _, cx| s.choose_open(cx))),
+                        )
+                        .child(div().flex_1())
+                        .child(tab_list),
+                )
+            })
             .when(self.tab_picker_open, |el| {
                 el.child(gpui::deferred(self.render_tab_picker(cx)).with_priority(2))
             })

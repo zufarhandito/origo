@@ -1,5 +1,15 @@
 # Desktop UI dan multi-tab
 
+## Koreksi susunan tiga baris (19 November 2026)
+
+Arahan terbaru pemilik: baris 1 hanya hamburger, ruang drag dan kontrol jendela;
+baris 2 berisi tab, + dan Daftar tab; baris 3 berisi toolbar ikon dokumen.
+Saat tidak ada PDF, baris tab tetap hilang dan tampil Empty State/recents di bawah
+header. Tab picker dimulai di bawah baris tab (68 logical px). Toolbar anotasi
+kontekstual dan perapian canvas/status dari checkpoint sebelumnya tetap berlaku.
+Uraian satu baris gabungan menu+tab di bawah merupakan checkpoint sebelumnya.
+
+
 ## Workspace ringkas dan menu aplikasi (19 November 2026)
 
 Header sekarang satu baris: ikon Menu aplikasi (hamburger) di kiri, tab/+ jika ada
