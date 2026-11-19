@@ -2,6 +2,11 @@
 
 ## Perataan kiri recent files (19 November 2026)
 
+Commit **aa85ec1**: `fix(ui): left-align recent file icons and names`.
+Push origin/main berhasil, respons `bc00b36..aa85ec1 main -> main`.
+Catatan auth/push gagal di checkpoint lebih lama bersifat historis; push ini
+mengonfirmasi pengiriman commit sampai aa85ec1, bukan kelulusan CI remote.
+
 Ikon dan nama file recent memakai baris konten selebar tombol, rata kiri pada
 posisi yang sama. Nama panjang tetap ellipsis; accessible name dan tooltip path
 utuh dipertahankan. Tombol Empty State utama tetap terpusat.
