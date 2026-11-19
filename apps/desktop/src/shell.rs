@@ -4,6 +4,10 @@ use gpui::assets::IconName;
 use gpui::component::{
     ActiveTheme, Disableable, Selectable, Theme, ThemeMode, WindowExt,
     button::{Button, ButtonCustomVariant, ButtonVariants},
+    empty::{
+        Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyMediaVariant,
+        EmptyTitle,
+    },
     menu::{ContextMenuExt, DropdownMenu, PopupMenuItem},
     tab::Tab as DocumentTab,
 };
@@ -1389,25 +1393,27 @@ impl Render for WindowShell {
                         }),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .border_b_1()
-                    .border_color(colors.border)
-                    .bg(cx.theme().tokens.tab_bar)
-                    .child(strip)
-                    .child(
-                        Button::new("new-tab")
-                            .ghost()
-                            .icon(IconName::Plus)
-                            .accessibility_label("Buka PDF di tab baru")
-                            .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
-                            .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
-                    )
-                    .child(div().flex_1())
-                    .child(tab_list),
-            )
+            .when(!self.tabs.is_empty(), |el| {
+                el.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .border_b_1()
+                        .border_color(colors.border)
+                        .bg(cx.theme().tokens.tab_bar)
+                        .child(strip)
+                        .child(
+                            Button::new("new-tab")
+                                .ghost()
+                                .icon(IconName::Plus)
+                                .accessibility_label("Buka PDF di tab baru")
+                                .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
+                                .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
+                        )
+                        .child(div().flex_1())
+                        .child(tab_list),
+                )
+            })
             .when(self.tab_picker_open, |el| {
                 el.child(gpui::deferred(self.render_tab_picker(cx)).with_priority(2))
             })
@@ -1491,24 +1497,29 @@ impl Render for WindowShell {
             )
             .when(session.is_none(), |el| {
                 el.child(
-                    div()
-                        .flex_1()
-                        .flex()
-                        .flex_col()
-                        .items_center()
-                        .justify_center()
-                        .gap_3()
-                        .child(if self.opening {
-                            "Memeriksa dokumen…"
-                        } else {
-                            "Buka beberapa PDF, satu dokumen per tab."
-                        })
-                        .child(
-                            Button::new("open-empty")
-                                .primary()
-                                .label("Buka PDF")
-                                .disabled(self.opening)
-                                .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
+                    Empty::new()
+                        .header(
+                            EmptyHeader::new()
+                                .media(
+                                    EmptyMedia::new()
+                                        .with_variant(EmptyMediaVariant::Icon)
+                                        .child(gpui::component::Icon::new(IconName::File)),
+                                )
+                                .title(EmptyTitle::new().child("Belum ada PDF terbuka"))
+                                .description(EmptyDescription::new().child(if self.opening {
+                                    "Memeriksa dokumen..."
+                                } else {
+                                    "Buka PDF untuk mulai membaca dan mengedit dokumen."
+                                })),
+                        )
+                        .content(
+                            EmptyContent::new().child(
+                                Button::new("open-empty")
+                                    .primary()
+                                    .label("Buka PDF")
+                                    .disabled(self.opening)
+                                    .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
+                            ),
                         ),
                 )
             })

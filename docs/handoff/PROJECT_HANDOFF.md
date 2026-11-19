@@ -1,5 +1,22 @@
 # Handoff terkini - 19 November 2026
 
+## Empty State tanpa baris tab (19 November 2026)
+
+Saat tidak ada tab dokumen, baris multi-tab/+ /Daftar tab disembunyikan. Konten
+kosong menggunakan Empty dan slot header/media/title/description/content GPUI-kit,
+dengan tombol Buka PDF. Tab muncul lagi setelah membuka PDF; close terakhir dan
+cancel picker kembali/tetap kosong. Header menu dan kontrol jendela dipertahankan.
+
+Fmt, Clippy desktop/all-targets denied warnings dan release build lulus. Enam
+kasus UI lulus: tutup terakhir menyembunyikan tab, empty terang, cancel picker,
+buka dari Empty State mengembalikan tab, tutup terakhir lagi dan empty gelap.
+Bukti lokal `.research/empty-state-ui-b27654110c31463fb7df528bef2560d3`.
+PDF sintetis tidak berubah. Suite PDF/unit tidak diulang untuk perubahan layout ini.
+Build teruji: `target/tab-background-check/release/pdf-studio.exe`, SHA-256
+`658E97BA0B7A3FBE79E8748D9211C6F96B89A4E49770CAA975D5DF565BEC4DD4`.
+Pemasangan ke launcher menunggu executable utama tidak aktif; lihat status akhir sesi.
+
+
 ## Header menu dan kontrol jendela (19 November 2026)
 
 Commit fitur: **6ed7c2c** (`feat(ui): merge menus and custom window controls into one header`).

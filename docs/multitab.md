@@ -1,5 +1,14 @@
 # Desktop UI dan multi-tab
 
+## Tanpa dokumen terbuka (19 November 2026)
+
+Jika daftar tab kosong, seluruh baris multi-tab (termasuk tombol + dan Daftar tab)
+disembunyikan. Area utama memakai komponen GPUI-kit Empty dengan EmptyHeader,
+EmptyMedia/Icon, EmptyTitle, EmptyDescription dan EmptyContent untuk tombol Buka PDF.
+Menu header tetap tersedia. Membuka PDF memunculkan tab; menutup tab terakhir
+mengembalikan Empty State. Batal pada picker tetap mempertahankan keadaan kosong.
+
+
 ## Header ringkas (19 November 2026)
 
 Menu Berkas, Edit, Tampilan, Alat dan Bantuan digabung dalam satu baris setinggi
