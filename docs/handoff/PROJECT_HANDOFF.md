@@ -4,10 +4,10 @@
 
 Commit fitur **ac60f1e**: `feat(ui): hide tabs and use GPUI empty state without documents`.
 Push origin/main dicoba dan gagal karena Git tidak memiliki kredensial Username
-GitHub (interaktivitas dinonaktifkan). Build utama belum diganti: proses pengguna
-masih memakai target/release/pdf-studio.exe. Pertanyaan penutupan aplikasi sudah
-dikirim lewat kartu; pemasangan menunggu proses tidak aktif. Jangan tutup proses
-pengguna untuk mengganti executable.
+GitHub (interaktivitas dinonaktifkan). Pemilik kemudian menutup aplikasi. Setelah memverifikasi target tidak aktif,
+build Empty State teruji sudah disalin ke target/release/pdf-studio.exe. Hash
+terpasang identik dengan build isolated yang dicatat di bawah. run.cmd sekarang
+memakai build Empty State baru; tidak ada proses pengguna yang ditutup oleh agen.
 
 Saat tidak ada tab dokumen, baris multi-tab/+ /Daftar tab disembunyikan. Konten
 kosong menggunakan Empty dan slot header/media/title/description/content GPUI-kit,
@@ -21,7 +21,8 @@ Bukti lokal `.research/empty-state-ui-b27654110c31463fb7df528bef2560d3`.
 PDF sintetis tidak berubah. Suite PDF/unit tidak diulang untuk perubahan layout ini.
 Build teruji: `target/tab-background-check/release/pdf-studio.exe`, SHA-256
 `658E97BA0B7A3FBE79E8748D9211C6F96B89A4E49770CAA975D5DF565BEC4DD4`.
-Pemasangan ke launcher menunggu executable utama tidak aktif; lihat status akhir sesi.
+Build sudah dipasang ke launcher setelah pemilik menutup aplikasi; hash terpasang
+identik dengan build isolated di atas.
 
 
 ## Header menu dan kontrol jendela (19 November 2026)
