@@ -83,6 +83,10 @@ folder penyimpanan, dan waktu modifikasi filesystem dalam zona waktu lokal
 (`dd-mm-yyyy HH:MM`). Bintang memakai state favorit yang sama dengan tab dan tetap
 terbaca setelah restart; tidak mengubah urutan recent. Lokasi/nama panjang dipotong
 dengan elipsis, sementara tooltip memuat path lengkap dan tanggal perubahan.
+Area header dan konten Empty State dibatasi 40 rem (sekitar 640 px), mengikuti
+lebar jendela dengan padding tetap lega. Item recent memakai dua baris: nama dan
+bintang di atas; lokasi fleksibel di kiri serta tanggal di kanan pada baris kedua.
+Lokasi panjang ellipsis agar tanggal tetap terbaca, tinggi minimum item 52 px.
 Welcome page dapat discroll bila daftar tidak muat pada tinggi jendela kecil.
 
 Tanggal dibaca melalui metadata filesystem di background untuk lima item terlihat,

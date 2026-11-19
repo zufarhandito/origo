@@ -1,5 +1,28 @@
 # Pengujian Origo
 
+## Recent files dua baris dan lebar moderat (19 November 2026)
+
+Header/konten Empty State memakai max-width 40 rem (sekitar 640 px), meningkat
+dari 24 rem dengan padding bawaan tetap lega. Item recent kini dua baris: nama
+file/bintang; lalu lokasi fleksibel di kiri dan modified date di kanan. Lokasi
+panjang ellipsis, tanggal tidak menyusut, minimum tinggi item turun 64 ke 52 px.
+Tooltip dan accessible names tetap lengkap; welcome tetap scroll bila perlu.
+
+Fmt, Clippy desktop/all-targets denied warnings dan release build lulus. Semua
+13 kasus recent-files UI existing lulus (termasuk reopen/restart/favorit/metadata/
+clear dan hash sumber tetap sama). Capture terang/gelap diperiksa visual:
+`.research/recent-files-ui-7294cc59e9bb4075b6fab9400dd5b99d`.
+Pemeriksaan layout tambahan lima item, missing-date fallback dan jendela pendek
+lulus dengan capture diperiksa:
+`.research/recent-metadata-layout-b55e7958634043c5a7e3d99599c044f2`.
+Tidak menambah unit test atau mengulang suite PDF untuk perubahan layout ini.
+
+Build teruji sudah dipasang ke target/release/pdf-studio.exe setelah target
+dipastikan tidak aktif. Tidak menutup proses pengguna. Hash isolated/terpasang:
+`8BDAF25F08753F4B39C5B14BCAFC7126F86D552B90547EF5253BFA1A23E34CD7`.
+run.cmd memakai build ini.
+
+
 ## Metadata dan favorit pada recent files (19 November 2026)
 
 Recent menampilkan bintang dari state favorit tab yang sama, folder penyimpanan,

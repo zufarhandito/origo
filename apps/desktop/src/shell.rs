@@ -1560,6 +1560,7 @@ impl Render for WindowShell {
                                 .min_h_full()
                                 .header(
                                     EmptyHeader::new()
+                                        .max_w(gpui::rems(40.))
                                         .media(
                                             EmptyMedia::new()
                                                 .with_variant(EmptyMediaVariant::Icon)
@@ -1576,6 +1577,7 @@ impl Render for WindowShell {
                                 )
                                 .content(
                                     EmptyContent::new()
+                                        .max_w(gpui::rems(40.))
                                         .child(
                                             Button::new("open-empty")
                                                 .primary()

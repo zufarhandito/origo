@@ -160,7 +160,7 @@ impl WindowShell {
                         Button::new(("recent-file", index))
                             .ghost()
                             .h_auto()
-                            .min_h(px(64.))
+                            .min_h(px(52.))
                             .py_2()
                             .child(
                                 div()
@@ -217,22 +217,30 @@ impl WindowShell {
                                                 div()
                                                     .w_full()
                                                     .min_w_0()
-                                                    .truncate()
+                                                    .flex()
+                                                    .items_center()
+                                                    .justify_between()
+                                                    .gap_4()
                                                     .text_xs()
                                                     .text_color(cx.theme().muted_foreground)
-                                                    .id(("recent-location", index))
-                                                    .role(gpui::Role::Group)
-                                                    .aria_label(format!("Lokasi: {folder}"))
-                                                    .child(folder.clone()),
-                                            )
-                                            .child(
-                                                div()
-                                                    .text_xs()
-                                                    .text_color(cx.theme().muted_foreground)
-                                                    .id(("recent-modified", index))
-                                                    .role(gpui::Role::Group)
-                                                    .aria_label(modified.clone())
-                                                    .child(modified.clone()),
+                                                    .child(
+                                                        div()
+                                                            .flex_1()
+                                                            .min_w_0()
+                                                            .truncate()
+                                                            .id(("recent-location", index))
+                                                            .role(gpui::Role::Group)
+                                                            .aria_label(format!("Lokasi: {folder}"))
+                                                            .child(folder.clone()),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .flex_shrink_0()
+                                                            .id(("recent-modified", index))
+                                                            .role(gpui::Role::Group)
+                                                            .aria_label(modified.clone())
+                                                            .child(modified.clone()),
+                                                    ),
                                             ),
                                     ),
                             )
