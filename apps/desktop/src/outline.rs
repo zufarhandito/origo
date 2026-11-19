@@ -1,10 +1,9 @@
 //! View-local outline navigation; source data is read-only and never executes actions.
 use crate::*;
 use gpui::component::{
-    ActiveTheme, Disableable, Selectable, Sizable,
+    ActiveTheme, Disableable, Selectable,
     button::{Button, ButtonVariants},
     scroll::Scrollbar,
-    tab::{Tab, TabBar},
 };
 use pdf_application::outline::Outline;
 use pdf_domain::{PageId, SourceFingerprint, SourceId};
@@ -32,27 +31,41 @@ enum Row {
 }
 impl DocumentSession {
     pub(super) fn outline_header(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let outline_open = self.outline.open && self.mode != ViewerMode::Organize;
         gpui::div()
+            .flex()
+            .items_center()
+            .gap_1()
             .p_1()
             .child(
-                TabBar::new("navigation-segments")
-                    .segmented()
-                    .small()
-                    .w_full()
-                    .last_empty_space(gpui::div())
-                    .selected_index(usize::from(
-                        self.outline.open && self.mode != ViewerMode::Organize,
-                    ))
-                    .child(Tab::new().label("Thumbnail"))
-                    .child(Tab::new().label("Daftar isi"))
-                    .on_click(cx.listener(|s, index, window, cx| {
-                        if *index == 1 && s.mode == ViewerMode::Organize {
+                Button::new("nav-thumbnails")
+                    .ghost()
+                    .icon(gpui::assets::IconName::LayoutGrid)
+                    .accessibility_label("Thumbnail")
+                    .tooltip("Thumbnail")
+                    .w(px(32.))
+                    .h(px(32.))
+                    .selected(!outline_open)
+                    .on_click(cx.listener(|s, _, _, cx| {
+                        s.outline.open = false;
+                        cx.notify();
+                    })),
+            )
+            .child(
+                Button::new("nav-outline")
+                    .ghost()
+                    .icon(gpui::assets::IconName::ListTree)
+                    .accessibility_label("Daftar isi")
+                    .tooltip("Daftar isi")
+                    .w(px(32.))
+                    .h(px(32.))
+                    .selected(outline_open)
+                    .on_click(cx.listener(|s, _, window, cx| {
+                        if s.mode == ViewerMode::Organize {
                             s.set_mode(ViewerMode::Read, window, cx);
                         }
-                        s.outline.open = *index == 1;
-                        if s.outline.open {
-                            s.load_outlines(cx);
-                        }
+                        s.outline.open = true;
+                        s.load_outlines(cx);
                         cx.notify();
                     })),
             )

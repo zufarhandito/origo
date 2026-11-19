@@ -1,7 +1,8 @@
 # Daftar isi PDF
 
 Pembaruan 19 November: pemicu Panel navigasi adalah ikon paling kiri toolbar utama.
-Pemilih Thumbnail/Daftar isi memakai TabBar::segmented() GPUI-kit; state per view,
+Pemilih Thumbnail/Daftar isi memakai dua tombol ikon GPUI-kit dengan tooltip,
+bukan segmented bertulisan; state per view,
 klik bab, expand/collapse dan model outline tidak berubah. Saat Organize,
 Thumbnail ditandai aktif sesuai konten yang sedang ditampilkan.
 
@@ -9,7 +10,8 @@ Thumbnail ditandai aktif sesuai konten yang sedang ditampilkan.
 Implementasi navigasi MVP, 19 November 2026. Dasar keputusan dan perbandingan vendor:
 [riset outline/bookmarks](research/pdf-outline-navigation.md).
 
-Buka **Panel navigasi** di kiri, lalu tab **Daftar isi** di sebelah **Thumbnail**.
+Buka **Panel navigasi** di kiri, lalu ikon **Daftar isi** di sebelah ikon
+**Thumbnail**. Nama muncul saat hover; ikon aktif diberi latar pilihan.
 Bab bertingkat dapat dibuka/ditutup lewat panah; klik judul untuk menuju tujuan lokal.
 Zoom pembaca dipertahankan. Destination halaman dan posisi XYZ/FitH didukung;
 mode destination lain menuju halaman tanpa memaksakan zoom. Direct dan named

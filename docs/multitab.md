@@ -1,5 +1,14 @@
 # Desktop UI dan multi-tab
 
+## Pemilih panel kiri hanya ikon (19 November 2026)
+
+Pilihan UI terbaru mengganti segmented bertulisan dengan dua tombol ikon ghost:
+LayoutGrid untuk Thumbnail dan ListTree untuk Daftar isi. Nama ditampilkan lewat
+tooltip saat hover dan tetap dipertahankan sebagai accessible label. Pilihan aktif
+memiliki latar selected; perilaku panel/Organize/per-view tidak berubah. Catatan
+segmented di checkpoint sebelumnya merupakan riwayat, bukan tampilan terkini.
+
+
 ## Pemilih tab di kiri dan navigasi segmented (19 November 2026)
 
 Baris kedua dimulai dengan tombol ikon ChevronDown/ChevronUp (tanpa label visual),

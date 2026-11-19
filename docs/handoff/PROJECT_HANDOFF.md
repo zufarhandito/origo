@@ -1,5 +1,24 @@
 # Handoff terkini - 19 November 2026
 
+## Ikon panel navigasi dan tooltip (19 November 2026)
+
+Segmented bertulisan diganti dua tombol ikon: LayoutGrid (Thumbnail), ListTree
+(Daftar isi), selected background untuk pilihan aktif. Label visual dihilangkan;
+accessible name dan tooltip tetap Thumbnail/Daftar isi. Model/perilaku outline,
+mode Organize dan state per view tetap dipertahankan.
+
+Fmt, Clippy desktop/all-targets denied warnings dan release build lulus. Delapan
+kasus outline UI lulus (tree/local destination, switch, delete/Undo, split, empty):
+`.research/outline-ui-9ebe218cfa624769a2d3bcf5ef1f1801`.
+Tooltip Thumbnail diamati lewat hover dan capture lokal:
+`.research/nav-icon-hover-3daa43964d9c4717aaa3d51e7b584544/thumbnail-tooltip.png`.
+PDF sintetis tidak berubah; unit/native PDF suite tidak diulang untuk styling ini.
+Build teruji sudah dipasang ke target/release/pdf-studio.exe saat target tidak aktif.
+Hash isolated/terpasang identik:
+`0CDE59F8FBE0D05FAA1D463723ED2D5E40019B82CD8A2F4979FB3D8EFADD14F4`.
+run.cmd kini memakai ikon panel; tidak ada proses pengguna yang ditutup oleh agen.
+
+
 ## Chevron kiri, urutan toolbar dan segmented tabs (19 November 2026)
 
 Pemilih Daftar tab kini tombol ikon chevron down/up di paling kiri baris tab,
