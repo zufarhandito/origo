@@ -1,5 +1,36 @@
 # Handoff terkini - 19 November 2026
 
+## Sinkron recent dan banner pemulihan sesi (19 November 2026)
+
+Tawaran pemulihan ditutup pada jalur open_paths bersama, sehingga recent/file
+picker/reopen tidak meninggalkan banner setelah pengguna memilih dokumen lain.
+Flag keputusan per window juga mencegah load_session async yang terlambat
+memunculkan tawaran kembali. Cancel picker mempertahankan tawaran. X menggantikan
+Mulai kosong, melewati pemulihan dan menyimpan snapshot sesi kosong, bukan
+menghapus recent/favorit/PDF. Proses restore posisi/fingerprint tetap seperti semula.
+
+Banner lebih ringkas: background amber transparan dan border amber, teks kecil,
+heading/jelaskan PDF asli tanpa pemulihan edit belum disimpan, satu tombol
+Pulihkan Sesi di kanan dan X paling kanan. Tema terang/gelap diperiksa visual.
+Fmt, Clippy desktop/all-targets denied warnings, 13 desktop unit tests dan release
+build lulus. **12 kasus session-restore UI** lulus: reading-only metadata, layout
+compact/right actions, cancel picker, recent dismiss + no resurrection, picker
+dismiss, restore active/order/position tanpa edit, partial + changed source,
+last-tab empty session, corrupt metadata/clear, X remembered, write failure/exit,
+dan source bytes unchanged. Bukti lokal:
+`.research/session-restore-ui-f529c8ed14eb402fae03bd6097d036ba`.
+Tes restart kini mengaktifkan window fixture sendiri; run awal berhenti karena
+aktivasi UI otomatis setelah cancel dialog belum stabil, lalu rerun lulus.
+Suite native PDF tidak diulang karena perubahan ini pada state/UI sesi baca.
+
+Build isolated teruji: target/tab-background-check/release/pdf-studio.exe.
+SHA-256: `799B364A52EE3AC4F5F101CDA7CAC7FAF797DEDCAA8D3C6E978CDB22CB9358D5`.
+Pemilik menutup aplikasi; setelah target dipastikan tidak aktif, build teruji
+sudah dipasang ke target/release/pdf-studio.exe. Hash terpasang cocok dengan
+isolated di atas. run.cmd memakai build baru; tidak ada proses pengguna ditutup
+oleh agen.
+
+
 ## Daftar isi membungkus dan collapse awal (19 November 2026)
 
 Judul outline mengikuti lebar panel dan membungkus menjadi beberapa baris dengan

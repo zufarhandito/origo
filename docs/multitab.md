@@ -1,5 +1,21 @@
 # Desktop UI dan multi-tab
 
+## Tawaran pemulihan sesi di welcome (19 November 2026)
+
+Banner pemulihan kini ringkas, berlatar amber transparan mengikuti tema, dengan
+teks kecil, satu tombol Pulihkan Sesi di kanan dan X untuk melewati pemulihan.
+Peringatan tetap menjelaskan bahwa PDF asli dibuka kembali dan perubahan belum
+disimpan tidak dipulihkan. X menggantikan Mulai kosong dan menyimpan sesi kosong;
+daftar recent/favorit dan file PDF tidak dihapus.
+
+Membuka dokumen melalui recent, file picker, reopen atau jalur pembukaan lain
+menutup tawaran sesi di satu jalur bersama. Keputusan ini berlaku sepanjang window
+tersebut, sehingga hasil load metadata terlambat tidak memunculkan tawaran lagi.
+Membatalkan file picker tidak menghitung sebagai pilihan dokumen dan tetap
+mempertahankan tawaran. Pemulihan sesi asli tetap memakai validasi fingerprint,
+partial restore dan metadata posisi baca yang ada.
+
+
 ## Pemilih panel kiri hanya ikon (19 November 2026)
 
 Pilihan UI terbaru mengganti segmented bertulisan dengan dua tombol ikon ghost:
@@ -164,7 +180,7 @@ nama tab dan history; nama output dilaporkan pada hasil ekspor.
 
 ## Restore sesi baca — tahap 3
 
-- Startup tanpa PDF eksplisit menawarkan **Pulihkan sesi / Mulai kosong** bila sesi
+- Startup tanpa PDF eksplisit menawarkan **Pulihkan Sesi / X untuk melewati pemulihan** bila sesi
   sebelumnya berisi dokumen. Menolak tawaran mengosongkan sesi tersimpan. Startup
   dengan argumen PDF membuka permintaan tersebut tanpa otomatis memulihkan sesi lain.
 - `%LOCALAPPDATA%/PDF Studio/session.json` menyimpan maksimal 8 sumber utama, urutan,

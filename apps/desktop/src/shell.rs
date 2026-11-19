@@ -84,6 +84,7 @@ pub(super) struct WindowShell {
     tab_picker_scroll: ScrollHandle,
     session_ready: bool,
     session_offer: Option<crate::local_state::SessionSnapshot>,
+    session_offer_dismissed: bool,
     restoring_session: Option<crate::local_state::SessionSnapshot>,
     session_last: Option<crate::local_state::SessionSnapshot>,
     session_writing: bool,
@@ -151,6 +152,7 @@ impl WindowShell {
                 tab_picker_scroll: ScrollHandle::new(),
                 session_ready: false,
                 session_offer: None,
+                session_offer_dismissed: false,
                 restoring_session: None,
                 session_last: None,
                 session_writing: false,
@@ -320,7 +322,6 @@ impl WindowShell {
         }
         self.opening = true;
         self.tab_picker_open = false;
-        self.session_offer = None;
         let picker = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
@@ -348,6 +349,11 @@ impl WindowShell {
         if self.opening || self.close.is_some() {
             return;
         }
+        if paths.is_empty() {
+            return;
+        }
+        self.session_offer = None;
+        self.session_offer_dismissed = true;
         self.opening = true;
         let task = cx.background_executor().spawn(async move {
             paths

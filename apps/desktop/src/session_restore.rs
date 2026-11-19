@@ -1,6 +1,7 @@
 //! Reading session persistence, separate from unsaved edits and export receipts.
 use super::*;
 use crate::local_state::{SavedDocument, SessionSnapshot};
+use gpui::component::{Sizable, StyledExt};
 
 impl WindowShell {
     pub(super) fn initialize_session_restore(
@@ -20,7 +21,7 @@ impl WindowShell {
                     Ok(snapshot) => {
                         this.session_ready = true;
                         this.session_last = snapshot.clone();
-                        if !explicit_file && !this.opening && this.tabs.is_empty() {
+                        if !explicit_file && !this.session_offer_dismissed && !this.opening && this.tabs.is_empty() {
                             this.session_offer = snapshot.filter(|s| !s.documents.is_empty());
                         }
                     }
@@ -188,20 +189,33 @@ impl WindowShell {
         }
         self.checkpoint_session(cx);
     }
+    fn dismiss_session_offer(&mut self, cx: &mut Context<Self>) {
+        if self.opening || self.close.is_some() || self.modal(cx) {
+            return;
+        }
+        self.session_offer_dismissed = true;
+        self.session_offer = None;
+        self.persist_session(SessionSnapshot::default(), cx);
+        cx.notify();
+    }
     pub(super) fn render_session_offer(&self, cx: &mut Context<Self>) -> AnyElement {
         let count = self.session_offer.as_ref().map_or(0, |s| s.documents.len());
-        div().id("restore-session-offer").flex().flex_col().gap_2().p_3()
+        let blocked = self.opening || self.close.is_some() || self.modal(cx);
+        div().id("restore-session-offer").flex().items_center().flex_shrink_0()
+            .gap_3().px_3().py_2().border_b_1()
+            .bg(cx.theme().warning.opacity(0.15)).border_color(cx.theme().warning.opacity(0.45))
             .role(gpui::Role::Group)
-            .aria_label(format!("Lanjutkan sesi baca terakhir ({count} PDF)? PDF sumber asli akan dibuka kembali; perubahan halaman dan impor yang belum diekspor tidak dipulihkan."))
-            .child(format!("Lanjutkan sesi baca terakhir ({count} PDF)?"))
-            .child("PDF sumber asli akan dibuka kembali. Perubahan halaman dan impor yang belum diekspor tidak dipulihkan.")
-            .child(div().flex().gap_2()
-                .child(Button::new("restore-session").primary().label("Pulihkan sesi").on_click(cx.listener(|this, _, _, cx| this.restore_session(cx))))
-                .child(Button::new("new-session").outline().label("Mulai kosong").on_click(cx.listener(|this, _, _, cx| {
-                    this.session_offer = None;
-                    this.persist_session(SessionSnapshot::default(), cx);
-                    cx.notify();
-                }))))
+            .aria_label(format!("Lanjutkan sesi baca terakhir ({count} PDF)? PDF asli dibuka kembali; perubahan belum disimpan tidak dipulihkan."))
+            .child(gpui::component::Icon::new(IconName::RotateCcw).size(px(16.)).flex_shrink_0().text_color(cx.theme().warning))
+            .child(div().flex_1().min_w_0().flex().flex_col().gap_1().text_xs()
+                .child(div().font_medium().child(format!("Lanjutkan sesi baca terakhir ({count} PDF)?")))
+                .child(div().text_color(cx.theme().muted_foreground).child("PDF asli dibuka kembali; perubahan belum disimpan tidak dipulihkan.")))
+            .child(Button::new("restore-session").primary().small().label("Pulihkan Sesi").disabled(blocked)
+                .on_click(cx.listener(|s,_,_,cx|s.restore_session(cx))))
+            .child(Button::new("dismiss-session-offer").ghost().icon(IconName::X)
+                .accessibility_label("Tutup tawaran sesi").tooltip("Tutup")
+                .w(px(28.)).h(px(28.)).disabled(blocked)
+                .on_click(cx.listener(|s,_,_,cx|s.dismiss_session_offer(cx))))
             .into_any_element()
     }
 }
