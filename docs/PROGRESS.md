@@ -1,5 +1,10 @@
 # Progres PDF Studio
 
+Commit fitur cetak/outline: **4736dfb**. Build lokal teruji sudah dipasang untuk
+`run.cmd`. Push ke origin/main belum berhasil: Git tidak memiliki kredensial,
+sehingga pengiriman remote/CI belum terverifikasi. Detail respons ada di
+[handoff](handoff/PROJECT_HANDOFF.md).
+
 19 November: **Cetak PDF** dan **panel Daftar isi** sudah diimplementasikan setelah
 riset dan otorisasi pemilik. Perilaku/batas: [cetak](printing.md), [daftar isi](outline.md).
 Riset sumber primer: [print](research/pdf-printing.md),

@@ -1,4 +1,4 @@
-# Handoff terkini - 17 November 2026
+# Handoff terkini - 19 November 2026
 
 Build fitur cetak/outline teruji sudah dipasang ke `target/release/pdf-studio.exe`
 setelah memastikan tidak ada proses memakai target. `run.cmd` memakai lokasi ini.
@@ -31,10 +31,25 @@ halaman memuat anotasi biru belum disimpan, sumber utuh dan dirty tetap. Bukti l
 ignored serta gate fisik ada di testing. Helper memakai STA khusus + native dialog
 klasik dengan guard dialog bertumpuk, bukan PDF shell verb.
 
-Status dasar Git sebelum implementasi: main, HEAD 26a79dd (riset); origin
-https://github.com/zufarhandito/origo.git. Push riset sebelumnya gagal autentikasi.
-Status commit/push implementasi dicatat setelah verifikasi akhir, bukan diasumsikan
-dari cache origin/main. Bagian branding/tanda tangan di bawah adalah riwayat.
+## Git dan pengiriman checkpoint ini
+
+Commit fitur **4736dfbd0d68ada5399f8d856fda01adceb810d0**:
+`feat(pdf): add Windows printing and outline navigation`.
+Branch `main`, origin terverifikasi `https://github.com/zufarhandito/origo.git`.
+Working tree bersih tepat setelah commit fitur; pembaruan status ini docs-only.
+
+**Push belum berhasil.** Percobaan awal tanpa respons dihentikan setelah sekitar
+tiga menit dengan menghentikan proses git-remote-https milik sesi ini. Percobaan
+ulang dengan interaktivitas dinonaktifkan ditolak:
+`fatal: Cannot prompt because user interactivity has been disabled.` dan
+`fatal: could not read Username for 'https://github.com': terminal prompts disabled`.
+Kartu kredensial aman sudah dibuka dan timeout tanpa jawaban; tidak ada token baru
+yang diterima/disimpan. Tidak ada konfirmasi server bahwa commit terkirim.
+Jangan menyamakan cache origin/main dengan verifikasi remote; perlu autentikasi
+sebelum mencoba push lagi. Tidak ada force-push atau PDF/binary/data privat di commit.
+
+Baseline sebelum implementasi adalah `26a79dd` (riset), yang push sebelumnya juga
+terkendala autentikasi. Bagian branding/tanda tangan di bawah adalah riwayat.
 
 Pembaruan aktif: pemilik memilih nama **Origo** dan mengotorisasi pemasangan ikon
 sementara lingkaran dari PNG-nya. Resource icon ID 1/metadata produk, title native,

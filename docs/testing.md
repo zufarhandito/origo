@@ -1,4 +1,4 @@
-# Documentation handover — 17 November 2026
+# Pengujian Origo
 
 Build fitur cetak/outline teruji sudah dipasang ke `target/release/pdf-studio.exe`
 setelah memastikan tidak ada proses memakai target. `run.cmd` memakai lokasi ini.
