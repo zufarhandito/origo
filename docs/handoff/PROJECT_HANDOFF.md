@@ -2,6 +2,13 @@
 
 ## Empty State tanpa baris tab (19 November 2026)
 
+Commit fitur **ac60f1e**: `feat(ui): hide tabs and use GPUI empty state without documents`.
+Push origin/main dicoba dan gagal karena Git tidak memiliki kredensial Username
+GitHub (interaktivitas dinonaktifkan). Build utama belum diganti: proses pengguna
+masih memakai target/release/pdf-studio.exe. Pertanyaan penutupan aplikasi sudah
+dikirim lewat kartu; pemasangan menunggu proses tidak aktif. Jangan tutup proses
+pengguna untuk mengganti executable.
+
 Saat tidak ada tab dokumen, baris multi-tab/+ /Daftar tab disembunyikan. Konten
 kosong menggunakan Empty dan slot header/media/title/description/content GPUI-kit,
 dengan tombol Buka PDF. Tab muncul lagi setelah membuka PDF; close terakhir dan
