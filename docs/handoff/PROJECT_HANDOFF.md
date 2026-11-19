@@ -2,6 +2,12 @@
 
 ## Workspace ringkas dan toolbar kontekstual (19 November 2026)
 
+Commit **cf831e1**: `feat(ui): streamline workspace header and contextual tools`.
+Push origin/main berhasil: `66a1a88..cf831e1 main -> main`. Ini konfirmasi pengiriman,
+bukan klaim CI remote lulus. Build launcher belum diganti karena aplikasi utama
+masih aktif. Kartu penutupan aplikasi telah dikirim; pemasangan menunggu target
+aman/tidak aktif. Jangan menutup proses pengguna untuk mengganti executable.
+
 Menu hamburger, tab/+ /Daftar tab dan kontrol jendela kini satu header. Menu lama
 tersedia sebagai submenu; area drag terpisah dari tombol/tab. Pemicu Anotasi di
 toolbar utama; baris alat hanya ada saat anotasi terbuka pada mode baca. Empat
