@@ -1,6 +1,29 @@
 # Pengujian Origo
 
-Build fitur cetak/outline teruji sudah dipasang ke `target/release/pdf-studio.exe`
+## Header menu dan kontrol jendela (19 November 2026)
+
+Baris logo/nama dan menu digabung menjadi satu header 34 logical px. Menu di kiri,
+ruang drag di tengah, kontrol minimize/maximize-restore/close custom GPUI di kanan.
+Hit area Windows dipisahkan sehingga menu dapat diklik tanpa menyeret jendela.
+Kontrol memakai jalur native Windows; tab tetap di baris berikutnya. Identitas
+Origo native/taskbar/About tetap. Detail perilaku: [multi-tab](multitab.md).
+
+Fmt dan Clippy desktop/all-targets denied warnings lulus. Release build lulus.
+`compact-titlebar-ui-smoke.ps1` lulus delapan pemeriksaan: single-row/menu-client-hit,
+drag-caption-hit, control-hit, menu/tema terang-gelap, maximize/restore, minimize,
+dan close. Label Restore/Maximize ikut diperiksa. Sumber sintetis tidak berubah.
+Bukti lokal `.research/compact-titlebar-3cb73ca7dd984184aa290275d71d2ef4`.
+Suite PDF/unit tidak diulang untuk perubahan layout ini. Snap flyout, touch dan
+multi-monitor/mixed DPI belum diuji secara interaktif.
+
+Build sudah dipasang setelah pemilik menutup aplikasi utama. Hash isolated dan
+`target/release/pdf-studio.exe` sama:
+`4197F57A052118A5ABFC2CF902B6BA2207B5B584B9D864278ED65E669359DC3F`.
+`run.cmd` kini memakai build header baru. Status Git/push lihat checkpoint akhir
+sesi dan git log; autentikasi remote sebelumnya masih terhalang.
+
+
+Riwayat build cetak/outline sebelum perubahan header: build teruji dipasang ke `target/release/pdf-studio.exe`
 setelah memastikan tidak ada proses memakai target. `run.cmd` memakai lokasi ini.
 SHA-256 build isolated dan terpasang identik: `F0877E523A922AD0BFACEA662DCBC00798A19F134FF44FD5BDEB95F7F5A2C460`.
 Tidak ada proses/dokumen pengguna yang ditutup untuk pemasangan.

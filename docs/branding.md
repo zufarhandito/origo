@@ -14,8 +14,9 @@ Ukuran 256 merupakan upscale; tidak ada SVG/vector tracing atau penghapusan lata
 Windows MSVC. Resource ikon **ID 1** sesuai loader native GPUI pin saat ini, sehingga
 Windows memakai aset aplikasi untuk window class/taskbar/Alt+Tab dan executable.
 VERSIONINFO menampilkan ProductName/FileDescription Origo. Manifest GPUI tidak diubah.
-Title bar custom menampilkan logo dan nama; title native, menu About dan isi About
-juga memakai Origo. Aset tertanam, tidak bergantung pada file PNG/ICO eksternal saat run.
+Pembaruan 19 November: title bar custom digabung dengan menu Berkas/Edit/Tampilan/
+Alat/Bantuan; logo/nama pada baris tersebut dihilangkan sesuai arahan pemilik.
+Title native, taskbar, menu About dan isi About tetap memakai Origo. Aset tertanam, tidak bergantung pada file PNG/ICO eksternal saat run.
 
 Nama executable `pdf-studio.exe`, crate/package, folder state, env var dan nama paket
 portable internal dipertahankan agar shortcut/riwayat tetap kompatibel. Rebranding

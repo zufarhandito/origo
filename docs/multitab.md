@@ -1,5 +1,16 @@
 # Desktop UI dan multi-tab
 
+## Header ringkas (19 November 2026)
+
+Menu Berkas, Edit, Tampilan, Alat dan Bantuan digabung dalam satu baris setinggi
+34 logical px dengan kontrol minimize/maximize-restore/close custom GPUI di kanan.
+Logo/nama Origo di baris itu dihilangkan; identitas native/taskbar/About tetap.
+Ruang kosong menjadi hit area Drag Windows (termasuk double-click maximize),
+sedangkan menu tidak menjadi area drag. Kontrol memakai native Min/Max/Close hit
+areas, sehingga jalur close Windows tetap melewati guard dokumen yang ada.
+Tab dokumen tetap pada baris berikutnya. Tidak ada perubahan model/history PDF.
+
+
 PDF Studio memakai satu shell jendela dengan maksimal **8 tab**, termasuk tab yang
 sedang dimuat. Menu Berkas, Edit, Tampilan, Alat, dan Bantuan mengelompokkan fungsi;
 toolbar baca tetap satu baris. Konversi placeholder tidak masuk navigasi utama.

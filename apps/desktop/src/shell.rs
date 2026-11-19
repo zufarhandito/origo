@@ -2,7 +2,7 @@
 use crate::*;
 use gpui::assets::IconName;
 use gpui::component::{
-    ActiveTheme, Disableable, Selectable, Theme, ThemeMode, TitleBar, WindowExt,
+    ActiveTheme, Disableable, Selectable, Theme, ThemeMode, WindowExt,
     button::{Button, ButtonCustomVariant, ButtonVariants},
     menu::{ContextMenuExt, DropdownMenu, PopupMenuItem},
     tab::Tab as DocumentTab,
@@ -1324,16 +1324,71 @@ impl Render for WindowShell {
                 this.tab_picker_key(event, window, cx)
             }))
             .child(
-                TitleBar::new().child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(gpui::img(origo_icon()).size(px(16.)))
-                        .child("Origo"),
-                ),
+                div()
+                    .flex()
+                    .items_center()
+                    .h(px(34.))
+                    .flex_shrink_0()
+                    .border_b_1()
+                    .border_color(colors.border)
+                    .child(menus.h_full().items_center())
+                    .child(
+                        div()
+                            .id("caption-drag")
+                            .h_full()
+                            .flex_1()
+                            .window_control_area(gpui::WindowControlArea::Drag),
+                    )
+                    .children(
+                        [
+                            (
+                                "Minimize",
+                                IconName::WindowMinimize,
+                                gpui::WindowControlArea::Min,
+                            ),
+                            (
+                                if window.is_maximized() {
+                                    "Restore"
+                                } else {
+                                    "Maximize"
+                                },
+                                if window.is_maximized() {
+                                    IconName::WindowRestore
+                                } else {
+                                    IconName::WindowMaximize
+                                },
+                                gpui::WindowControlArea::Max,
+                            ),
+                            (
+                                "Close",
+                                IconName::WindowClose,
+                                gpui::WindowControlArea::Close,
+                            ),
+                        ]
+                        .into_iter()
+                        .map(|(label, icon, area)| {
+                            div()
+                                .id(label)
+                                .role(gpui::Role::Button)
+                                .aria_label(label)
+                                .w(px(34.))
+                                .h_full()
+                                .flex_shrink_0()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .window_control_area(area)
+                                .hover(move |style| {
+                                    if area == gpui::WindowControlArea::Close {
+                                        style.bg(gpui::rgb(0xe81123)).text_color(gpui::white())
+                                    } else {
+                                        style.bg(colors.secondary)
+                                    }
+                                })
+                                .child(gpui::component::Icon::new(icon).size(px(14.)))
+                        }),
+                    ),
             )
-            .child(menus)
             .child(
                 div()
                     .flex()
@@ -1458,18 +1513,6 @@ impl Render for WindowShell {
                 )
             })
     }
-}
-
-// Embedded bytes keep the title-bar icon available in portable installs.
-fn origo_icon() -> Arc<gpui::Image> {
-    static ICON: std::sync::OnceLock<Arc<gpui::Image>> = std::sync::OnceLock::new();
-    ICON.get_or_init(|| {
-        Arc::new(gpui::Image::from_bytes(
-            gpui::ImageFormat::Png,
-            include_bytes!("../resources/branding/origo-32.png").to_vec(),
-        ))
-    })
-    .clone()
 }
 
 #[cfg(test)]
