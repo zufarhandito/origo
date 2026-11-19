@@ -50,6 +50,9 @@ impl DocumentSession {
         let c = cx.theme().colors;
         let organizing = self.mode == ViewerMode::Organize;
         if self.sidebar {
+            if self.outline.open && !organizing {
+                return self.outline_sidebar(cx);
+            }
             let weak = cx.weak_entity();
             div()
                 .id("page-organizer")
@@ -137,6 +140,7 @@ impl DocumentSession {
                 .bg(c.background)
                 .border_r_1()
                 .border_color(c.border)
+                .child(self.outline_header(cx))
                 .child(
                     div()
                         .h_10()

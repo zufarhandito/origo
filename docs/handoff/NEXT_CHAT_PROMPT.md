@@ -5,6 +5,8 @@ Lanjut PDF Studio di D:\projects\bpdf, Windows/PowerShell, bahasa Indonesia.
 Mulai dari AGENTS.md, docs/README.md, docs/handoff/PROJECT_HANDOFF.md,
 docs/feature-development.md, docs/annotations.md, docs/signatures.md dan docs/testing.md.
 
+Cetak PDF dan panel Daftar isi sudah diimplementasikan setelah otorisasi pemilik.
+Baca docs/printing.md dan docs/outline.md, lalu cek bukti/gate terbaru di testing.
 Anotator dan tanda tangan visual sudah diotorisasi. Tanda tangan mendukung pad mouse,
 PNG/JPEG, klik/drag penempatan, drag pindah, resize proporsional, hapus, Undo/Redo,
 shared views serta Save As/reopen objek Stamp milik aplikasi. Ini belum sertifikat,

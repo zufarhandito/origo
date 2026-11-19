@@ -77,6 +77,7 @@ impl DocumentSession {
         if !self.export.running {
             self.export.notice = None;
         }
+        self.outline = outline::OutlineState::default();
         self.annotation = annotations::AnnotationState::default();
         self.mode = ViewerMode::Read;
         self.page_dragging = false;

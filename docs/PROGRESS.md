@@ -1,11 +1,10 @@
 # Progres PDF Studio
 
-Prioritas 18 November: **Cetak PDF**, lalu **panel daftar isi navigasi**. Riset sumber
-primer sudah tersedia: [print](research/pdf-printing.md),
-[outline](research/pdf-outline-navigation.md). Kedua fitur belum diimplementasikan.
-Riset bukan bukti tes UI vendor; spike cetak Windows dan model outline masih perlu.
-Publikasi/installer ditunda oleh pemilik.
-
+19 November: **Cetak PDF** dan **panel Daftar isi** sudah diimplementasikan setelah
+riset dan otorisasi pemilik. Perilaku/batas: [cetak](printing.md), [daftar isi](outline.md).
+Riset sumber primer: [print](research/pdf-printing.md),
+[outline](research/pdf-outline-navigation.md). Bukti terkini dan gate fisik ada di
+[testing](testing.md). Publikasi/installer tetap ditunda oleh pemilik.
 
 Branding Origo: ikon sementara pemilik dipasang sebagai resource native Windows ID 1,
 logo title bar, nama tampilan/About dan metadata produk. Aset dapat diganti melalui

@@ -7,6 +7,7 @@ use pdf_application::export::{
 use pdf_platform::LocalOutput;
 #[derive(Clone, Default)]
 pub(super) struct ExportState {
+    pub printing: bool,
     pub png: bool,
     pub png_total: usize,
     pub png_done: Arc<std::sync::atomic::AtomicUsize>,
@@ -29,6 +30,9 @@ impl ExportState {
             .control
             .as_ref()
             .map_or(ExportPhase::Choosing, |c| c.phase());
+        if self.printing {
+            return "Menyiapkan cetak / dialog printer";
+        }
         if self.png {
             match phase {
                 ExportPhase::Writing => "Merender dan memvalidasi PNG",
@@ -46,6 +50,7 @@ impl DocumentSession {
         self.resources
             .export_owner
             .store(self.tab_id.0, std::sync::atomic::Ordering::SeqCst);
+        self.export.printing = false;
         self.export.optimizing = false;
         self.export.png = false;
         self.export.png_total = 0;

@@ -51,12 +51,12 @@ Handoff terkini mengalahkan status milestone historis di arsip/blueprint. Rencan
 tidak berarti sudah diimplementasikan atau otomatis diizinkan untuk dieksekusi.
 Instruksi pengguna pada sesi aktif tetap menentukan pekerjaan yang dilakukan.
 
-## Riset prioritas berikutnya
+## Cetak dan daftar isi
 
-18 November 2026: [cetak PDF](research/pdf-printing.md) dan
-[panel daftar isi/bookmarks](research/pdf-outline-navigation.md). Membandingkan
-sumber primer Edge/Chrome/Firefox/Acrobat dan memetakan UX/engine/acceptance Origo.
-Dokumen ini hasil riset, bukan klaim fitur sudah tersedia. Publikasi ditunda.
+[Cetak PDF](printing.md) dan [panel daftar isi](outline.md) sudah diimplementasikan
+setelah otorisasi pemilik. Riset awal: [print](research/pdf-printing.md) dan
+[outline](research/pdf-outline-navigation.md). Batas cetak fisik serta bukti uji
+ada di [testing](testing.md). Publikasi/installer tetap ditunda.
 
 ## Peta dokumentasi
 

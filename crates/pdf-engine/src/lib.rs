@@ -54,15 +54,18 @@ pub struct PdfiumRenderer {
 }
 enum Operation {
     Inspect,
+    Outline,
     InspectOutput,
     Render(RenderRequest),
     RenderExact(ExactRenderRequest),
+    Print(ExactRenderRequest),
     Text(TextRequest),
 }
 enum Output {
     Inspected(InspectedDocument),
     Rendered(RenderedPage),
     Text(TextPage),
+    Outline(pdf_application::outline::Outline),
 }
 struct Job {
     path: PathBuf,
@@ -93,6 +96,26 @@ impl PdfiumRenderer {
         self.worker = Arc::new(OnceLock::new());
         self.counters = Arc::new(Counters::default());
         Ok(self)
+    }
+    pub fn outline(
+        &self,
+        path: &Path,
+        fingerprint: SourceFingerprint,
+    ) -> Result<pdf_application::outline::Outline, RenderError> {
+        match self.request(path, Some(fingerprint), Operation::Outline)? {
+            Output::Outline(outline) => Ok(outline),
+            _ => Err(worker_error()),
+        }
+    }
+    pub fn render_print(&self, request: &ExactRenderRequest) -> Result<RenderedPage, RenderError> {
+        match self.request(
+            &request.path,
+            Some(request.fingerprint),
+            Operation::Print(request.clone()),
+        )? {
+            Output::Rendered(page) => Ok(page),
+            _ => Err(worker_error()),
+        }
     }
     pub fn session_stats(&self) -> SessionStats {
         SessionStats {
@@ -212,6 +235,7 @@ fn worker(
             }
             let document = session.as_ref().ok_or_else(worker_error)?;
             let result = match &job.operation {
+                Operation::Outline => Output::Outline(read_outline(document)?),
                 Operation::Inspect | Operation::InspectOutput => {
                     Output::Inspected(InspectedDocument {
                         annotations: read_document_annotations(document)?,
@@ -235,7 +259,7 @@ fn worker(
                         || render(document, request, limits),
                     )?)
                 }
-                Operation::RenderExact(request) => {
+                Operation::RenderExact(request) | Operation::Print(request) => {
                     renders += 1;
                     counters.renders.fetch_add(1, Ordering::Relaxed);
                     Output::Rendered(with_annotations(
@@ -243,7 +267,14 @@ fn worker(
                         request.page_index,
                         request.annotations.as_deref(),
                         request.rotation_delta,
-                        || render_exact(document, request, limits),
+                        || {
+                            render_exact(
+                                document,
+                                request,
+                                limits,
+                                matches!(job.operation, Operation::Print(_)),
+                            )
+                        },
                     )?)
                 }
                 Operation::Text(request) => {
@@ -258,7 +289,7 @@ fn worker(
             }
             if matches!(
                 job.operation,
-                Operation::InspectOutput | Operation::RenderExact(_)
+                Operation::InspectOutput | Operation::RenderExact(_) | Operation::Print(_)
             ) {
                 session = None;
                 session_key = None;
@@ -423,6 +454,7 @@ fn render_exact(
     document: &PdfDocument<'_>,
     request: &ExactRenderRequest,
     limits: ResourceLimits,
+    printing: bool,
 ) -> Result<RenderedPage, RenderError> {
     if request.rotation_delta > 3
         || request.width == 0
@@ -447,6 +479,7 @@ fn render_exact(
         .render_with_config(
             &PdfRenderConfig::new()
                 .set_fixed_size(width as i32, height as i32)
+                .use_print_quality(printing)
                 .set_clear_color(PdfColor::WHITE),
         )
         .map_err(|_| RenderError::InvalidPdf)?;
@@ -653,6 +686,111 @@ fn read_document_annotations(
             return Err(RenderError::ResourceLimit);
         }
         result.push(annotations);
+    }
+    Ok(result)
+}
+
+fn read_outline(
+    document: &PdfDocument<'_>,
+) -> Result<pdf_application::outline::Outline, RenderError> {
+    use pdf_application::outline::{Outline, OutlineNode};
+    fn destination(
+        document: &PdfDocument<'_>,
+        dest: &PdfDestination<'_>,
+    ) -> Option<(u16, Option<[f32; 2]>)> {
+        let index = u16::try_from(dest.page_index().ok()?).ok()?;
+        if i32::from(index) >= document.pages().len() {
+            return None;
+        }
+        let page = document.pages().get(i32::from(index)).ok()?;
+        let crop = page.boundaries().crop().ok().map(|b| b.bounds);
+        let xy = match dest.view_settings().ok()? {
+            PdfDestinationViewSettings::SpecificCoordinatesAndZoom(x, y, _) => y.map(|y| {
+                (
+                    x.or_else(|| crop.map(|c| c.left()))
+                        .unwrap_or(PdfPoints::ZERO),
+                    y,
+                )
+            }),
+            PdfDestinationViewSettings::FitPageHorizontallyToWindow(y) => {
+                y.map(|y| (crop.map(|c| c.left()).unwrap_or(PdfPoints::ZERO), y))
+            }
+            _ => None,
+        };
+        let point = xy
+            .and_then(|(x, y)| {
+                page.points_to_pixels(x, y, &PdfRenderConfig::new().set_fixed_size(16384, 16384))
+                    .ok()
+            })
+            .map(|(x, y)| {
+                [
+                    (x as f32 / 16384.).clamp(0., 1.),
+                    (y as f32 / 16384.).clamp(0., 1.),
+                ]
+            });
+        Some((index, point))
+    }
+    let mut result = Outline::default();
+    let mut stack = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut text = 0;
+    if let Some(root) = document.bookmarks().root() {
+        for node in std::iter::once(root.clone())
+            .chain(root.iter_siblings())
+            .take(4097)
+        {
+            stack.push((node, None, 0usize));
+        }
+        stack.reverse();
+    }
+    while let Some((bookmark, parent, depth)) = stack.pop() {
+        if result.nodes.len() >= 4096 || text >= 256 * 1024 || depth > 64 {
+            result.limited = true;
+            break;
+        }
+        if !seen.insert(bookmark.clone()) {
+            result.limited = true;
+            continue;
+        }
+        let title = bookmark.title().unwrap_or_default();
+        if title.chars().count() > 256 {
+            result.limited = true;
+        }
+        let title = if title.trim().is_empty() {
+            "Tanpa judul".into()
+        } else {
+            title.chars().take(256).collect::<String>()
+        };
+        text += title.len();
+        let action = bookmark.action();
+        let blocked = action
+            .as_ref()
+            .is_some_and(|a| a.action_type() != PdfActionType::GoToDestinationInSameDocument);
+        let target = if blocked {
+            None
+        } else if let Some(dest) = bookmark.destination() {
+            destination(document, &dest)
+        } else {
+            action
+                .as_ref()
+                .and_then(|a| a.as_local_destination_action())
+                .and_then(|a| a.destination().ok().and_then(|d| destination(document, &d)))
+        };
+        let own = result.nodes.len();
+        result.nodes.push(OutlineNode {
+            title,
+            parent,
+            page: target.map(|p| p.0),
+            point: target.and_then(|p| p.1),
+            blocked,
+        });
+        let children = bookmark
+            .iter_direct_children()
+            .take(4097)
+            .collect::<Vec<_>>();
+        for node in children.into_iter().rev() {
+            stack.push((node, Some(own), depth + 1));
+        }
     }
     Ok(result)
 }

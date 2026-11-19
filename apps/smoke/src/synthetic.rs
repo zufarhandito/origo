@@ -364,3 +364,69 @@ pub fn export_safety_pdf(feature: &str) -> Vec<u8> {
     objects.extend(extra);
     assemble_trailer(&objects, trailer)
 }
+
+pub fn outline_pdf() -> Vec<u8> {
+    let objects=vec![
+        b"<< /Type /Catalog /Pages 2 0 R /Outlines 10 0 R /Names << /Dests 17 0 R >> >>".to_vec(),
+        b"<< /Type /Pages /Count 3 /Kids [4 0 R 6 0 R 8 0 R] >>".to_vec(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>".to_vec(),
+        stream("",b"BT /F1 18 Tf 20 380 Td (CHAPTER ONE) Tj ET"),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R >>".to_vec(),
+        stream("",b"BT /F1 18 Tf 20 380 Td (SECTION TWO) Tj ET"),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] /CropBox [20 30 280 390] /Rotate 90 /Resources << /Font << /F1 3 0 R >> >> /Contents 9 0 R >>".to_vec(),
+        stream("",b"BT /F1 18 Tf 30 350 Td (CHAPTER THREE) Tj ET"),
+        b"<< /Type /Outlines /First 11 0 R /Last 15 0 R /Count 6 >>".to_vec(),
+        b"<< /Title (Bab 1) /Parent 10 0 R /Next 14 0 R /Dest [4 0 R /Fit] /First 12 0 R /Last 13 0 R /Count 2 >>".to_vec(),
+        b"<< /Title (Subbab bernama) /Parent 11 0 R /Next 13 0 R /Dest (section) >>".to_vec(),
+        b"<< /Title (Tautan eksternal) /Parent 11 0 R /Prev 12 0 R /A << /S /URI /URI (https://example.invalid) >> >>".to_vec(),
+        b"<< /Title (Bab 3 terotasi) /Parent 10 0 R /Prev 11 0 R /Next 15 0 R /Dest [8 0 R /XYZ 30 350 2] >>".to_vec(),
+        b"<< /Title (Kelompok) /Parent 10 0 R /Prev 14 0 R /First 16 0 R /Last 16 0 R /Count 1 >>".to_vec(),
+        b"<< /Title <FEFF004200610062002000D800DF> /Parent 15 0 R /Dest [6 0 R /FitH 300] >>".to_vec(),
+        b"<< /Names [(section) [6 0 R /XYZ 20 200 null]] >>".to_vec(),
+    ];
+    assemble(&objects)
+}
+pub fn print_flags_pdf() -> Vec<u8> {
+    let objects = vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] /Annots [4 0 R 5 0 R] >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Stamp /Rect [20 20 100 60] /F 0 /AP << /N 6 0 R >> >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Stamp /Rect [150 20 230 60] /F 4 /AP << /N 7 0 R >> >>"
+            .to_vec(),
+        stream(
+            "/Type /XObject /Subtype /Form /BBox [0 0 80 40]",
+            b"1 0 0 rg 0 0 80 40 re f",
+        ),
+        stream(
+            "/Type /XObject /Subtype /Form /BBox [0 0 80 40]",
+            b"0 0 1 rg 0 0 80 40 re f",
+        ),
+    ];
+    assemble(&objects)
+}
+
+pub fn large_outline_pdf(count: usize) -> Vec<u8> {
+    let mut objects = vec![
+        b"<< /Type /Catalog /Pages 2 0 R /Outlines 4 0 R >>".to_vec(),
+        b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 420] >>".to_vec(),
+        format!(
+            "<< /Type /Outlines /First 5 0 R /Last {} 0 R /Count {count} >>",
+            4 + count
+        )
+        .into_bytes(),
+    ];
+    for i in 0..count {
+        let next = if i + 1 < count {
+            format!("/Next {} 0 R", i + 6)
+        } else {
+            String::new()
+        };
+        objects.push(
+            format!("<< /Title (Item {i}) /Parent 4 0 R /Dest [3 0 R /Fit] {next} >>").into_bytes(),
+        );
+    }
+    assemble(&objects)
+}

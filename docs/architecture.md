@@ -1,5 +1,16 @@
 # Architecture - desktop multi-tab
 
+## Cetak dan navigasi outline (19 November 2026)
+
+[Cetak](printing.md): snapshot immutable, raster PDFium dengan print intent 150 DPI,
+managed helper Windows Forms terisolasi dan publikasi virtual melalui LocalOutput.
+Print tidak mengubah baseline bersih. Microsoft Print to PDF menghasilkan gambar;
+printer virtual file lain belum didukung. Printer fisik perlu acceptance perangkat.
+[Daftar isi](outline.md): DTO bounded tanpa native handle, load async per sumber,
+cache per view dan tujuan dipetakan melalui PageId. Aksi eksternal tidak dieksekusi.
+Kemampuan membaca outline tidak mengubah consent/preservation ekspor bookmark.
+
+
 One tab can retain two reading entities with distinct ViewIds and one shared
 UI-thread Workspace handle. Cloning that handle does not clone document history.
 The model also owns the monotonic import-source allocator and inspection busy flag.

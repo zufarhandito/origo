@@ -1,16 +1,40 @@
 # Handoff terkini - 17 November 2026
 
-Prioritas terbaru pemilik (18 November 2026): fitur **Cetak PDF** dan panel **Daftar
-isi** di kiri seperti Edge, dengan permintaan riset. Pada sesi ini riset keduanya
-selesai; belum ada implementasi atau print job. Scope opsional ditanyakan saat
-riset berjalan; tanpa jawaban tahap ini diambil sebagai riset dahulu. Dokumen:
-[print](../research/pdf-printing.md), [outline](../research/pdf-outline-navigation.md).
-Rekomendasi: implementasi cetak lebih dahulu sesuai urutan pemilik; outline memakai
-sidebar Thumbnail/Daftar isi dan destination lokal. Publikasi/installer tetap ditunda.
-Metode: dokumentasi/source vendor dan inspeksi repo, bukan uji UI vendor/perangkat.
-Tidak ada test produk diulang, dependency/printer/driver diubah, atau data PDF dibuka.
-Peta lama "task belum dipilih" di bawah adalah checkpoint historis sebelum arahan ini.
+Build fitur cetak/outline teruji sudah dipasang ke `target/release/pdf-studio.exe`
+setelah memastikan tidak ada proses memakai target. `run.cmd` memakai lokasi ini.
+SHA-256 build isolated dan terpasang identik: `F0877E523A922AD0BFACEA662DCBC00798A19F134FF44FD5BDEB95F7F5A2C460`.
+Tidak ada proses/dokumen pengguna yang ditutup untuk pemasangan.
 
+Pembaruan 19 November 2026: pemilik mengotorisasi implementasi **Cetak PDF** dan
+**Daftar isi** setelah riset. Keduanya kini tersedia. Baca [cetak](../printing.md),
+[outline](../outline.md), [testing](../testing.md), serta batas aktual di
+[compatibility](../compatibility.md). Publikasi/installer tetap ditunda.
+
+Cetak: toolbar/menu/Ctrl+P, semua/current/rentang workspace, preview, printer/properti,
+kertas/orientasi dan fit/100%. Snapshot menyertakan anotasi/tanda tangan tersimpan
+maupun belum disimpan. Raster print intent 150 DPI; tidak mengubah baseline dirty.
+Microsoft Print to PDF melalui temp + validasi + publikasi file baru tanpa overwrite.
+Helper managed PowerShell/.NET di-embed; tidak memakai PDF viewer eksternal.
+Port hardware dikenal dan MS PDF saja; file/custom port lain ditolak. Kertas satu
+ukuran per job. Output PDF berupa raster; cetak fisik/duplex/warna belum diuji.
+
+Daftar isi: panel kiri Thumbnail/Daftar isi, nested/expand/local direct/named target,
+XYZ/FitH/source crop/rotasi dan zoom tetap. Tujuan mengikuti PageId setelah edit;
+external actions tidak dieksekusi. Ada empty/error/limit state dan cache bounded per
+view. Ini pembacaan navigasi, bukan preservation bookmark pada ekspor. Consent lama
+masih berlaku. Tidak membuat daftar isi otomatis dari teks/OCR.
+
+Verifikasi fitur baru: 66 unit tests, fmt, Clippy denied warnings dan release build
+lulus. Native outline/print flags/4096 limit, annotation/signature smoke dan default
+export/PNG suite lulus. UI akhir: 8 outline + 5 printing lulus; PDF virtual satu
+halaman memuat anotasi biru belum disimpan, sumber utuh dan dirty tetap. Bukti lokal
+ignored serta gate fisik ada di testing. Helper memakai STA khusus + native dialog
+klasik dengan guard dialog bertumpuk, bukan PDF shell verb.
+
+Status dasar Git sebelum implementasi: main, HEAD 26a79dd (riset); origin
+https://github.com/zufarhandito/origo.git. Push riset sebelumnya gagal autentikasi.
+Status commit/push implementasi dicatat setelah verifikasi akhir, bukan diasumsikan
+dari cache origin/main. Bagian branding/tanda tangan di bawah adalah riwayat.
 
 Pembaruan aktif: pemilik memilih nama **Origo** dan mengotorisasi pemasangan ikon
 sementara lingkaran dari PNG-nya. Resource icon ID 1/metadata produk, title native,

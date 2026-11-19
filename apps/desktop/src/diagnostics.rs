@@ -20,6 +20,10 @@ impl DocumentSession {
     pub(super) fn diagnostics(&self) -> Value {
         let native = self.renderer.session_stats();
         let mut result = json!({
+            "outlineOpen": self.outline.open,
+            "printing": self.export.printing,
+            "printPrepared": self.export.png_done.load(Ordering::SeqCst),
+            "printDialog": self.print_dialog.is_some(),
             "signaturePanel": self.annotation.signature.open,
             "signaturePlacing": self.annotation.signature.placing,
             "signatureStrokes": self.annotation.signature.strokes.len(),

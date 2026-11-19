@@ -1,5 +1,57 @@
 # Documentation handover — 17 November 2026
 
+Build fitur cetak/outline teruji sudah dipasang ke `target/release/pdf-studio.exe`
+setelah memastikan tidak ada proses memakai target. `run.cmd` memakai lokasi ini.
+SHA-256 build isolated dan terpasang identik: `F0877E523A922AD0BFACEA662DCBC00798A19F134FF44FD5BDEB95F7F5A2C460`.
+Tidak ada proses/dokumen pengguna yang ditutup untuk pemasangan.
+
+## Cetak dan daftar isi (19 November 2026)
+
+Fmt, Clippy workspace/all-targets denied warnings dan workspace tests lulus:
+**66 unit tests** (26 application, 10 domain, 5 platform, 12 desktop, 13 QPDF).
+Tes baru mencakup grammar/range workspace dan penolakan publikasi cetak ke sumber
+atau tujuan yang sudah ada, tanpa mengubah byte keduanya.
+
+Release workspace dibangun terisolasi di `target/tab-background-check/release`.
+Native `--outline-print-smoke` lulus: nested/Unicode/parent tanpa destination,
+named/local destination, CropBox/rotasi, external action exclusion, stale-source,
+4200 bookmark dibatasi ke 4096 dengan indikator, snapshot range dan source bytes.
+Render print intent menghilangkan anotasi nonprintable sambil mempertahankan yang
+printable; render viewer tetap menampilkan keduanya.
+
+Native `--annotation-smoke` dan suite default lulus: editable Ink/Highlight/Stamp,
+alpha dan rotasi, Save As/Extract/Split/Optimize/PNG, teks/search, consent/unsafe
+rejection, staging/no-clobber/cancel serta source preservation. Tidak ada printer
+fisik yang dipakai suite native.
+
+UI outline awal delapan kasus lulus di
+`.research/outline-ui-fe9c4bc1725a4530ac5e80284ae9de61`: nested/disabled external,
+expand/collapse, named destination/clean, rotated crop, sidebar switch,
+delete/Undo target, split view dan empty state. Build akhir juga lulus delapan kasus yang sama di
+`.research/outline-ui-d1fd84053d844490943d23cea22ebce9`.
+
+UI cetak build akhir lulus lima kasus di
+`.research/printing-ui-5fff1930646043869fd39accbc061a1d`: rentang invalid tetap di
+modal, preview cancel mempertahankan edit, pilih printer Microsoft Print to PDF,
+publikasi file baru tetap dirty, dan reopen hasil current-page menjadi satu halaman.
+`--verify-printed-pdf` memverifikasi 1067 piksel anotasi biru yang belum disimpan
+pada PDF virtual tersebut. Hash sumber tetap sama. Tes memeriksa keberadaan kontrol
+Properties; interaksi properti driver fisik tidak diklaim sudah diuji.
+
+Uji awal menemukan loop helper yang tidak selesai setelah dialog printer serta
+pemanggilan dialog bertumpuk oleh tes otomatis. Helper akhir memakai STA khusus,
+dialog printer klasik dan guard reentrancy. Tes menunggu owner enabled sebelum
+submit dan hanya mengirim job setelah label Microsoft Print to PDF dikonfirmasi.
+Run gagal sebelumnya bukan bukti lulus. Suite akhir tidak mengirim job fisik.
+
+Batas yang belum teruji: printer fisik/offline/duplex/warna dan hasil ukuran di
+kertas; semua driver/port Windows; kebijakan enterprise yang memblokir PowerShell;
+interoperabilitas UI vendor; keyboard tree khusus, malformed cycle/depth dan cache
+besar di UI. Node count besar diuji native, bukan klaim semua PDF rusak didukung.
+Tidak ada instalasi driver atau job ke printer fisik. Kode tidak memanggil API
+perubahan default printer; Windows dapat mengelola default dari printer terakhir.
+
+
 Pemasangan branding ke lokasi launcher: build Origo teruji disalin ke
 `target/release/pdf-studio.exe` setelah dipastikan tidak aktif. Hash identik dengan
 build isolated: `3008C73397F0562A9592C6EDE332F4C0CFA8A005D975E78663EF414F0AA64283`.

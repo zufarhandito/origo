@@ -23,7 +23,9 @@ mod document_model;
 mod exporting;
 mod feedback;
 mod local_state;
+mod outline;
 mod png_export;
+mod printing;
 mod reading_position;
 mod search;
 mod shared_workspace;
@@ -48,6 +50,7 @@ actions!(
         PreviousTab,
         ReopenTab,
         SaveAs,
+        PrintPdf,
         ExtractPages,
         ImportPdf,
         UndoEdit,
@@ -109,6 +112,7 @@ struct DocumentSession {
     close_approved: bool,
     split_dialog: Option<splitting::SplitDialog>,
     png_dialog: Option<png_export::PngDialog>,
+    print_dialog: Option<printing::PrintDialog>,
     transition: transitions::Transition,
     error_popup: bool,
     export: exporting::ExportState,
@@ -137,6 +141,7 @@ struct DocumentSession {
     pending_reading: Option<reading_position::ReadingPosition>,
     dpr: f32,
     sidebar: bool,
+    outline: outline::OutlineState,
     generation: u64,
     source_sequence: u64,
     queue: RenderQueue,
@@ -204,6 +209,7 @@ fn main() -> anyhow::Result<()> {
             gpui_kit::component::Theme::update(cx, |theme| theme.font_family = "Segoe UI".into());
             cx.bind_keys([
                 KeyBinding::new("ctrl-o", Open, None),
+                KeyBinding::new("ctrl-p", PrintPdf, Some("PdfViewer")),
                 KeyBinding::new("ctrl-f", FindText, Some("PdfViewer")),
                 KeyBinding::new("f3", FindNext, Some("PdfViewer")),
                 KeyBinding::new("shift-f3", FindPrevious, Some("PdfViewer")),
@@ -401,6 +407,7 @@ impl DocumentSession {
                 close_approved: false,
                 split_dialog: None,
                 png_dialog: None,
+                print_dialog: None,
                 transition: transitions::Transition::default(),
                 error_popup: false,
                 export: exporting::ExportState::default(),
@@ -430,6 +437,7 @@ impl DocumentSession {
                 pending_reading: None,
                 dpr: window.scale_factor(),
                 sidebar: true,
+                outline: outline::OutlineState::default(),
                 generation: 0,
                 source_sequence: tab_id.0 << 32,
                 queue: RenderQueue::new(32),

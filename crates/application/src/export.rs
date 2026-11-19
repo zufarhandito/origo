@@ -12,6 +12,8 @@ use std::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
+    #[error("Cetak Windows gagal: {0}")]
+    PrintBackend(String),
     #[error("Tidak ada halaman untuk diekspor.")]
     Empty,
     #[error("Rencana ekspor tidak valid.")]

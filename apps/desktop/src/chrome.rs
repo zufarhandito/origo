@@ -312,13 +312,18 @@ impl DocumentSession {
                             })),
                     )
                     .child(
-                        icon("sidebar", IconName::PanelLeft, "Panel thumbnail", "")
+                        icon("sidebar", IconName::PanelLeft, "Panel navigasi", "")
                             .selected(self.sidebar)
                             .disabled(self.workspace.is_none())
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.sidebar = !this.sidebar;
                                 cx.notify();
                             })),
+                    )
+                    .child(
+                        icon("print-pdf", IconName::Printer, "Cetak PDF", "Ctrl+P")
+                            .disabled(!available || self.edits_locked() || self.export.running)
+                            .on_click(cx.listener(|s, _, window, cx| s.show_print(window, cx))),
                     )
                     .child(divider(cx))
                     .child(

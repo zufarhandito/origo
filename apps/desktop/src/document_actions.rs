@@ -3,6 +3,7 @@ impl DocumentSession {
     pub(super) fn document_actions(element: gpui::Div, cx: &mut Context<Self>) -> gpui::Div {
         element
             .key_context("PdfViewer")
+            .on_action(cx.listener(|s, _: &PrintPdf, window, cx| s.show_print(window, cx)))
             .on_action(cx.listener(|this, _: &DeleteAnnotation, _, cx| this.delete_annotation(cx)))
             .on_action(cx.listener(|this, _: &FindText, window, cx| this.show_search(window, cx)))
             .on_action(cx.listener(|this, _: &FindNext, window, cx| {

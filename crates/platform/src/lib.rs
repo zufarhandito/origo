@@ -16,6 +16,7 @@ use std::{
 };
 use tempfile::{TempDir, TempPath};
 pub mod png;
+pub mod printing;
 pub mod split;
 
 pub fn fingerprint(path: &Path) -> Result<SourceFingerprint, ExportError> {

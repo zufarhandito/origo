@@ -1,5 +1,11 @@
 # Riset: panel daftar isi PDF
 
+Pembaruan 19 November 2026: setelah riset, pemilik mengotorisasi implementasi.
+Perilaku aktual dan adaptasi MVP dijelaskan pada [cetak](../printing.md) dan
+[daftar isi](../outline.md); bagian pemetaan/spike di bawah merekam keadaan awal
+riset. Bukti uji dan gate yang belum dijalankan ada di [testing](../testing.md).
+
+
 Tanggal akses: 18 November 2026. Target Origo Windows desktop. Dasar repo `3fac8d8`.
 Permintaan: pemilik ingin panel daftar isi seperti Edge, dibuka di sebelah kiri.
 Tahap ini riset; implementasi belum dilakukan. Cetak menjadi pekerjaan produk yang

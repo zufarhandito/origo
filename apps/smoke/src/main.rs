@@ -9,6 +9,7 @@ mod annotations;
 mod books;
 mod exporting;
 mod optimizing;
+mod outline_print;
 mod png;
 mod search;
 mod splitting;
@@ -106,6 +107,19 @@ fn main() -> Result<()> {
         std::fs::write(dir.join("long.pdf"), synthetic::pdf(1000, false))?;
         std::fs::write(dir.join("blank.pdf"), synthetic::blank_pdf())?;
         return Ok(());
+    }
+    if std::env::args().nth(1).as_deref() == Some("--write-outline-print-fixtures") {
+        return outline_print::write(&root);
+    }
+    if std::env::args().nth(1).as_deref() == Some("--outline-print-smoke") {
+        return outline_print::run(&root, &PdfiumRenderer::new(&root.join("sidecars")));
+    }
+    if std::env::args().nth(1).as_deref() == Some("--verify-printed-pdf") {
+        let path = std::env::args_os().nth(2).context("PDF path required")?;
+        return outline_print::verify_printed(
+            &PathBuf::from(path),
+            &PdfiumRenderer::new(&root.join("sidecars")),
+        );
     }
     if std::env::args().nth(1).as_deref() == Some("--annotation-smoke") {
         return annotations::run(&root, &PdfiumRenderer::new(&root.join("sidecars")));

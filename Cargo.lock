@@ -4561,6 +4561,7 @@ dependencies = [
  "dunce",
  "image",
  "pdf-application",
+ "serde_json",
  "tempfile",
 ]
 

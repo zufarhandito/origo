@@ -1,8 +1,14 @@
 # Riset: cetak PDF dari Origo
 
+Pembaruan 19 November 2026: setelah riset, pemilik mengotorisasi implementasi.
+Perilaku aktual dan adaptasi MVP dijelaskan pada [cetak](../printing.md) dan
+[daftar isi](../outline.md); bagian pemetaan/spike di bawah merekam keadaan awal
+riset. Bukti uji dan gate yang belum dijalankan ada di [testing](../testing.md).
+
+
 Tanggal akses: 18 November 2026. Platform target Windows desktop; repo `3fac8d8`.
 Pemilik meminta fitur cetak serta riset [panel daftar isi](pdf-outline-navigation.md).
-Tahap ini hasil riset/rekomendasi, belum implementasi cetak. Publikasi ditunda.
+Saat riset dicatat, tahapnya riset/rekomendasi sebelum implementasi cetak. Publikasi ditunda.
 
 ## Metode dan fakta kompetitor
 

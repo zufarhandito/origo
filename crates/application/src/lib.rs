@@ -1,4 +1,6 @@
 //! M0 rendering boundary. No native pointers or GPUI objects cross this port.
+pub mod outline;
+pub mod printing;
 pub use pdf_domain::{
     ExportSupport, PageGeometry, SourceDocument, SourceFingerprint, SourceId, Workspace,
 };

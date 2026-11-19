@@ -826,6 +826,7 @@ enum MenuAction {
     ExitCompare,
     DuplicateView,
     Save,
+    Print,
     Close,
     Quit,
     Undo,
@@ -902,6 +903,7 @@ impl WindowShell {
             _ => {
                 if let Some(s) = self.session() {
                     s.update(cx, |s, cx| match action {
+                        Print => s.show_print(window, cx),
                         Save => s.start_export(pdf_application::export::ExportScope::All, cx),
                         Undo | Redo => s.history(matches!(action, Redo), cx),
                         Copy => s.copy_text(cx),
@@ -1243,6 +1245,7 @@ impl Render for WindowShell {
                     ("Buka ulang tab tertutup  Ctrl+Shift+T", Reopen),
                     ("Hapus riwayat sesi", ClearSession),
                     ("Simpan sebagai…  Ctrl+Shift+S", Save),
+                    ("Cetak PDF  Ctrl+P", Print),
                     ("Tutup tab  Ctrl+W", Close),
                     ("Keluar", Quit),
                 ],

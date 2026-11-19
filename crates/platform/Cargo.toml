@@ -8,6 +8,7 @@ pdf-application.workspace = true
 tempfile.workspace = true
 dunce.workspace = true
 image.workspace = true
+serde_json.workspace = true
 [target.'cfg(windows)'.dependencies]
 atomicwrites = "=0.4.4"
 [lints]

@@ -1,5 +1,16 @@
 # Current compatibility
 
+## Cetak dan navigasi outline (19 November 2026)
+
+[Cetak](printing.md): snapshot immutable, raster PDFium dengan print intent 150 DPI,
+managed helper Windows Forms terisolasi dan publikasi virtual melalui LocalOutput.
+Print tidak mengubah baseline bersih. Microsoft Print to PDF menghasilkan gambar;
+printer virtual file lain belum didukung. Printer fisik perlu acceptance perangkat.
+[Daftar isi](outline.md): DTO bounded tanpa native handle, load async per sumber,
+cache per view dan tujuan dipetakan melalui PageId. Aksi eksternal tidak dieksekusi.
+Kemampuan membaca outline tidak mengubah consent/preservation ekspor bookmark.
+
+
 Text highlights, freehand pen/marker, colors, select/delete and Undo/Redo are available
 under **Anotasi**. Standard PDF Ink/Highlight objects persist through safe Save As;
 PDF Studio metadata enables reopening/editing its own annotations. Generic third-party
