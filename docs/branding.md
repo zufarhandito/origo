@@ -1,5 +1,10 @@
 # Branding Origo
 
+Workspace terbaru memakai menu hamburger dan tab dalam satu header, dengan kontrol
+jendela custom di kanan. Logo/nama tetap tidak ditampilkan pada header; identitas
+native/taskbar/About tetap Origo. Catatan menu teks di bawah bersifat historis.
+
+
 Nama tampilan aplikasi Windows kini **Origo**. Pemilik menyetujui pemasangan ikon
 lingkaran yang dikirim sebagai ikon sementara; desain bisa diganti lagi.
 

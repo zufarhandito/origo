@@ -11,7 +11,7 @@ function Hit([int]$x,[int]$y){
 function Caption([int]$code){[OutputDialog]::PostMessage($app.MainWindowHandle,0x112,[IntPtr]$code,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 500}
 try{
  $null=Wait-State {param($s) $s.pageCount -gt 0}
- $menu=(Find 'Berkas').Current.BoundingRectangle
+ $menu=(Find 'Menu aplikasi').Current.BoundingRectangle
  $rect=New-Object M3Capture+Rect;[M3Capture]::GetWindowRect($app.MainWindowHandle,[ref]$rect)|Out-Null
  if($menu.Y-$rect.T -gt 12){throw 'Menu still occupies a second row'}
  if((Hit ([int]($menu.X+$menu.Width/2)) ([int]($menu.Y+$menu.Height/2))) -ne 1){throw 'Menu incorrectly treated as drag area'}

@@ -127,9 +127,13 @@ impl DocumentSession {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let available = self.navigation.count > 0;
-        let compact = window.viewport_size().width < px(1000.);
-        let previous = self.navigation.target(Direction::Previous).is_some();
-        let next = self.navigation.target(Direction::Next).is_some();
+        let _ = window;
+        let show_history = self.mode == ViewerMode::Organize
+            || self.annotation.open
+            || self
+                .workspace
+                .as_ref()
+                .is_some_and(|w| w.can_undo() || w.can_redo());
         let weak = cx.weak_entity();
         let zoom = self.zoom;
         let zoom_menu = Button::new("zoom-menu")
@@ -176,28 +180,6 @@ impl DocumentSession {
             .flex()
             .items_center()
             .gap_1()
-            .when(!compact, |el| {
-                el.child(
-                    icon(
-                        "first-page",
-                        IconName::ChevronsLeft,
-                        "Halaman pertama",
-                        "Ctrl+Home",
-                    )
-                    .disabled(!previous)
-                    .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::First, cx))),
-                )
-            })
-            .child(
-                icon(
-                    "previous-page",
-                    IconName::ChevronLeft,
-                    "Halaman sebelumnya",
-                    "PgUp",
-                )
-                .disabled(!previous)
-                .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::Previous, cx))),
-            )
             .child(
                 div()
                     .w(px(56.))
@@ -219,61 +201,7 @@ impl DocumentSession {
                     .text_sm()
                     .text_color(cx.theme().muted_foreground)
                     .child(format!("/ {}", self.navigation.count)),
-            )
-            .child(
-                icon(
-                    "next-page",
-                    IconName::ChevronRight,
-                    "Halaman berikutnya",
-                    "PgDn",
-                )
-                .disabled(!next)
-                .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::Next, cx))),
-            )
-            .when(!compact, |el| {
-                el.child(
-                    icon(
-                        "last-page",
-                        IconName::ChevronsRight,
-                        "Halaman terakhir",
-                        "Ctrl+End",
-                    )
-                    .disabled(!next)
-                    .on_click(cx.listener(|this, _, _, cx| this.navigate(Direction::Last, cx))),
-                )
-            })
-            .when(compact, |el| {
-                let weak = cx.weak_entity();
-                el.child(
-                    icon(
-                        "navigation-menu",
-                        IconName::Ellipsis,
-                        "Navigasi halaman",
-                        "",
-                    )
-                    .disabled(!available)
-                    .dropdown_menu(move |menu, _, _| {
-                        let w = weak.clone();
-                        let w2 = weak.clone();
-                        menu.item(
-                            PopupMenuItem::new("Halaman pertama")
-                                .disabled(!previous)
-                                .on_click(move |_, _, cx| {
-                                    let _ = w
-                                        .update(cx, |this, cx| this.navigate(Direction::First, cx));
-                                }),
-                        )
-                        .item(
-                            PopupMenuItem::new("Halaman terakhir")
-                                .disabled(!next)
-                                .on_click(move |_, _, cx| {
-                                    let _ = w2
-                                        .update(cx, |this, cx| this.navigate(Direction::Last, cx));
-                                }),
-                        )
-                    }),
-                )
-            });
+            );
         div()
             .id("reading-toolbar")
             .h(px(40.))
@@ -325,25 +253,50 @@ impl DocumentSession {
                             .disabled(!available || self.edits_locked() || self.export.running)
                             .on_click(cx.listener(|s, _, window, cx| s.show_print(window, cx))),
                     )
-                    .child(divider(cx))
                     .child(
-                        icon("undo", IconName::Undo2, "Undo", "Ctrl+Z")
-                            .disabled(
-                                self.opening
-                                    || self.edits_locked()
-                                    || !self.workspace.as_ref().is_some_and(|w| w.can_undo()),
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| this.history(false, cx))),
+                        icon("annotations-toggle", IconName::Pencil, "Anotasi", "")
+                            .selected(self.annotation.open)
+                            .disabled(!available || self.edits_locked())
+                            .on_click(cx.listener(|s, _, window, cx| {
+                                if s.mode != ViewerMode::Read {
+                                    s.set_mode(ViewerMode::Read, window, cx);
+                                    if !s.annotation.open {
+                                        s.toggle_annotations(cx);
+                                    }
+                                } else {
+                                    s.toggle_annotations(cx);
+                                }
+                            })),
                     )
-                    .child(
-                        icon("redo", IconName::Redo2, "Redo", "Ctrl+Y")
-                            .disabled(
-                                self.opening
-                                    || self.edits_locked()
-                                    || !self.workspace.as_ref().is_some_and(|w| w.can_redo()),
+                    .when(show_history, |el| {
+                        el.child(divider(cx))
+                            .child(
+                                icon("undo", IconName::Undo2, "Undo", "Ctrl+Z")
+                                    .disabled(
+                                        self.opening
+                                            || self.edits_locked()
+                                            || !self
+                                                .workspace
+                                                .as_ref()
+                                                .is_some_and(|w| w.can_undo()),
+                                    )
+                                    .on_click(
+                                        cx.listener(|this, _, _, cx| this.history(false, cx)),
+                                    ),
                             )
-                            .on_click(cx.listener(|this, _, _, cx| this.history(true, cx))),
-                    ),
+                            .child(
+                                icon("redo", IconName::Redo2, "Redo", "Ctrl+Y")
+                                    .disabled(
+                                        self.opening
+                                            || self.edits_locked()
+                                            || !self
+                                                .workspace
+                                                .as_ref()
+                                                .is_some_and(|w| w.can_redo()),
+                                    )
+                                    .on_click(cx.listener(|this, _, _, cx| this.history(true, cx))),
+                            )
+                    }),
             )
             .child(navigation)
             .child(
@@ -360,6 +313,7 @@ impl DocumentSession {
                                 cx.listener(|this, _, window, cx| this.show_search(window, cx)),
                             ),
                     )
+                    .child(divider(cx))
                     .child(
                         icon("zoom-out", IconName::Minus, "Perkecil", "Ctrl+-")
                             .disabled(!available || self.zoom_percent() <= 50)

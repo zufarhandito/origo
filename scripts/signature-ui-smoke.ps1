@@ -62,9 +62,13 @@ try {
     $null=Wait-State {param($s) $s.splitView -and @($s.sessions|Where-Object {$_.signatureCount -ne 2}).Count -eq 0}
     Pass 'shared-signatures-two-views'
     $right=Find 'Panel PDF: A.pdf (kanan)'
-    $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Anotasi')
-    $right.FindFirst([Windows.Automation.TreeScope]::Descendants,$condition).GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
-    Start-Sleep -Milliseconds 200
+    # Annotation trigger now belongs to the shared main toolbar. Focus the right
+    # view first so that this toolbar edits that view's contextual tool state.
+    $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Isi halaman 1')
+    $rightPage=$right.FindFirst([Windows.Automation.TreeScope]::Descendants,$condition)
+    Stroke 0.03 0.03 0.03 0.03 'Isi halaman 1' $rightPage
+    $null=Wait-State {param($s) $s.viewId -eq 3}
+    Invoke 'Anotasi'
     $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Pen')
     $right.FindFirst([Windows.Automation.TreeScope]::Descendants,$condition).GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
     $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Isi halaman 1')

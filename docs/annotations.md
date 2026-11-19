@@ -1,5 +1,12 @@
 # Anotator PDF
 
+Pembaruan workspace 19 November 2026: pemicu Anotasi (ikon pensil) ada di toolbar
+utama. Baris pen/highlighter/select/eraser/signature hanya muncul ketika anotasi
+terbuka pada mode baca. Menutupnya membatalkan draft/placement dan kembali ke
+Select; objek yang sudah ditempatkan tetap ada. Undo/Redo tetap tersedia di mode
+baca bila history ada. Menu aplikasi memakai hamburger di sebelah tab.
+
+
 Implementasi inti, 17 November 2026. Pemilik mengotorisasi anotator terlebih dahulu;
 tanda tangan draw/import kini tersedia melalui [Tanda tangan](signatures.md). Dasar UX: [riset kompetitor](research/pdf-annotations-and-signatures.md).
 

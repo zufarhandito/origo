@@ -1,5 +1,38 @@
 # Pengujian Origo
 
+## Workspace ringkas dan toolbar kontekstual (19 November 2026)
+
+Menu hamburger, tab/+ /Daftar tab dan kontrol jendela kini satu header. Menu lama
+tersedia sebagai submenu; area drag terpisah dari tombol/tab. Pemicu Anotasi di
+toolbar utama; baris alat hanya ada saat anotasi terbuka pada mode baca. Empat
+panah navigasi dihapus dari toolbar, input nomor/total halaman tetap. Undo/Redo
+muncul saat Organize/anotasi atau history ada. Search dan zoom diberi separator.
+Label Halaman di bawah tab Thumbnail dan Halaman N di atas kertas dihapus; nomor
+thumbnail tetap. Status tanpa selectable text memakai chip Butuh OCR disabled,
+tooltip OCR segera hadir, tanpa engine/proses OCR.
+
+Fmt, Clippy desktop/all-targets denied warnings, 13 unit tests desktop dan release
+build lulus. UI terpilih **36 kasus** lulus:
+- 8 workspace: header satu baris, submenu action, input halaman, contextual tools,
+  undo/redo di mode baca, narrow/dark, empty state, OCR disabled. Bukti lokal:
+  `.research/workspace-ui-fd83e57059d741708febe800828c5df6`.
+- 8 caption/menus: `.research/compact-titlebar-cfbf4948f7444be6b7f6254a504d7d67`.
+- 9 annotation: `.research/annotation-ui-1208716d589e4c67af2bc8ac51b188b6`.
+- 11 signature: `.research/signature-ui-449c0bb2cf34499c8faeb0cf41264bf8`.
+
+Anotasi/tanda tangan mencakup close-cancel, Save As/reopen/delete dan shared views.
+Hash PDF sintetis tetap. Snapshot workspace diperiksa visual. Tes tanda tangan
+awal berhenti karena selector pemicu Anotasi masih berada di dalam pane; selector
+diubah untuk fokus pane lalu memakai pemicu toolbar bersama dan rerun lulus.
+Menu-Action pada helper tes kini mendukung hamburger serta executable UI lama.
+Suite native PDF tidak diulang untuk perubahan presentasi ini. Snap flyout,
+touch, mixed DPI/multi-monitor dan interaksi stylus belum diuji pada checkpoint ini.
+
+Build isolated teruji: target/tab-background-check/release/pdf-studio.exe.
+SHA-256: `33A1FBBC22389913696DEEFA471040023CEA33A39BA8F10EB8115943B977095D`.
+Pemasangan launcher menunggu proses utama tidak aktif; lihat status akhir sesi.
+
+
 ## Perataan kiri recent files (19 November 2026)
 
 Ikon dan nama file recent memakai baris konten selebar tombol, rata kiri pada

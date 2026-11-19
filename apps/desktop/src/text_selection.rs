@@ -241,9 +241,7 @@ impl DocumentSession {
                 self.update_status();
             }
         } else if start && text.chars.is_empty() {
-            self.status =
-                "Halaman ini tidak memiliki teks yang dapat dipilih. Scan gambar membutuhkan OCR."
-                    .into();
+            self.update_status();
         }
         self.report(cx);
         cx.notify();

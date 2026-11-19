@@ -79,6 +79,19 @@ impl DocumentSession {
         self.annotation.signature.gesture = None;
     }
 
+    pub(super) fn toggle_annotations(&mut self, cx: &mut Context<Self>) {
+        if self.edits_locked() {
+            return;
+        }
+        self.close_annotation_popups();
+        self.annotation.open = !self.annotation.open;
+        self.annotation.draft = None;
+        self.annotation.selected = None;
+        self.annotation.tool = Tool::Select;
+        self.annotation.signature.placing = false;
+        self.annotation.signature.gesture = None;
+        cx.notify();
+    }
     pub(super) fn annotation_bar(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let mut bar = gpui::div()
             .flex()
@@ -89,23 +102,6 @@ impl DocumentSession {
             .py_1()
             .border_b_1()
             .border_color(cx.theme().border);
-        bar = bar.child(
-            Button::new("annotations-toggle")
-                .ghost()
-                .label("Anotasi")
-                .selected(self.annotation.open)
-                .disabled(self.edits_locked())
-                .on_click(cx.listener(|s, _, _, cx| {
-                    s.close_annotation_popups();
-                    s.annotation.open = !s.annotation.open;
-                    s.annotation.draft = None;
-                    s.annotation.selected = None;
-                    s.annotation.tool = Tool::Select;
-                    s.annotation.signature.placing = false;
-                    s.annotation.signature.gesture = None;
-                    cx.notify();
-                })),
-        );
         if self.annotation.sliders.is_none() {
             use gpui::component::slider::{SliderEvent, SliderState};
             let sliders = [

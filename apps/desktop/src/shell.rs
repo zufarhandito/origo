@@ -1036,34 +1036,6 @@ impl WindowShell {
             _ => content,
         }
     }
-    fn menu(
-        &self,
-        label: &'static str,
-        entries: &[(&'static str, MenuAction)],
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let weak = cx.weak_entity();
-        let entries: Vec<_> = entries
-            .iter()
-            .map(|(label, action)| (*label, *action, self.enabled(*action, cx)))
-            .collect();
-        Button::new(label)
-            .ghost()
-            .label(label)
-            .dropdown_menu(move |mut menu, _, _| {
-                for (label, action, enabled) in &entries {
-                    let weak = weak.clone();
-                    let action = *action;
-                    menu = menu.item(PopupMenuItem::new(*label).disabled(!enabled).on_click(
-                        move |_, window, cx| {
-                            let _ = weak.update(cx, |this, cx| this.action(action, window, cx));
-                        },
-                    ));
-                }
-                menu
-            })
-            .into_any_element()
-    }
 }
 #[path = "recent_files.rs"]
 mod recent_files;
@@ -1258,12 +1230,10 @@ impl Render for WindowShell {
             .label("Daftar tab")
             .disabled(self.close.is_some() || self.modal(cx))
             .on_click(cx.listener(|this, _, window, cx| this.toggle_tab_picker(window, cx)));
-        let menus = div()
-            .flex()
-            .gap_1()
-            .child(self.menu(
+        let groups: Vec<(&'static str, Vec<(&'static str, MenuAction)>)> = vec![
+            (
                 "Berkas",
-                &[
+                vec![
                     ("Buka PDF…  Ctrl+O", Open),
                     ("Buka ulang tab tertutup  Ctrl+Shift+T", Reopen),
                     ("Hapus riwayat sesi", ClearSession),
@@ -1272,11 +1242,10 @@ impl Render for WindowShell {
                     ("Tutup tab  Ctrl+W", Close),
                     ("Keluar", Quit),
                 ],
-                cx,
-            ))
-            .child(self.menu(
+            ),
+            (
                 "Edit",
-                &[
+                vec![
                     ("Undo  Ctrl+Z", Undo),
                     ("Redo  Ctrl+Y", Redo),
                     ("Salin  Ctrl+C", Copy),
@@ -1284,11 +1253,10 @@ impl Render for WindowShell {
                     ("Pilih semua halaman", Select),
                     ("Bersihkan pilihan", Clear),
                 ],
-                cx,
-            ))
-            .child(self.menu(
+            ),
+            (
                 "Tampilan",
-                &[
+                vec![
                     ("Thumbnail", Sidebar),
                     ("Panel alat", Panel),
                     ("Bandingkan dua PDF…", Compare),
@@ -1303,11 +1271,10 @@ impl Render for WindowShell {
                     ("Terang", Light),
                     ("Gelap", Dark),
                 ],
-                cx,
-            ))
-            .child(self.menu(
+            ),
+            (
                 "Alat",
-                &[
+                vec![
                     ("Atur halaman", Organize),
                     ("Impor PDF…", Import),
                     ("Ekstrak…", Extract),
@@ -1315,13 +1282,54 @@ impl Render for WindowShell {
                     ("Ekspor PNG…", Png),
                     ("Optimize PDF (lossless)…", Optimize),
                 ],
-                cx,
-            ))
-            .child(self.menu(
+            ),
+            (
                 "Bantuan",
-                &[("Daftar shortcut", Help), ("Tentang Origo", About)],
-                cx,
-            ));
+                vec![("Daftar shortcut", Help), ("Tentang Origo", About)],
+            ),
+        ];
+        let groups = groups
+            .into_iter()
+            .map(|(label, entries)| {
+                (
+                    label,
+                    entries
+                        .into_iter()
+                        .map(|(title, action)| (title, action, self.enabled(action, cx)))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let weak = cx.weak_entity();
+        let menus = Button::new("application-menu")
+            .ghost()
+            .icon(IconName::Menu)
+            .accessibility_label("Menu aplikasi")
+            .tooltip("Menu aplikasi")
+            .w(px(34.))
+            .h(px(34.))
+            .dropdown_menu(move |mut menu, window, cx| {
+                for (label, entries) in &groups {
+                    let entries = entries.clone();
+                    let weak = weak.clone();
+                    menu = menu.submenu(*label, window, cx, move |mut submenu, _, _| {
+                        for (title, action, enabled) in &entries {
+                            let weak = weak.clone();
+                            let action = *action;
+                            submenu = submenu.item(
+                                PopupMenuItem::new(*title).disabled(!enabled).on_click(
+                                    move |_, window, cx| {
+                                        let _ =
+                                            weak.update(cx, |s, cx| s.action(action, window, cx));
+                                    },
+                                ),
+                            );
+                        }
+                        submenu
+                    });
+                }
+                menu
+            });
         let export_owner = self.resources.export_owner.load(Ordering::SeqCst);
         let job = self
             .tabs
@@ -1354,14 +1362,26 @@ impl Render for WindowShell {
                     .flex_shrink_0()
                     .border_b_1()
                     .border_color(colors.border)
-                    .child(menus.h_full().items_center())
+                    .child(menus)
+                    .when(!self.tabs.is_empty(), |el| {
+                        el.child(strip).child(
+                            Button::new("new-tab")
+                                .ghost()
+                                .icon(IconName::Plus)
+                                .accessibility_label("Buka PDF di tab baru")
+                                .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
+                                .on_click(cx.listener(|s, _, _, cx| s.choose_open(cx))),
+                        )
+                    })
                     .child(
                         div()
                             .id("caption-drag")
                             .h_full()
                             .flex_1()
+                            .min_w(px(48.))
                             .window_control_area(gpui::WindowControlArea::Drag),
                     )
+                    .when(!self.tabs.is_empty(), |el| el.child(tab_list))
                     .children(
                         [
                             (
@@ -1412,27 +1432,6 @@ impl Render for WindowShell {
                         }),
                     ),
             )
-            .when(!self.tabs.is_empty(), |el| {
-                el.child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .border_b_1()
-                        .border_color(colors.border)
-                        .bg(cx.theme().tokens.tab_bar)
-                        .child(strip)
-                        .child(
-                            Button::new("new-tab")
-                                .ghost()
-                                .icon(IconName::Plus)
-                                .accessibility_label("Buka PDF di tab baru")
-                                .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
-                                .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
-                        )
-                        .child(div().flex_1())
-                        .child(tab_list),
-                )
-            })
             .when(self.tab_picker_open, |el| {
                 el.child(gpui::deferred(self.render_tab_picker(cx)).with_priority(2))
             })

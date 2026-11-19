@@ -156,6 +156,9 @@ function Switch-Tab([string]$Name) {
     Invoke $Name
 }
 function Menu-Action([string]$Menu,[string]$Action) {
+    $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+    $group=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$Menu))
+    if(-not $group){Invoke 'Menu aplikasi'}
     Invoke $Menu
     Invoke $Action
 }

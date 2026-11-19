@@ -1,5 +1,28 @@
 # Desktop UI dan multi-tab
 
+## Workspace ringkas dan menu aplikasi (19 November 2026)
+
+Header sekarang satu baris: ikon Menu aplikasi (hamburger) di kiri, tab/+ jika ada
+dokumen, ruang drag, Daftar tab dan kontrol jendela di kanan. Kelompok Berkas,
+Edit, Tampilan, Alat dan Bantuan tetap tersedia sebagai submenu hamburger dengan
+action/shortcut/disabled guards yang sama. Saat kosong, baris tab/+ /Daftar tab
+hilang; hamburger dan kontrol jendela tetap tersedia di atas Empty State/recents.
+Tab picker diposisikan tepat di bawah header (34 logical px).
+
+Main toolbar menyisakan input nomor/total halaman; empat panah dan menu navigasi
+compact dihapus dari toolbar. Navigasi menu/keyboard/scroll tetap tersedia.
+Pencarian dipisahkan dari zoom oleh separator. Pemicu Anotasi berupa ikon pensil
+pada toolbar utama; klik membuka/menutup baris alat kontekstual pada mode baca.
+Undo/Redo tampil saat Organize, toolbar anotasi terbuka, atau ada history undo/redo,
+sehingga kembali ke mode baca tidak menyembunyikan akses perubahan yang ada.
+
+Label Halaman di bawah tab Thumbnail dan label Halaman N di atas canvas dihapus.
+Nomor di bawah thumbnail dan input nomor halaman tetap ada. Status halaman tanpa
+teks memakai chip Butuh OCR nonaktif, tooltip OCR segera hadir; tidak ada engine
+atau proses OCR. Pesan panjang saat klik halaman kosong tidak lagi dipasang.
+Keterangan header/menu klasik pada checkpoint di bawah merekam UI sebelumnya.
+
+
 ## Terakhir dibuka (19 November 2026)
 
 Empty State menampilkan maksimal lima PDF terakhir di bawah tombol Buka PDF.

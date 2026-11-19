@@ -1,7 +1,7 @@
 use crate::*;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme, Icon, Sizable,
+    ActiveTheme, Disableable, Icon, Sizable,
     button::{Button, ButtonVariants},
     empty::{Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle},
     scroll::Scrollbar,
@@ -141,15 +141,6 @@ impl DocumentSession {
                 .border_r_1()
                 .border_color(c.border)
                 .child(self.outline_header(cx))
-                .child(
-                    div()
-                        .h_10()
-                        .px_4()
-                        .py_2()
-                        .text_xs()
-                        .text_color(c.muted_foreground)
-                        .child("Halaman"),
-                )
                 .child(
                     div()
                         .flex_1()
@@ -581,13 +572,7 @@ impl DocumentSession {
                 .flex_col()
                 .items_center()
                 .gap_2()
-                .child(
-                    div()
-                        .h_6()
-                        .text_xs()
-                        .text_color(colors.muted_foreground)
-                        .child(format!("Halaman {}", index + 1)),
-                )
+                .py_6()
                 .child(page)
                 .into_any_element()
         }
@@ -604,7 +589,8 @@ impl Render for DocumentSession {
         let reading_toolbar = (self.mode != ViewerMode::Convert && !self.split_presentation)
             .then(|| self.reading_toolbar(window, cx));
         let annotation_bar =
-            (has_document && self.mode == ViewerMode::Read).then(|| self.annotation_bar(cx));
+            (has_document && self.mode == ViewerMode::Read && self.annotation.open)
+                .then(|| self.annotation_bar(cx));
         let search_bar = (has_document && self.search.open && self.mode != ViewerMode::Convert)
             .then(|| self.search_bar(cx));
 
@@ -909,6 +895,9 @@ impl Render for DocumentSession {
                                 "Konversi - fitur akan datang".to_owned()
                             } else {
                                 self.status.clone()
+                            })
+                            .when(self.navigation.count > 0 && self.text.pages.get(&usize::from(self.navigation.current)).is_some_and(|p|p.chars.is_empty()), |el| {
+                                el.child(Button::new("ocr-coming-soon").outline().xsmall().rounded_full().label("Butuh OCR").tooltip("OCR segera hadir").disabled(true))
                             })
                             .when(self.workspace.is_some(), |el| {
                                 el.child(format!(
