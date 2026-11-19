@@ -68,6 +68,10 @@ pub(super) struct WindowShell {
     notice: Option<String>,
     favorites: std::collections::BTreeSet<String>,
     favorites_ready: bool,
+    recents: Vec<PathBuf>,
+    recents_ready: bool,
+    recents_revision: u64,
+    recents_writer: Arc<std::sync::Mutex<u64>>,
     favorites_revision: u64,
     favorites_writer: Arc<std::sync::Mutex<u64>>,
     pending_preferences: usize,
@@ -129,6 +133,10 @@ impl WindowShell {
                 notice: None,
                 favorites: Default::default(),
                 favorites_ready: false,
+                recents: vec![],
+                recents_ready: false,
+                recents_revision: 0,
+                recents_writer: Arc::default(),
                 favorites_revision: 0,
                 favorites_writer: Arc::default(),
                 pending_preferences: 0,
@@ -159,6 +167,7 @@ impl WindowShell {
             })
             .detach();
             shell.load_favorites(cx);
+            shell.load_recents(cx);
             shell.initialize_session_restore(initial.is_some(), cx);
             shell.focus.focus(window, cx);
             if shell.metrics.is_some() {
@@ -480,6 +489,14 @@ impl WindowShell {
                                     ViewId(id.0 * 2),
                                 );
                                 session.update(cx, |s, cx| s.install_workspace(workspace, cx));
+                                if let Some(path) = this
+                                    .tabs
+                                    .iter()
+                                    .find(|t| t.id == id)
+                                    .map(|t| t.path.clone())
+                                {
+                                    this.record_recent(path, cx);
+                                }
                                 this.finish_reopen(id, &session, cx);
                                 this.apply_session_position(id, &session, cx);
                                 this.observe_document_view(&session, id, true, cx);
@@ -1048,6 +1065,8 @@ impl WindowShell {
             .into_any_element()
     }
 }
+#[path = "recent_files.rs"]
+mod recent_files;
 #[path = "tab_management.rs"]
 mod tab_management;
 use tab_management::{TabDrag, TabDragLabel, tab_context_menu};
@@ -1513,13 +1532,17 @@ impl Render for WindowShell {
                                 })),
                         )
                         .content(
-                            EmptyContent::new().child(
-                                Button::new("open-empty")
-                                    .primary()
-                                    .label("Buka PDF")
-                                    .disabled(self.opening)
-                                    .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
-                            ),
+                            EmptyContent::new()
+                                .child(
+                                    Button::new("open-empty")
+                                        .primary()
+                                        .label("Buka PDF")
+                                        .disabled(self.opening)
+                                        .on_click(
+                                            cx.listener(|this, _, _, cx| this.choose_open(cx)),
+                                        ),
+                                )
+                                .child(self.recent_list(cx)),
                         ),
                 )
             })

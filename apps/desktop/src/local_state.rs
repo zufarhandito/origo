@@ -255,3 +255,71 @@ mod tests {
         Ok(())
     }
 }
+
+pub(super) fn load_recents(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
+    let file = match std::fs::File::open(dir.join("recents.json")) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => return Err(e.into()),
+    };
+    let mut bytes = Vec::new();
+    file.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
+    anyhow::ensure!(bytes.len() as u64 <= MAX_BYTES, "Riwayat terlalu besar");
+    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+    anyhow::ensure!(value["version"] == 1, "Versi riwayat tidak didukung");
+    let values = value["paths"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("Riwayat tidak valid"))?;
+    anyhow::ensure!(values.len() <= 20, "Riwayat terlalu panjang");
+    let mut seen = BTreeSet::new();
+    values
+        .iter()
+        .map(|v| {
+            let raw = v
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("Path tidak valid"))?;
+            let path = PathBuf::from(raw);
+            anyhow::ensure!(
+                raw.len() <= 32768
+                    && path.is_absolute()
+                    && seen.insert(raw.replace('/', "\\").to_lowercase()),
+                "Path riwayat tidak valid"
+            );
+            Ok(path)
+        })
+        .collect()
+}
+pub(super) fn save_recents(dir: &Path, paths: &[PathBuf]) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        paths.len() <= 20
+            && paths
+                .iter()
+                .all(|p| p.is_absolute() && p.to_string_lossy().len() <= 32768),
+        "Riwayat tidak valid"
+    );
+    let bytes = serde_json::to_vec(&serde_json::json!({"version":1,"paths":paths}))?;
+    anyhow::ensure!(bytes.len() as u64 <= MAX_BYTES, "Riwayat terlalu besar");
+    write_atomic(dir, "recents.json", &bytes)
+}
+#[cfg(test)]
+mod recent_tests {
+    use super::*;
+    #[test]
+    fn recents_roundtrip_clear_and_reject_invalid_metadata() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let paths = vec![dir.path().join("B.pdf"), dir.path().join("A.pdf")];
+        assert!(load_recents(dir.path())?.is_empty());
+        save_recents(dir.path(), &paths)?;
+        assert_eq!(load_recents(dir.path())?, paths);
+        save_recents(dir.path(), &[])?;
+        assert!(load_recents(dir.path())?.is_empty());
+        std::fs::write(
+            dir.path().join("recents.json"),
+            br#"{"version":1,"paths":["relative.pdf"]}"#,
+        )?;
+        assert!(load_recents(dir.path()).is_err());
+        std::fs::write(dir.path().join("recents.json"), b"broken")?;
+        assert!(load_recents(dir.path()).is_err());
+        Ok(())
+    }
+}
