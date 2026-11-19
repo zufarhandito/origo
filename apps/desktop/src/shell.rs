@@ -70,6 +70,8 @@ pub(super) struct WindowShell {
     favorites_ready: bool,
     recents: Vec<PathBuf>,
     recents_ready: bool,
+    recent_modified: HashMap<String, Option<std::time::SystemTime>>,
+    recent_metadata_revision: u64,
     recents_revision: u64,
     recents_writer: Arc<std::sync::Mutex<u64>>,
     favorites_revision: u64,
@@ -136,6 +138,8 @@ impl WindowShell {
                 favorites_ready: false,
                 recents: vec![],
                 recents_ready: false,
+                recent_modified: HashMap::new(),
+                recent_metadata_revision: 0,
                 recents_revision: 0,
                 recents_writer: Arc::default(),
                 favorites_revision: 0,
@@ -1546,33 +1550,43 @@ impl Render for WindowShell {
             )
             .when(session.is_none(), |el| {
                 el.child(
-                    Empty::new()
-                        .header(
-                            EmptyHeader::new()
-                                .media(
-                                    EmptyMedia::new()
-                                        .with_variant(EmptyMediaVariant::Icon)
-                                        .child(gpui::component::Icon::new(IconName::File)),
+                    div()
+                        .id("welcome-scroll")
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_y_scroll()
+                        .child(
+                            Empty::new()
+                                .min_h_full()
+                                .header(
+                                    EmptyHeader::new()
+                                        .media(
+                                            EmptyMedia::new()
+                                                .with_variant(EmptyMediaVariant::Icon)
+                                                .child(gpui::component::Icon::new(IconName::File)),
+                                        )
+                                        .title(EmptyTitle::new().child("Belum ada PDF terbuka"))
+                                        .description(EmptyDescription::new().child(
+                                            if self.opening {
+                                                "Memeriksa dokumen..."
+                                            } else {
+                                                "Buka PDF untuk mulai membaca dan mengedit dokumen."
+                                            },
+                                        )),
                                 )
-                                .title(EmptyTitle::new().child("Belum ada PDF terbuka"))
-                                .description(EmptyDescription::new().child(if self.opening {
-                                    "Memeriksa dokumen..."
-                                } else {
-                                    "Buka PDF untuk mulai membaca dan mengedit dokumen."
-                                })),
-                        )
-                        .content(
-                            EmptyContent::new()
-                                .child(
-                                    Button::new("open-empty")
-                                        .primary()
-                                        .label("Buka PDF")
-                                        .disabled(self.opening)
-                                        .on_click(
-                                            cx.listener(|this, _, _, cx| this.choose_open(cx)),
-                                        ),
-                                )
-                                .child(self.recent_list(cx)),
+                                .content(
+                                    EmptyContent::new()
+                                        .child(
+                                            Button::new("open-empty")
+                                                .primary()
+                                                .label("Buka PDF")
+                                                .disabled(self.opening)
+                                                .on_click(cx.listener(|this, _, _, cx| {
+                                                    this.choose_open(cx)
+                                                })),
+                                        )
+                                        .child(self.recent_list(cx)),
+                                ),
                         ),
                 )
             })

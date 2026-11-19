@@ -1,5 +1,33 @@
 # Handoff terkini - 19 November 2026
 
+## Metadata dan favorit pada recent files (19 November 2026)
+
+Recent menampilkan bintang dari state favorit tab yang sama, folder penyimpanan,
+dan tanggal modifikasi filesystem lokal (dd-mm-yyyy HH:MM), dengan informasi kecil
+di bawah nama rata kiri. Tidak memakai table. Tooltip memuat path penuh dan tanggal.
+Pembacaan metadata lima item berjalan di background saat load/record recent,
+dengan revision guard agar hasil lama tidak muncul setelah clear/reorder. Tanggal
+bukan last opened, tidak dipersist ulang dan tidak diawasi live. File hilang/tidak
+terakses menampilkan tanggal tidak tersedia. Format recents.json tetap path-only;
+tidak membaca konten PDF untuk metadata. Welcome page scroll saat tinggi terbatas.
+
+Fmt, Clippy desktop/all-targets denied warnings, 13 unit tests dan release build
+lulus. Suite recent-files UI kini **13 kasus** lulus, termasuk bintang, folder,
+tanggal sesuai filesystem/zona waktu lokal, reload metadata + favorit setelah
+restart, unstar sync, clear, dedup/order dan hash PDF sintetis tetap sama.
+Capture terang/gelap diperiksa visual. Bukti lokal:
+`.research/recent-files-ui-bf21cb4083e040179717329b36114d6a`.
+Pemeriksaan tambahan lokal dengan lima path sintetis (satu hilang) memverifikasi
+fallback tanggal dan scroll ke item terakhir pada jendela pendek:
+`.research/recent-metadata-layout-654e97223e4f44268942803adaca7434`.
+Suite native PDF tidak diulang karena perubahan pada metadata/UI welcome.
+
+Build teruji sudah dipasang ke target/release/pdf-studio.exe setelah dipastikan
+target tidak aktif. Tidak ada proses pengguna ditutup. Hash isolated/terpasang:
+`B2887B503449414EADE1A14DD8F226E779F6EB91D429A6835EBD5982C2AAF32C`.
+run.cmd memakai build tersebut.
+
+
 ## Sinkron recent dan banner pemulihan sesi (19 November 2026)
 
 Tawaran pemulihan ditutup pada jalur open_paths bersama, sehingga recent/file

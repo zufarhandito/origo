@@ -4586,6 +4586,7 @@ name = "pdf-studio"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "dunce",
  "embed-resource",
  "gpui-kit",

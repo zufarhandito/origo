@@ -78,6 +78,20 @@ dipotong dengan elipsis. Klik nama untuk membuka lewat alur inspeksi PDF biasa; 
 tooltip untuk membedakan nama yang sama. File hilang/rusak memakai pesan gagal
 pembukaan biasa, bukan dibaca diam-diam atau dihapus dari daftar secara otomatis.
 
+Setiap item menampilkan nama, indikator bintang bila path tersebut ada di favorit,
+folder penyimpanan, dan waktu modifikasi filesystem dalam zona waktu lokal
+(`dd-mm-yyyy HH:MM`). Bintang memakai state favorit yang sama dengan tab dan tetap
+terbaca setelah restart; tidak mengubah urutan recent. Lokasi/nama panjang dipotong
+dengan elipsis, sementara tooltip memuat path lengkap dan tanggal perubahan.
+Welcome page dapat discroll bila daftar tidak muat pada tinggi jendela kecil.
+
+Tanggal dibaca melalui metadata filesystem di background untuk lima item terlihat,
+saat riwayat dimuat atau pembukaan berhasil dicatat. Tidak membaca isi PDF dan tidak
+menyimpan tanggal duplikat di recents.json. Bukan waktu terakhir dibuka dan tidak
+memantau perubahan eksternal secara live. Sambil menunggu muncul status loading;
+file hilang/tidak dapat diakses menampilkan tanggal tidak tersedia. Revisi cache
+mencegah hasil lama muncul setelah clear atau perubahan urutan recent.
+
 Riwayat mencatat pembukaan dokumen yang berhasil, terbaru di atas, tanpa duplikat
 path Windows (case/separator dinormalisasi). Maksimal 20 path disimpan lokal dalam
 `recents.json` di direktori state aplikasi, terpisah dari sesi/favorit. Tidak ada
