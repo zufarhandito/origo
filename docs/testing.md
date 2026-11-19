@@ -1,5 +1,30 @@
 # Pengujian Origo
 
+## Terakhir dibuka di Empty State (19 November 2026)
+
+Lima recent PDF tampil di bawah tombol Buka PDF; maksimal 20 path disimpan dalam
+recents.json lokal, newest-first dan deduplikasi path Windows. Klik membuka lewat
+inspeksi biasa, tooltip menunjukkan path, Hapus riwayat membersihkan recent tanpa
+menghapus PDF/favorit/sesi. Hanya pembukaan berhasil dicatat, termasuk restore.
+Tidak memuat isi PDF otomatis untuk daftar ini. File metadata rusak/oversize
+menonaktifkan write agar data lama aman. Write atomik/serial; close menunggu prefs.
+
+Fmt, Clippy desktop/all-targets denied warnings, 13 desktop unit tests dan release
+build lulus. Unit baru memverifikasi round-trip/clear serta invalid/corrupt metadata.
+Delapan kasus UI lulus: persist successful open, recent reopen, dedup, newest-first,
+promote reopened, light/dark, reload after restart dan persistent clear. Hash kedua
+PDF sintetis tetap sama. Bukti lokal:
+`.research/recent-files-ui-21c999dd92c34eb5a5d2bbd104ab0983`.
+Suite native PDF tidak diulang untuk riwayat UI. Missing/moved file memakai error
+pembukaan biasa; kasus tersebut belum diuji UI khusus pada checkpoint ini.
+
+Commit fitur tersedia: **c6e49ea**. Build isolated teruji:
+`target/tab-background-check/release/pdf-studio.exe`, SHA-256
+`BA57376005728AA8FA1D36A0D67E33ECBC46D58FB33613DD07E5367CAD564401`.
+Pemasangan launcher menunggu proses utama tidak aktif. Status push diverifikasi
+terpisah; cache origin/main tidak membuktikan keberhasilan pengiriman.
+
+
 ## Empty State tanpa baris tab (19 November 2026)
 
 Saat tidak ada tab dokumen, baris multi-tab/+ /Daftar tab disembunyikan. Konten

@@ -1,5 +1,26 @@
 # Desktop UI dan multi-tab
 
+## Terakhir dibuka (19 November 2026)
+
+Empty State menampilkan maksimal lima PDF terakhir di bawah tombol Buka PDF.
+Klik nama untuk membuka lewat alur inspeksi PDF biasa; path lengkap tersedia di
+tooltip untuk membedakan nama yang sama. File hilang/rusak memakai pesan gagal
+pembukaan biasa, bukan dibaca diam-diam atau dihapus dari daftar secara otomatis.
+
+Riwayat mencatat pembukaan dokumen yang berhasil, terbaru di atas, tanpa duplikat
+path Windows (case/separator dinormalisasi). Maksimal 20 path disimpan lokal dalam
+`recents.json` di direktori state aplikasi, terpisah dari sesi/favorit. Tidak ada
+isi PDF, thumbnail atau edit belum tersimpan di metadata ini. Restore sesi yang
+berhasil membuka dokumen juga dihitung. Aktivasi tab saja tidak mengubah urutan.
+
+Hapus riwayat mengosongkan daftar recent di memori dan disk; tidak menghapus PDF,
+favorit atau metadata pemulihan sesi. Pembukaan berikutnya kembali dicatat.
+Baca/tulis state berjalan di background, write atomik dan serial berdasarkan
+revisi; close menunggu pekerjaan preferensi. Pembukaan saat metadata masih loading
+digabung dengan riwayat lama. Metadata rusak/oversize/path invalid menonaktifkan
+penyimpanan riwayat dan menampilkan pesan agar file lama tidak tertimpa.
+
+
 ## Tanpa dokumen terbuka (19 November 2026)
 
 Jika daftar tab kosong, seluruh baris multi-tab (termasuk tombol + dan Daftar tab)
