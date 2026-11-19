@@ -149,7 +149,7 @@ impl WindowShell {
             .id("tab-picker")
             .absolute()
             .top(px(68.))
-            .right(px(8.))
+            .left(px(8.))
             .w(px(600.))
             .max_w_full()
             .bg(colors.background)

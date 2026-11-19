@@ -1,5 +1,17 @@
 # Desktop UI dan multi-tab
 
+## Pemilih tab di kiri dan navigasi segmented (19 November 2026)
+
+Baris kedua dimulai dengan tombol ikon ChevronDown/ChevronUp (tanpa label visual),
+lalu tab dokumen dan +. Nama aksesibel Daftar tab dipertahankan, tooltip berubah
+Buka/Tutup daftar tab, dan popup terbuka dari sisi kiri di bawah baris tab.
+Header tiga baris dan Empty State tanpa baris tab tetap berlaku.
+Urutan kiri toolbar utama: Panel navigasi, Buka PDF, Simpan sebagai, Cetak PDF,
+Anotasi. Thumbnail/Daftar isi memakai TabBar segmented bawaan GPUI-kit, bukan dua
+button ghost; pilihan tetap per view. Dalam Organize, Thumbnail ditandai aktif;
+memilih Daftar isi kembali ke mode baca seperti sebelumnya.
+
+
 ## Koreksi susunan tiga baris (19 November 2026)
 
 Arahan terbaru pemilik: baris 1 hanya hamburger, ruang drag dan kontrol jendela;

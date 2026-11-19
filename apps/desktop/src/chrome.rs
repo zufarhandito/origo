@@ -220,6 +220,15 @@ impl DocumentSession {
                     .items_center()
                     .gap_1()
                     .child(
+                        icon("sidebar", IconName::PanelLeft, "Panel navigasi", "")
+                            .selected(self.sidebar)
+                            .disabled(self.workspace.is_none())
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.sidebar = !this.sidebar;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
                         icon("open", IconName::FolderOpen, "Buka PDF", "Ctrl+O")
                             .disabled(self.edits_locked())
                             .on_click(cx.listener(|this, _, _, cx| this.choose_open(cx))),
@@ -237,15 +246,6 @@ impl DocumentSession {
                             )
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.start_export(pdf_application::export::ExportScope::All, cx)
-                            })),
-                    )
-                    .child(
-                        icon("sidebar", IconName::PanelLeft, "Panel navigasi", "")
-                            .selected(self.sidebar)
-                            .disabled(self.workspace.is_none())
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.sidebar = !this.sidebar;
-                                cx.notify();
                             })),
                     )
                     .child(

@@ -11,10 +11,18 @@ try {
  if([Math]::Abs(($tabs.Y-$menu.Y)-34) -gt 3){throw 'Tabs must occupy the second row'}
  $tools=(Find 'Anotasi').Current.BoundingRectangle
  if($tools.Y -lt $tabs.Bottom){throw 'Main toolbar must occupy the third row'}
+ if($tabs.X -gt $menu.X+5 -or $tabs.Width -gt 36){throw 'Tab picker must be a leading icon-only control'}
+ $previousX=-1
+ foreach($name in @('Panel navigasi','Buka PDF','Simpan sebagai','Cetak PDF','Anotasi')){
+  $x=(Find $name).Current.BoundingRectangle.X
+  if($x -le $previousX){throw 'Main toolbar order is incorrect'};$previousX=$x
+ }
  $search=(Find 'Cari teks').Current.BoundingRectangle;$zoom=(Find 'Perkecil').Current.BoundingRectangle
  if($zoom.X-$search.Right -lt 12){throw 'Search and zoom need separation'}
  Invoke 'Daftar tab';$picker=(Find 'Cari tab').Current.BoundingRectangle
  if($picker.Y -lt $tabs.Bottom){throw 'Tab picker overlaps the tab row'}
+ if([Math]::Abs($picker.X-$tabs.X) -gt 40){throw 'Tab picker must open at the left'}
+ Capture 'tab-picker-open.png'
  Invoke 'Daftar tab'
  Pass 'three-row-read-header'
  Menu-Action 'Tampilan' 'Sesuaikan halaman';Pass 'hamburger-submenu-action'

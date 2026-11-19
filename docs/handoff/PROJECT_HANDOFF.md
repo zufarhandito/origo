@@ -1,5 +1,29 @@
 # Handoff terkini - 19 November 2026
 
+## Chevron kiri, urutan toolbar dan segmented tabs (19 November 2026)
+
+Pemilih Daftar tab kini tombol ikon chevron down/up di paling kiri baris tab,
+tanpa label visual; nama aksesibel tetap Daftar tab. Popup dibuka dari sisi kiri,
+dengan tooltip Buka/Tutup daftar tab. Tab dan + mengikuti tombol chevron.
+Toolbar utama diawali Panel navigasi, Buka PDF, Simpan sebagai, Cetak PDF, Anotasi.
+Pemilih Thumbnail/Daftar isi memakai TabBar::segmented() GPUI-kit (state per view).
+Dalam mode Organize, Thumbnail ditandai aktif sesuai konten yang ditampilkan.
+
+Fmt, Clippy desktop/all-targets denied warnings dan release build lulus. 16 kasus
+UI lulus: 8 workspace (termasuk posisi/ukuran picker, popup kiri dan urutan toolbar)
+dan 8 outline (nested/local destination, switch segmented, delete/Undo, split dan
+empty outline). Bukti lokal:
+`.research/workspace-ui-f224a3dd66004101a6b35369a336c42a` dan
+`.research/outline-ui-80090f07d9f3474e8efd1288563e3666`.
+Capture terang, gelap dan chevron terbuka diperiksa visual. PDF sintetis tidak
+berubah. Unit/native PDF suite tidak diulang untuk perubahan presentasi ini.
+
+Build telah dipasang ke target/release/pdf-studio.exe setelah memastikan target
+tidak aktif. Hash isolated/terpasang identik:
+`C3E91F73F8BB3A6C703B311399028BF4BA90F75A90C48D4E93BFFB7787833203`.
+run.cmd memakai build baru; tidak ada proses pengguna yang ditutup oleh agen.
+
+
 ## Koreksi header tiga baris (19 November 2026)
 
 Arahan pemilik mengembalikan multi-tab ke baris kedua: baris 1 hamburger + ruang

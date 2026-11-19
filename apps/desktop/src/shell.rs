@@ -1225,9 +1225,22 @@ impl Render for WindowShell {
                 ),
         );
         let tab_list = Button::new("tab-list")
-            .outline()
-            .dropdown_caret(true)
-            .label("Daftar tab")
+            .ghost()
+            .icon(if self.tab_picker_open {
+                IconName::ChevronUp
+            } else {
+                IconName::ChevronDown
+            })
+            .selected(self.tab_picker_open)
+            .accessibility_label("Daftar tab")
+            .tooltip(if self.tab_picker_open {
+                "Tutup daftar tab"
+            } else {
+                "Buka daftar tab"
+            })
+            .w(px(32.))
+            .h(px(32.))
+            .flex_shrink_0()
             .disabled(self.close.is_some() || self.modal(cx))
             .on_click(cx.listener(|this, _, window, cx| this.toggle_tab_picker(window, cx)));
         let groups: Vec<(&'static str, Vec<(&'static str, MenuAction)>)> = vec![
@@ -1431,6 +1444,7 @@ impl Render for WindowShell {
                         .border_b_1()
                         .border_color(colors.border)
                         .bg(cx.theme().tokens.tab_bar)
+                        .child(tab_list)
                         .child(strip)
                         .child(
                             Button::new("new-tab")
@@ -1440,8 +1454,7 @@ impl Render for WindowShell {
                                 .disabled(!self.enabled(Open, cx) || self.tabs.len() >= MAX_TABS)
                                 .on_click(cx.listener(|s, _, _, cx| s.choose_open(cx))),
                         )
-                        .child(div().flex_1())
-                        .child(tab_list),
+                        .child(div().flex_1()),
                 )
             })
             .when(self.tab_picker_open, |el| {
