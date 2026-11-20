@@ -63,3 +63,12 @@ Lihat [testing](testing.md) untuk hasil aktual dan batas interoperabilitas.
 [Riset iLovePDF dan roadmap UX](research/signature-ux-roadmap.md), 20 November 2026,
 mencatat kandidat type/font, inisial, stempel, pustaka lokal dan QR HP.
 Seluruhnya usulan, belum diimplementasikan atau diotorisasi oleh riset ini.
+
+## Editor tahap 1 (20 November 2026)
+
+Editor 500 px memisahkan metode Gambar dan Dari gambar, menampilkan preview
+hasil goresan setelah mouse dilepas, serta menyediakan Batal tanda tangan.
+Batal menutup editor tanpa menandai PDF berubah; draft tetap tersedia dalam view.
+Undo goresan membuang cache aset/preview agar hasil tidak memakai goresan lama.
+Impor menampilkan preview dan memilih metode gambar. Penempatan dan ekspor tetap
+memakai alur existing. Tahap type/initial/stamp/library/QR belum termasuk tahap ini.

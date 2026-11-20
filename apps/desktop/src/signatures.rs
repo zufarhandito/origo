@@ -1,7 +1,7 @@
 //! Local visual signatures. No certificate field or template persistence.
 use crate::*;
 use gpui::component::{
-    ActiveTheme, Disableable,
+    ActiveTheme, Disableable, Selectable,
     button::{Button, ButtonVariants},
     popover::Popover,
 };
@@ -10,9 +10,16 @@ use pdf_domain::{
     annotation::{Annotation, SignatureImage},
 };
 
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SignatureMethod {
+    #[default]
+    Draw,
+    Image,
+}
 #[derive(Default)]
 pub(super) struct SignatureState {
     pub open: bool,
+    pub method: SignatureMethod,
     pub drawing: bool,
     pub strokes: Vec<Vec<[f32; 2]>>,
     pub asset: Option<Arc<SignatureImage>>,
@@ -112,6 +119,10 @@ impl DocumentSession {
                     if phase == gpui::DispatchPhase::Bubble && e.button == gpui::MouseButton::Left {
                         let _ = weak.update(cx, |s, cx| {
                             s.annotation.signature.drawing = false;
+                            if let Some(asset) = draw_asset(&s.annotation.signature.strokes) {
+                                s.annotation.signature.preview = asset_preview(&asset);
+                                s.annotation.signature.asset = Some(Arc::new(asset));
+                            }
                             cx.notify();
                         });
                     }
@@ -121,23 +132,60 @@ impl DocumentSession {
         .w_full()
         .h(px(180.));
         let mut panel = gpui::div()
-            .w(px(440.))
+            .w(px(500.))
+            .max_w_full()
             .flex()
             .flex_col()
             .gap_3()
             .p_2()
             .child("Buat tanda tangan")
-            .child("Gambar di area berikut atau impor PNG/JPEG.")
             .child(
                 gpui::div()
-                    .id("signature-pad")
-                    .role(gpui::Role::Group)
-                    .aria_label("Area gambar tanda tangan")
-                    .w_full()
-                    .bg(gpui::rgb(0xffffff))
-                    .border_1()
-                    .border_color(cx.theme().border)
-                    .child(pad),
+                    .flex()
+                    .gap_2()
+                    .child(
+                        Button::new("signature-method-draw")
+                            .ghost()
+                            .label("Gambar")
+                            .selected(self.annotation.signature.method == SignatureMethod::Draw)
+                            .on_click(cx.listener(|s, _, _, cx| {
+                                s.annotation.signature.method = SignatureMethod::Draw;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        Button::new("signature-method-image")
+                            .ghost()
+                            .label("Dari gambar")
+                            .selected(self.annotation.signature.method == SignatureMethod::Image)
+                            .on_click(cx.listener(|s, _, _, cx| {
+                                s.annotation.signature.method = SignatureMethod::Image;
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(
+                if self.annotation.signature.method == SignatureMethod::Draw {
+                    "Gambar tanda tangan dengan mouse di area berikut."
+                } else {
+                    "Impor PNG/JPEG. Transparansi PNG dipertahankan."
+                },
+            )
+            .when(
+                self.annotation.signature.method == SignatureMethod::Draw,
+                |panel| {
+                    panel.child(
+                        gpui::div()
+                            .id("signature-pad")
+                            .role(gpui::Role::Group)
+                            .aria_label("Area gambar tanda tangan")
+                            .w_full()
+                            .bg(gpui::rgb(0xffffff))
+                            .border_1()
+                            .border_color(cx.theme().border)
+                            .child(pad),
+                    )
+                },
             );
         if let Some(preview) = &self.annotation.signature.preview {
             panel = panel.child(
@@ -151,11 +199,13 @@ impl DocumentSession {
         }
         panel.child(gpui::div().flex().gap_2()
             .child(Button::new("signature-undo").ghost().label("Undo goresan").disabled(self.annotation.signature.strokes.is_empty())
-                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.strokes.pop();cx.notify();})))
+                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.strokes.pop();s.annotation.signature.asset=None;s.annotation.signature.preview=None;cx.notify();})))
             .child(Button::new("signature-clear").ghost().label("Hapus semua")
-                .on_click(cx.listener(|s,_,_,cx|{let open=s.annotation.signature.open;s.annotation.signature=SignatureState{open,..Default::default()};cx.notify();})))
+                .on_click(cx.listener(|s,_,_,cx|{let open=s.annotation.signature.open;let method=s.annotation.signature.method;s.annotation.signature=SignatureState{open,method,..Default::default()};cx.notify();})))
             .child(Button::new("signature-import").ghost().label("Impor gambar")
                 .on_click(cx.listener(|s,_,_,cx|s.import_signature(cx)))))
+            .child(Button::new("signature-cancel").ghost().label("Batal tanda tangan")
+                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.open=false;s.annotation.signature.drawing=false;s.annotation_popup_changed(false,cx);cx.notify();})))
             .child(Button::new("signature-use").label("Gunakan tanda tangan")
                 .disabled(self.annotation.signature.asset.is_none() && self.annotation.signature.strokes.iter().all(|s|s.len()<2))
                 .on_click(cx.listener(|s,_,window,cx|{
@@ -196,6 +246,7 @@ impl DocumentSession {
                     s.opening = false;
                     match result {
                         Ok(asset) => {
+                            s.annotation.signature.method = SignatureMethod::Image;
                             s.annotation.signature.preview = asset_preview(&asset);
                             s.annotation.signature.asset = Some(Arc::new(asset));
                             s.annotation.signature.strokes.clear();

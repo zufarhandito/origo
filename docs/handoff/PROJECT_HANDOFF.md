@@ -1,5 +1,19 @@
 # Handoff terkini - 19 November 2026
 
+## Tanda tangan tahap 1 (20 November 2026)
+
+Pemilik mengotorisasi implementasi per tahap dengan commit terpisah. Cakupan
+individu/lokal: desktop dan QR LAN; kolaborasi/request/email/sertifikat ditunda.
+Editor kini memisahkan Gambar/Dari gambar, lebih lega (500 px), punya Batal,
+dan invalidasi cache pada Undo. Draw/import/placement tetap tanpa dirty sebelum
+objek ditempatkan. Fmt, Clippy denied warnings, build release dan 12 kasus UI
+signature lulus: termasuk metode/cancel, drop outside, move/resize Undo/Redo,
+import invalid/alpha, split view blocking, Save As/reopen/edit/delete. Bukti:
+`.research/signature-ui-08592b449cc1400f942b25df59b537e2`.
+Build masih isolated target/tab-background-check; instalasi final setelah tahap
+berikut selesai dan proses utama dipastikan tidak aktif. Tahap 2-5 masih berjalan.
+
+
 ## Riset peningkatan tanda tangan (20 November 2026)
 
 Pemilik meminta analisis iLovePDF dan plan dahulu. Riset primer iLovePDF web dan

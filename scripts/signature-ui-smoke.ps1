@@ -17,6 +17,10 @@ try {
     Menu-Action 'Tampilan' 'Sesuaikan halaman'
     Invoke 'Anotasi';Invoke 'Tanda tangan'
     if((Find 'Gunakan tanda tangan').Current.IsEnabled){throw 'Empty drawing must be disabled'}
+    Invoke 'Dari gambar';Invoke 'Gambar'
+    Invoke 'Batal tanda tangan';$null=Wait-State {param($s) -not $s.signaturePanel -and -not $s.dirty}
+    Invoke 'Tanda tangan';$null=Find 'Area gambar tanda tangan'
+    Pass 'editor-methods-cancel-no-dirty'
     Stroke 0.15 0.4 0.75 0.7 'Area gambar tanda tangan'
     $null=Wait-State {param($s) $s.signatureStrokes -eq 1 -and -not $s.dirty}
     Invoke 'Undo goresan';$null=Wait-State {param($s) $s.signatureStrokes -eq 0}
