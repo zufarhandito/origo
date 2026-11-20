@@ -16,6 +16,18 @@ try {
     $null=Wait-State {param($s) $s.pageCount -eq 4 -and -not $s.textLoading}
     Menu-Action 'Tampilan' 'Sesuaikan halaman'
     Invoke 'Anotasi';Invoke 'Tanda tangan'
+    Invoke 'Ketik'
+    $field=Find 'Nama atau inisial tanda tangan';$field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('Zufar Handito')
+    $null=Wait-State {param($s) $s.signatureAsset -and -not $s.dirty}
+    Invoke 'Dancing Script';Invoke 'Biru';Pass 'typed-font-color-offline-preview'
+    Invoke 'Inisial';$field=Find 'Nama atau inisial tanda tangan'
+    if($field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value -ne 'ZH'){throw 'Initials suggestion missing'}
+    $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('ZAH')
+    Invoke 'Gunakan tanda tangan';Stroke 0.4 0.4 0.4 0.4
+    $null=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty}
+    Invoke 'Undo';$null=Wait-State {param($s) $s.signatureCount -eq 0 -and -not $s.dirty}
+    Pass 'initials-edit-place-undo'
+    Invoke 'Tanda tangan';Invoke 'Tanda tangan penuh';Invoke 'Gambar';Invoke 'Hapus semua'
     if((Find 'Gunakan tanda tangan').Current.IsEnabled){throw 'Empty drawing must be disabled'}
     Invoke 'Dari gambar';Invoke 'Gambar'
     Invoke 'Batal tanda tangan';$null=Wait-State {param($s) -not $s.signaturePanel -and -not $s.dirty}
@@ -101,5 +113,11 @@ try {
     Pass 'reopen-delete-save-reopen'
     if((Get-FileHash $a).Hash -ne $hashA){throw 'Source changed'}
     Close-Window
+    if(-not $app.WaitForExit(3000)){
+        # Only the synthetic fixture process owned by this suite may be cleaned up.
+        $owned=Get-CimInstance Win32_Process -Filter "ProcessId=$($app.Id)"
+        if($owned.ExecutablePath -ne $exe -or -not $owned.CommandLine.Contains($directory)){throw 'Refusing cleanup of non-test process'}
+        Stop-Process -Id $app.Id
+    }
     Write-Host "Signature evidence: $directory"
 } catch {Capture 'failure.png';throw}

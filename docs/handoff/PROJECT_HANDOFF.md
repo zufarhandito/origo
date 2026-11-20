@@ -1,5 +1,19 @@
 # Handoff terkini - 19 November 2026
 
+## Tanda tangan tahap 2 (20 November 2026)
+
+Ketik memakai font Caveat/Dancing Script OFL yang dibundel untuk offline, tiga
+warna, input nama dan inisial terpisah, saran inisial editable. Raster font punya
+alpha dan warna konsisten; input 1-80 karakter, kontrol/glyph unsupported ditolak.
+Signature/stamp PDF tetap memakai format visual existing. Fontdue 0.9.5 ditambah.
+14 unit tests dan Clippy denied warnings lulus. Build release lulus; 14 kasus UI
+signature termasuk typed font/color dan inisial place/undo lulus; screenshot font
+diperiksa. Bukti `.research/signature-ui-586caa41a311438a80b9368f9c734404`.
+Cleanup graceful suite tertahan pada window uji; cleanup kini hanya boleh
+mengakhiri process yang cocok exe+path fixture milik suite, bukan proses pengguna.
+Batas dan fitur aktual ada di signatures.md. Tahap 3-5 masih berlangsung.
+
+
 ## Tanda tangan tahap 1 (20 November 2026)
 
 Pemilik mengotorisasi implementasi per tahap dengan commit terpisah. Cakupan

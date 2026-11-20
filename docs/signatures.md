@@ -72,3 +72,12 @@ Batal menutup editor tanpa menandai PDF berubah; draft tetap tersedia dalam view
 Undo goresan membuang cache aset/preview agar hasil tidak memakai goresan lama.
 Impor menampilkan preview dan memilih metode gambar. Penempatan dan ekspor tetap
 memakai alur existing. Tahap type/initial/stamp/library/QR belum termasuk tahap ini.
+
+## Ketik dan inisial (tahap 2)
+
+Pilih Tanda tangan penuh atau Inisial lalu Ketik. Nama dan inisial punya input
+terpisah; saran inisial dari huruf pertama nama dapat diedit. Pilih Caveat atau
+Dancing Script serta Hitam/Biru/Merah. Font dan lisensi OFL disertakan dalam binary
+agar bekerja offline. Maksimal 80 karakter satu baris; glyph tidak didukung
+menghasilkan error, bukan diganti kotak kosong. Preview dan output memakai aset
+raster yang sama. Tidak ada font installation atau upload.

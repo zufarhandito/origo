@@ -30,6 +30,7 @@ mod reading_position;
 mod search;
 mod shared_workspace;
 mod shell;
+mod signature_text;
 mod signatures;
 mod splitting;
 mod transitions;
