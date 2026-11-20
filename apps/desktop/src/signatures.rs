@@ -23,6 +23,7 @@ pub(super) enum SignatureKind {
     #[default]
     Signature,
     Initials,
+    Stamp,
 }
 #[derive(Default)]
 pub(super) struct SignatureState {
@@ -33,6 +34,8 @@ pub(super) struct SignatureState {
     pub initials: Option<Entity<InputState>>,
     pub style: usize,
     pub color: usize,
+    pub remove_white: bool,
+    pub thickness: usize,
     pub imported: Option<Arc<SignatureImage>>,
     pub drawing: bool,
     pub strokes: Vec<Vec<[f32; 2]>>,
@@ -63,7 +66,7 @@ impl DocumentSession {
                 s.annotation.draft = None;
                 cx.notify();
             }))
-            .content(move |_, _, cx| owner.update(cx, |s, cx| s.signature_panel(cx)))
+            .content(move |_, window, cx| owner.update(cx, |s, cx| s.signature_panel(window, cx)))
             .into_any_element()
     }
     fn init_signature_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -116,7 +119,10 @@ impl DocumentSession {
         }
         cx.notify();
     }
-    fn signature_method(&mut self, method: SignatureMethod, cx: &mut Context<Self>) {
+    fn signature_method(&mut self, mut method: SignatureMethod, cx: &mut Context<Self>) {
+        if self.annotation.signature.kind == SignatureKind::Stamp {
+            method = SignatureMethod::Image;
+        }
         self.annotation.signature.method = method;
         self.annotation.signature.error = None;
         if method == SignatureMethod::Text {
@@ -124,10 +130,28 @@ impl DocumentSession {
             return;
         }
         self.annotation.signature.asset = if method == SignatureMethod::Draw {
-            draw_asset(&self.annotation.signature.strokes).map(Arc::new)
+            draw_asset_with(
+                &self.annotation.signature.strokes,
+                signature_color(self.annotation.signature.color),
+                self.annotation.signature.thickness,
+            )
+            .map(Arc::new)
         } else {
-            self.annotation.signature.imported.clone()
+            self.annotation
+                .signature
+                .imported
+                .as_deref()
+                .and_then(|a| image_variant(a, self.annotation.signature.remove_white))
+                .map(Arc::new)
         };
+        if method == SignatureMethod::Image
+            && self.annotation.signature.remove_white
+            && self.annotation.signature.asset.is_none()
+        {
+            self.annotation.signature.error = Some(
+                "Tidak ada isi tersisa setelah latar putih dihapus. Kembalikan gambar asli.".into(),
+            );
+        }
         self.annotation.signature.preview = self
             .annotation
             .signature
@@ -136,14 +160,16 @@ impl DocumentSession {
             .and_then(asset_preview);
         cx.notify();
     }
-    fn signature_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    fn signature_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
         let weak = cx.weak_entity();
         let strokes = self.annotation.signature.strokes.clone();
+        let color = signature_color(self.annotation.signature.color);
+        let thickness = [2., 4., 6.][self.annotation.signature.thickness.min(2)];
         let pad = gpui::canvas(
             |_, _, _| {},
             move |bounds, _, window, _| {
                 for stroke in &strokes {
-                    let mut path = gpui::PathBuilder::stroke(px(2.));
+                    let mut path = gpui::PathBuilder::stroke(px(thickness));
                     for (i, p) in stroke.iter().enumerate() {
                         let p = bounds.origin
                             + gpui::point(bounds.size.width * p[0], bounds.size.height * p[1]);
@@ -154,7 +180,14 @@ impl DocumentSession {
                         }
                     }
                     if let Ok(path) = path.build() {
-                        window.paint_path(path, gpui::rgb(0x191919));
+                        window.paint_path(
+                            path,
+                            gpui::rgb(
+                                (u32::from(color[0]) << 16)
+                                    | (u32::from(color[1]) << 8)
+                                    | u32::from(color[2]),
+                            ),
+                        );
                     }
                 }
                 let down = weak.clone();
@@ -204,7 +237,11 @@ impl DocumentSession {
                     if phase == gpui::DispatchPhase::Bubble && e.button == gpui::MouseButton::Left {
                         let _ = weak.update(cx, |s, cx| {
                             s.annotation.signature.drawing = false;
-                            if let Some(asset) = draw_asset(&s.annotation.signature.strokes) {
+                            if let Some(asset) = draw_asset_with(
+                                &s.annotation.signature.strokes,
+                                signature_color(s.annotation.signature.color),
+                                s.annotation.signature.thickness,
+                            ) {
                                 s.annotation.signature.preview = asset_preview(&asset);
                                 s.annotation.signature.asset = Some(Arc::new(asset));
                             }
@@ -217,6 +254,9 @@ impl DocumentSession {
         .w_full()
         .h(px(180.));
         let mut panel = gpui::div()
+            .id("signature-editor-scroll")
+            .max_h((window.viewport_size().height - px(180.)).max(px(240.)))
+            .overflow_y_scroll()
             .w(px(500.))
             .max_w_full()
             .flex()
@@ -229,6 +269,7 @@ impl DocumentSession {
                     [
                         (SignatureKind::Signature, "Tanda tangan penuh"),
                         (SignatureKind::Initials, "Inisial"),
+                        (SignatureKind::Stamp, "Stempel"),
                     ]
                     .into_iter()
                     .map(|(kind, label)| {
@@ -260,7 +301,14 @@ impl DocumentSession {
                                         });
                                     }
                                 }
-                                s.signature_method(s.annotation.signature.method, cx);
+                                s.signature_method(
+                                    if kind == SignatureKind::Stamp {
+                                        SignatureMethod::Image
+                                    } else {
+                                        s.annotation.signature.method
+                                    },
+                                    cx,
+                                );
                             }))
                     }),
                 ),
@@ -273,6 +321,7 @@ impl DocumentSession {
                         Button::new("signature-method-text")
                             .ghost()
                             .label("Ketik")
+                            .disabled(self.annotation.signature.kind == SignatureKind::Stamp)
                             .selected(self.annotation.signature.method == SignatureMethod::Text)
                             .on_click(cx.listener(|s, _, _, cx| {
                                 s.signature_method(SignatureMethod::Text, cx)
@@ -282,6 +331,7 @@ impl DocumentSession {
                         Button::new("signature-method-draw")
                             .ghost()
                             .label("Gambar")
+                            .disabled(self.annotation.signature.kind == SignatureKind::Stamp)
                             .selected(self.annotation.signature.method == SignatureMethod::Draw)
                             .on_click(cx.listener(|s, _, _, cx| {
                                 s.signature_method(SignatureMethod::Draw, cx);
@@ -366,6 +416,56 @@ impl DocumentSession {
                 ),
             );
         }
+        if self.annotation.signature.method == SignatureMethod::Draw {
+            panel = panel.child(
+                gpui::div().flex().gap_2().children(
+                    ["Hitam", "Biru", "Merah"]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(color, label)| {
+                            Button::new(("signature-draw-color", color))
+                                .ghost()
+                                .label(label)
+                                .selected(self.annotation.signature.color == color)
+                                .on_click(cx.listener(move |s, _, _, cx| {
+                                    s.annotation.signature.color = color;
+                                    s.signature_method(SignatureMethod::Draw, cx);
+                                }))
+                        }),
+                ),
+            );
+            panel =
+                panel.child(gpui::div().flex().gap_2().children(
+                    ["Tipis", "Sedang", "Tebal"].into_iter().enumerate().map(
+                        |(thickness, label)| {
+                            Button::new(("signature-thickness", thickness))
+                                .ghost()
+                                .label(label)
+                                .selected(self.annotation.signature.thickness == thickness)
+                                .on_click(cx.listener(move |s, _, _, cx| {
+                                    s.annotation.signature.thickness = thickness;
+                                    s.signature_method(SignatureMethod::Draw, cx);
+                                }))
+                        },
+                    ),
+                ));
+        }
+        if self.annotation.signature.method == SignatureMethod::Image {
+            panel = panel
+                .child(
+                    Button::new("signature-remove-white")
+                        .ghost()
+                        .label("Hapus latar putih")
+                        .selected(self.annotation.signature.remove_white)
+                        .disabled(self.annotation.signature.imported.is_none())
+                        .on_click(cx.listener(|s, _, _, cx| {
+                            s.annotation.signature.remove_white =
+                                !s.annotation.signature.remove_white;
+                            s.signature_method(SignatureMethod::Image, cx);
+                        })),
+                )
+                .child("Penghapusan latar opsional. Klik lagi untuk mengembalikan gambar asli.");
+        }
         if let Some(preview) = &self.annotation.signature.preview {
             panel = panel.child(
                 gpui::div()
@@ -386,9 +486,9 @@ impl DocumentSession {
             .child(Button::new("signature-cancel").ghost().label("Batal tanda tangan")
                 .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.open=false;s.annotation.signature.drawing=false;s.annotation_popup_changed(false,cx);cx.notify();})))
             .child(Button::new("signature-use").label("Gunakan tanda tangan")
-                .disabled(self.annotation.signature.asset.is_none() && self.annotation.signature.strokes.iter().all(|s|s.len()<2))
+                .disabled(self.annotation.signature.asset.is_none() && (self.annotation.signature.method!=SignatureMethod::Draw || self.annotation.signature.strokes.iter().all(|s|s.len()<2)))
                 .on_click(cx.listener(|s,_,window,cx|{
-                    if s.annotation.signature.asset.is_none(){s.annotation.signature.asset=draw_asset(&s.annotation.signature.strokes).map(Arc::new);}
+                    if s.annotation.signature.asset.is_none() && s.annotation.signature.method==SignatureMethod::Draw {s.annotation.signature.asset=draw_asset_with(&s.annotation.signature.strokes,signature_color(s.annotation.signature.color),s.annotation.signature.thickness).map(Arc::new);}
                     if s.annotation.signature.asset.is_some(){
                         s.annotation_popup(false);s.annotation.signature.placing=true;s.annotation.signature.open=false;
                         s.annotation.tool=crate::annotations::Tool::Select;
@@ -429,6 +529,7 @@ impl DocumentSession {
                             s.annotation.signature.preview = asset_preview(&asset);
                             s.annotation.signature.asset = Some(Arc::new(asset));
                             s.annotation.signature.imported = s.annotation.signature.asset.clone();
+                            s.annotation.signature.remove_white = false;
                             s.annotation.signature.strokes.clear();
                             s.annotation.signature.error = None;
                         }
@@ -560,7 +661,15 @@ fn pad_point(bounds: Bounds<gpui::Pixels>, p: gpui::Point<gpui::Pixels>) -> [f32
         (f32::from(p.y - bounds.origin.y) / f32::from(bounds.size.height)).clamp(0., 1.),
     ]
 }
+#[cfg(test)]
 fn draw_asset(strokes: &[Vec<[f32; 2]>]) -> Option<SignatureImage> {
+    draw_asset_with(strokes, [25, 25, 25], 0)
+}
+fn draw_asset_with(
+    strokes: &[Vec<[f32; 2]>],
+    color: [u8; 3],
+    thickness: usize,
+) -> Option<SignatureImage> {
     let mut rgba = vec![0; 512 * 256 * 4];
     for stroke in strokes {
         for pair in stroke.windows(2) {
@@ -572,12 +681,13 @@ fn draw_asset(strokes: &[Vec<[f32; 2]>]) -> Option<SignatureImage> {
                 let t = i as f32 / steps.max(1) as f32;
                 let x = (p[0] * 511. + dx * t) as i32;
                 let y = (p[1] * 255. + dy * t) as i32;
-                for oy in -1..=1 {
-                    for ox in -1..=1 {
+                let radius = (thickness.min(2) + 1) as i32;
+                for oy in -radius..=radius {
+                    for ox in -radius..=radius {
                         let (x, y) = (x + ox, y + oy);
                         if (0..512).contains(&x) && (0..256).contains(&y) {
                             let at = (y as usize * 512 + x as usize) * 4;
-                            rgba[at..at + 4].copy_from_slice(&[25, 25, 25, 255]);
+                            rgba[at..at + 4].copy_from_slice(&[color[0], color[1], color[2], 255]);
                         }
                     }
                 }
@@ -649,12 +759,43 @@ fn load_asset(path: &std::path::Path) -> Result<SignatureImage, String> {
     let mut image = image::DynamicImage::from_decoder(decoder)
         .map_err(|_| "Gambar rusak atau terlalu besar.")?;
     image.apply_orientation(orientation);
-    let image = if image.width() > 512 || image.height() > 256 {
-        image.thumbnail(512, 256).to_rgba8()
+    let (w, h) = (image.width() as f64, image.height() as f64);
+    let scale = (512. * 256. / (w * h))
+        .sqrt()
+        .min(512. / w)
+        .min(512. / h)
+        .min(1.);
+    let image = if scale < 1. {
+        image
+            .resize_exact(
+                (w * scale).floor().max(1.) as u32,
+                (h * scale).floor().max(1.) as u32,
+                image::imageops::FilterType::Lanczos3,
+            )
+            .to_rgba8()
     } else {
         image.to_rgba8()
     };
     crop_asset(image).ok_or_else(|| "Gambar sepenuhnya transparan.".into())
+}
+fn image_variant(asset: &SignatureImage, remove_white: bool) -> Option<SignatureImage> {
+    let mut image = image::RgbaImage::from_raw(asset.width, asset.height, asset.rgba.clone())?;
+    if remove_white {
+        for p in image.pixels_mut() {
+            let low = p[0].min(p[1]).min(p[2]);
+            let high = p[0].max(p[1]).max(p[2]);
+            if low >= 220 && high - low <= 20 {
+                let opacity = 255 - u16::from(low);
+                for i in 0..3 {
+                    p[i] = ((u16::from(p[i]) - u16::from(low)) * 255)
+                        .checked_div(opacity)
+                        .unwrap_or(0) as u8;
+                }
+                p[3] = (u16::from(p[3]) * opacity / 255) as u8;
+            }
+        }
+    }
+    crop_asset(image)
 }
 fn asset_preview(asset: &SignatureImage) -> Option<Arc<RenderImage>> {
     let mut rgba = asset.rgba.clone();
@@ -670,6 +811,35 @@ fn asset_preview(asset: &SignatureImage) -> Option<Arc<RenderImage>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stamp_aspect_budget_and_optional_white_removal() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("stamp.png");
+        let mut image = image::RgbaImage::from_pixel(600, 600, image::Rgba([255; 4]));
+        for y in 100..500 {
+            for x in 100..500 {
+                image.put_pixel(x, y, image::Rgba([20, 60, 160, 255]));
+            }
+        }
+        image.save(&path)?;
+        let asset = load_asset(&path).map_err(anyhow::Error::msg)?;
+        assert!(asset.valid());
+        assert_eq!(asset.width, asset.height);
+        assert!(asset.height > 256);
+        assert!(asset.width * asset.height <= 512 * 256);
+        let original = image_variant(&asset, false).ok_or_else(|| anyhow::anyhow!("original"))?;
+        assert_eq!(original, asset);
+        let removed = image_variant(&asset, true).ok_or_else(|| anyhow::anyhow!("removed"))?;
+        assert!(removed.width < asset.width);
+        assert!(removed.valid());
+        let white = SignatureImage {
+            width: 1,
+            height: 1,
+            rgba: vec![255; 4],
+        };
+        assert!(image_variant(&white, true).is_none());
+        Ok(())
+    }
     #[test]
     fn draw_crop_and_import_are_bounded_and_preserve_alpha() -> anyhow::Result<()> {
         assert!(draw_asset(&[]).is_none());

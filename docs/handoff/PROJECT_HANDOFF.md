@@ -1,5 +1,18 @@
 # Handoff terkini - 19 November 2026
 
+## Tanda tangan tahap 3 (20 November 2026)
+
+Stempel impor, hapus latar putih opt-in/reset, draw color/thickness dan editor
+scroll tersedia. Raster dibatasi total 131072 piksel dan 512 per sisi; stempel
+persegi sekitar 362 x 362, tanpa menaikkan budget 512 KiB/aset atau delapan objek.
+Metadata lama tetap valid; build lama bisa menolak aset dengan tinggi >256 px.
+Fmt, Clippy desktop/domain denied warnings, 15 desktop + 10 domain tests, release
+build dan 14 kasus UI lulus. Suite kini menempatkan stempel persegi berwarna,
+menghapus latar, Save As dan reopen/delete/reopen dengan sumber utuh. Bukti:
+`.research/signature-ui-8b6b948ebcc245e4a799bc334c777730`.
+Tahap pustaka lokal/placement dan QR LAN berikutnya; binary masih isolated.
+
+
 ## Tanda tangan tahap 2 (20 November 2026)
 
 Ketik memakai font Caveat/Dancing Script OFL yang dibundel untuk offline, tiga

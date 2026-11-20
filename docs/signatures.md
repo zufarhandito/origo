@@ -24,10 +24,9 @@ objek dan history; draft/pad/selection per view.
 
 ## Gambar, kualitas dan privasi
 
-PNG mempertahankan alpha. JPEG mempertahankan latarnya; penghapusan latar putih
-belum tersedia. Orientasi EXIF diterapkan. Pinggir transparan dipotong otomatis;
+PNG mempertahankan alpha. JPEG mempertahankan latarnya; penghapusan latar putih tersedia secara opsional dengan preview dan reset. Orientasi EXIF diterapkan. Pinggir transparan dipotong otomatis;
 isi gambar tidak dipotong berdasarkan warna. Gambar diperkecil bila perlu ke
-maksimal 512 ? 256 piksel; tidak memperbesar gambar kecil. Tanda tangan gambar
+maksimal 131072 piksel total dan 512 piksel per sisi; tidak memperbesar gambar kecil. Tanda tangan gambar
 akan kehilangan ketajaman jika diperbesar jauh di atas resolusi tersebut.
 
 Input maksimal 8 MiB, dimensi maksimal 8192 per sisi, budget decode 64 MiB. Hanya
@@ -52,7 +51,7 @@ milik aplikasi dengan validasi terbatas dan menolak key aktif/subtype palsu.
 
 Ini tanda tangan visual, tanpa sertifikat kriptografis, validasi identitas atau audit
 trail. Dukungan PDF yang sudah ditandatangani secara digital mengikuti pembatasan
-lama. Edit Stamp pihak ketiga, SVG, ketikan nama, rotasi objek sendiri, duplicate,
+lama. Edit Stamp pihak ketiga, SVG, rotasi objek sendiri, duplicate,
 gerak keyboard, template permanen, pressure sensitivity dan background removal belum
 tersedia. Rotasi halaman ikut memutar tanda tangan bersama isi halaman.
 
@@ -81,3 +80,15 @@ Dancing Script serta Hitam/Biru/Merah. Font dan lisensi OFL disertakan dalam bin
 agar bekerja offline. Maksimal 80 karakter satu baris; glyph tidak didukung
 menghasilkan error, bukan diganti kotak kosong. Preview dan output memakai aset
 raster yang sama. Tidak ada font installation atau upload.
+
+## Stempel dan kualitas (tahap 3)
+
+Jenis Stempel memakai impor PNG/JPEG. Tombol Hapus latar putih bersifat opt-in,
+klik lagi mengembalikan aset asli; gambar warna tidak otomatis direcolor.
+Batas total raster tetap 131072 piksel (512 KiB RGBA/aset); masing-masing sisi
+boleh sampai 512 sehingga stempel persegi dapat sekitar 362 x 362 dan stempel
+tinggi tidak dipaksa ke rasio tanda tangan lebar. Batas delapan objek tidak naik.
+Metadata lama tetap diterima, tetapi build lama mungkin menolak aset yang tingginya
+melebihi 256 px. Template SVG/generator stempel belum tersedia.
+Draw kini memiliki warna Hitam/Biru/Merah dan ketebalan Tipis/Sedang/Tebal.
+Editor scroll mengikuti tinggi jendela agar kontrol tidak hilang pada layar pendek.

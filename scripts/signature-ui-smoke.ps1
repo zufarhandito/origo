@@ -60,18 +60,20 @@ try {
     $s=Wait-State {param($s) ($s.signatureRects[0][1][0]-$s.signatureRects[0][0][0]) -gt $width+0.05}
     Pass 'proportional-corner-resize'
     $png=Join-Path $directory 'signature.png'
-    $bitmap=New-Object Drawing.Bitmap 160,60;$graphics=[Drawing.Graphics]::FromImage($bitmap);$graphics.Clear([Drawing.Color]::Transparent)
+    $bitmap=New-Object Drawing.Bitmap 160,160;$graphics=[Drawing.Graphics]::FromImage($bitmap);$graphics.Clear([Drawing.Color]::White)
     $pen=New-Object Drawing.Pen ([Drawing.Color]::FromArgb(180,20,70,180)),4
-    $graphics.DrawLine($pen,10,40,60,10);$graphics.DrawLine($pen,60,10,140,45);$bitmap.Save($png,[Drawing.Imaging.ImageFormat]::Png)
+    $graphics.DrawEllipse($pen,10,10,140,140);$graphics.DrawLine($pen,30,80,130,80);$bitmap.Save($png,[Drawing.Imaging.ImageFormat]::Png)
     $pen.Dispose();$graphics.Dispose();$bitmap.Dispose()
     Invoke 'Tanda tangan'
+    Invoke 'Stempel'
     $bad=Join-Path $directory 'bad.png';[IO.File]::WriteAllText($bad,'invalid image')
     Picker 'Impor gambar';Fill-Picker $bad
     $null=Wait-State {param($s) $s.signatureError -and $s.signatureCount -eq 1}
     Pass 'invalid-image-keeps-document'
     Picker 'Impor gambar';Fill-Picker $png
     $null=Wait-State {param($s) $s.signatureAsset -and -not $s.signatureError}
-    Pass 'import-transparent-png-preview'
+    Invoke 'Hapus latar putih';$null=Wait-State {param($s) $s.signatureAsset -and -not $s.signatureError}
+    Pass 'stamp-square-white-removal-preview'
     Invoke 'Gunakan tanda tangan';Stroke 0.4 0.7 0.4 0.7
     $null=Wait-State {param($s) $s.signatureCount -eq 2}
     Menu-Action 'Tampilan' 'Tampilan kedua PDF ini'

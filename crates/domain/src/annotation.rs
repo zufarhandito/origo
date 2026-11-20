@@ -97,7 +97,8 @@ impl SignatureImage {
         self.width > 0
             && self.height > 0
             && self.width <= 512
-            && self.height <= 256
+            && self.height <= 512
+            && u64::from(self.width) * u64::from(self.height) <= 512 * 256
             && self.rgba.len() == self.width as usize * self.height as usize * 4
     }
     fn hex(&self) -> String {
@@ -107,7 +108,8 @@ impl SignatureImage {
         if width == 0
             || height == 0
             || width > 512
-            || height > 256
+            || height > 512
+            || u64::from(width) * u64::from(height) > 512 * 256
             || text.len() != width as usize * height as usize * 8
         {
             return None;
@@ -159,6 +161,22 @@ mod tests {
             })),
         };
         assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
+        let square = SignatureImage {
+            width: 362,
+            height: 362,
+            rgba: vec![0; 362 * 362 * 4],
+        };
+        assert!(square.valid());
+        a.signature = Some(std::sync::Arc::new(square));
+        assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
+        assert!(
+            !SignatureImage {
+                width: 512,
+                height: 512,
+                rgba: vec![0; 512 * 512 * 4]
+            }
+            .valid()
+        );
         a.points.swap(0, 1);
         assert!(!a.valid());
         assert!(Annotation::from_name(&a.name()).is_none());
