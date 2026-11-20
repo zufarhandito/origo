@@ -1,4 +1,4 @@
-//! Local visual signatures. No certificate field or template persistence.
+//! Local visual signatures with opt-in templates; no certificate fields.
 use crate::*;
 use gpui::component::{
     ActiveTheme, Disableable, Selectable,
@@ -30,6 +30,11 @@ pub(super) struct SignatureState {
     pub open: bool,
     pub method: SignatureMethod,
     pub kind: SignatureKind,
+    pub library: Vec<crate::signature_library::Entry>,
+    pub library_ready: bool,
+    pub library_loading: bool,
+    pub library_selected: Option<String>,
+    pub library_label: Option<Entity<InputState>>,
     pub text: Option<Entity<InputState>>,
     pub initials: Option<Entity<InputState>>,
     pub style: usize,
@@ -60,6 +65,9 @@ impl DocumentSession {
             .open(self.annotation.signature.open)
             .on_open_change(cx.listener(|s, open, window, cx| {
                 s.init_signature_text(window, cx);
+                if *open {
+                    s.load_signature_library(cx);
+                }
                 s.annotation_popup_changed(*open, cx);
                 s.annotation.signature.open = *open;
                 s.annotation.signature.drawing = false;
@@ -73,6 +81,8 @@ impl DocumentSession {
         if self.annotation.signature.text.is_some() {
             return;
         }
+        self.annotation.signature.library_label =
+            Some(cx.new(|cx| InputState::new(window, cx).placeholder("Nama template (opsional)")));
         let input = cx.new(|cx| InputState::new(window, cx).placeholder("Nama atau inisial"));
         cx.subscribe_in(&input, window, |s, _, event: &InputEvent, _, cx| {
             if matches!(event, InputEvent::Change)
@@ -255,7 +265,7 @@ impl DocumentSession {
         .h(px(180.));
         let mut panel = gpui::div()
             .id("signature-editor-scroll")
-            .max_h((window.viewport_size().height - px(180.)).max(px(240.)))
+            .max_h((window.viewport_size().height - px(330.)).max(px(240.)))
             .overflow_y_scroll()
             .w(px(500.))
             .max_w_full()
@@ -473,10 +483,11 @@ impl DocumentSession {
                     .child(gpui::img(preview.clone()).h(px(90.)).max_w_full()),
             );
         }
+        panel = panel.child(self.signature_library_panel(cx));
         if let Some(error) = &self.annotation.signature.error {
             panel = panel.child(error.clone());
         }
-        panel.child(gpui::div().flex().gap_2()
+        gpui::div().w(px(500.)).max_w_full().flex().flex_col().gap_2().child(panel).child(gpui::div().flex().gap_2()
             .child(Button::new("signature-undo").ghost().label("Undo goresan").disabled(self.annotation.signature.strokes.is_empty())
                 .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.strokes.pop();s.annotation.signature.asset=None;s.annotation.signature.preview=None;cx.notify();})))
             .child(Button::new("signature-clear").ghost().label("Hapus semua")
@@ -545,6 +556,71 @@ impl DocumentSession {
             }
         })
         .detach();
+    }
+    pub(super) fn change_selected_signature(
+        &mut self,
+        duplicate: bool,
+        delta: [f32; 2],
+        cx: &mut Context<Self>,
+    ) {
+        if self.edits_locked()
+            || self.opening
+            || self.annotation.signature.open
+            || !self.annotation.open
+        {
+            return;
+        }
+        let Some((page, id)) = self.annotation.selected else {
+            return;
+        };
+        let Some(mut w) = self.workspace.as_mut() else {
+            return;
+        };
+        if duplicate
+            && w.pages()
+                .iter()
+                .map(|p| {
+                    w.annotations(p.id)
+                        .iter()
+                        .filter(|a| a.signature.is_some())
+                        .count()
+                })
+                .sum::<usize>()
+                >= 8
+        {
+            self.status = "Maksimal delapan tanda tangan/stempel per dokumen.".into();
+            cx.notify();
+            return;
+        }
+        let turns = w
+            .pages()
+            .iter()
+            .position(|p| p.id == page)
+            .and_then(|i| w.geometry(i).ok())
+            .map(|g| g.quarter_turns)
+            .unwrap_or(0);
+        let delta = signature_delta(delta, turns);
+        let mut all = w.annotations(page).to_vec();
+        let Some(index) = all.iter().position(|a| a.id == id && a.signature.is_some()) else {
+            return;
+        };
+        let mut asset = all[index].clone();
+        let dx = delta[0].clamp(-asset.points[0][0], 1. - asset.points[1][0]);
+        let dy = delta[1].clamp(-asset.points[0][1], 1. - asset.points[1][1]);
+        for p in &mut asset.points {
+            p[0] += dx;
+            p[1] += dy;
+        }
+        if duplicate {
+            asset.id = w.allocate_annotation_id();
+            all.push(asset.clone());
+        } else {
+            all[index] = asset.clone();
+        }
+        drop(w);
+        self.set_annotations(page, all, cx);
+        self.annotation.selected = Some((page, asset.id));
+        cx.notify();
     }
     pub(super) fn signature_pointer(
         &mut self,
@@ -651,6 +727,11 @@ impl DocumentSession {
         }
         false
     }
+}
+fn signature_delta(delta: [f32; 2], turns: u8) -> [f32; 2] {
+    let point =
+        pdf_domain::annotation::rotate([0.5 + delta[0], 0.5 + delta[1]], (4 - turns % 4) % 4);
+    [point[0] - 0.5, point[1] - 0.5]
 }
 fn signature_color(index: usize) -> [u8; 3] {
     [[25, 25, 25], [30, 80, 180], [180, 35, 45]][index.min(2)]
@@ -797,7 +878,7 @@ fn image_variant(asset: &SignatureImage, remove_white: bool) -> Option<Signature
     }
     crop_asset(image)
 }
-fn asset_preview(asset: &SignatureImage) -> Option<Arc<RenderImage>> {
+pub(super) fn asset_preview(asset: &SignatureImage) -> Option<Arc<RenderImage>> {
     let mut rgba = asset.rgba.clone();
     for p in rgba.as_chunks_mut::<4>().0.iter_mut() {
         p.swap(0, 2);
@@ -811,6 +892,14 @@ fn asset_preview(asset: &SignatureImage) -> Option<Arc<RenderImage>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn keyboard_delta_follows_display_rotation() {
+        for turns in 0..4 {
+            let d = signature_delta([0.01, 0.], turns);
+            let p = pdf_domain::annotation::rotate([0.5 + d[0], 0.5 + d[1]], turns);
+            assert!((p[0] - 0.51).abs() < 0.0001 && (p[1] - 0.5).abs() < 0.0001);
+        }
+    }
     #[test]
     fn stamp_aspect_budget_and_optional_white_removal() -> anyhow::Result<()> {
         let dir = tempfile::tempdir()?;

@@ -35,7 +35,7 @@ PNG/JPEG diterima; file rusak dan gambar sepenuhnya transparan ditolak. Pad maks
 Maksimal delapan tanda tangan dalam model Workspace (termasuk halaman dihapus yang
 masih dipertahankan untuk Undo) dan delapan saat inspeksi satu sumber.
 
-Tidak ada upload atau pustaka template permanen. Draft hanya bertahan selama view
+Tidak ada upload ke layanan eksternal. Pustaka template lokal tersedia secara opt-in. Draft hanya bertahan selama view
 masih terbuka; tanda tangan yang ditempatkan tersimpan di PDF hasil ekspor. Metadata
 berisi raster tanda tangan agar bisa diedit ulang, sehingga penerima file juga
 menerima gambar tersebut.
@@ -51,8 +51,7 @@ milik aplikasi dengan validasi terbatas dan menolak key aktif/subtype palsu.
 
 Ini tanda tangan visual, tanpa sertifikat kriptografis, validasi identitas atau audit
 trail. Dukungan PDF yang sudah ditandatangani secara digital mengikuti pembatasan
-lama. Edit Stamp pihak ketiga, SVG, rotasi objek sendiri, duplicate,
-gerak keyboard, template permanen, pressure sensitivity dan background removal belum
+lama. Edit Stamp pihak ketiga, SVG, rotasi objek sendiri, pressure sensitivity dan background removal belum
 tersedia. Rotasi halaman ikut memutar tanda tangan bersama isi halaman.
 
 Lihat [testing](testing.md) untuk hasil aktual dan batas interoperabilitas.
@@ -76,7 +75,7 @@ memakai alur existing. Tahap type/initial/stamp/library/QR belum termasuk tahap 
 
 Pilih Tanda tangan penuh atau Inisial lalu Ketik. Nama dan inisial punya input
 terpisah; saran inisial dari huruf pertama nama dapat diedit. Pilih Caveat atau
-Dancing Script serta Hitam/Biru/Merah. Font dan lisensi OFL disertakan dalam binary
+Dancing Script serta Hitam/Biru/Merah. Font dibundel dalam binary dan berkas lisensi OFL disertakan di assets source
 agar bekerja offline. Maksimal 80 karakter satu baris; glyph tidak didukung
 menghasilkan error, bukan diganti kotak kosong. Preview dan output memakai aset
 raster yang sama. Tidak ada font installation atau upload.
@@ -92,3 +91,21 @@ Metadata lama tetap diterima, tetapi build lama mungkin menolak aset yang tinggi
 melebihi 256 px. Template SVG/generator stempel belum tersedia.
 Draw kini memiliki warna Hitam/Biru/Merah dan ketebalan Tipis/Sedang/Tebal.
 Editor scroll mengikuti tinggi jendela agar kontrol tidak hilang pada layar pendek.
+
+## Pustaka lokal dan penempatan (tahap 4)
+
+Isi Nama template lalu Simpan template untuk menyimpan aset secara eksplisit.
+Maksimal delapan template berlabel 1-40 karakter disimpan di signature-library.json
+pada direktori state lokal. File berisi gambar tanda tangan, bukan dokumen PDF;
+file ini tidak dienkripsi. Jangan simpan pada komputer bersama bila tidak diinginkan.
+Pilih Pakai template untuk preview, lalu Gunakan untuk placement. Ubah nama dan
+Hapus template hanya mengubah pustaka; anotasi yang sudah ditempatkan tidak berubah.
+Read/write pustaka berjalan di background dan serial, write atomik; data rusak
+menonaktifkan write agar file lama tidak ditimpa. Metadata file maksimal 10 MiB.
+
+Pilih objek tanda tangan/stempel: Duplikat tanda tangan atau Ctrl+D membuat salinan
+bergeser sedikit sebagai satu langkah Undo. Alt+panah menggeser objek terpilih
+sedikit per langkah, dibatasi ke halaman. Shortcut berlaku saat canvas fokus,
+sehingga mengetik pada input tidak menggeser objek. Batas delapan objek tetap.
+Rotasi objek dan terapkan ke banyak halaman belum termasuk checkpoint ini.
+Footer Gunakan/Batal serta aksi draft tetap terlihat; isi panjang dapat discroll.

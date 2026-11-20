@@ -1,5 +1,21 @@
 # Handoff terkini - 19 November 2026
 
+## Tanda tangan tahap 4 (20 November 2026)
+
+Pustaka lokal opt-in (maksimal delapan template), rename/delete/reuse tersedia.
+Storage signature-library.json dibatasi 10 MiB, serial/atomik di background;
+corrupt data menonaktifkan write. Menghapus template tidak mengubah objek PDF.
+Duplicate Ctrl+D/toolbar dan Alt+panah aktif saat canvas fokus, satu Undo/gesture;
+perhitungan keyboard mengikuti rotasi halaman. Footer aksi tetap terlihat.
+17 desktop unit tests, Clippy denied warnings, build release, 18 kasus signature
+UI serta suite restart/reuse/delete template lulus. Bukti lokal:
+`.research/signature-ui-ad4b950637e04b4386e86a9b4692f644` dan
+`.research/signature-library-ui-ba0aa8075fc144aaa1ad30d90ee06de4`.
+Run awal menemukan footer terdorong keluar viewport dan fokus keyboard tertinggal
+di tombol; kedua masalah diperbaiki dan rerun lulus. PDF sumber tetap utuh.
+Rotasi objek sendiri/multi-page apply masih follow-up; QR LAN tahap berikutnya.
+
+
 ## Tanda tangan tahap 3 (20 November 2026)
 
 Stempel impor, hapus latar putih opt-in/reset, draw color/thickness dan editor

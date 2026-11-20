@@ -3,6 +3,31 @@ impl DocumentSession {
     pub(super) fn document_actions(element: gpui::Div, cx: &mut Context<Self>) -> gpui::Div {
         element
             .key_context("PdfViewer")
+            .on_action(cx.listener(|s, _: &DuplicateSignature, window, cx| {
+                if s.focus.is_focused(window) {
+                    s.change_selected_signature(true, [0.02, 0.02], cx);
+                }
+            }))
+            .on_action(cx.listener(|s, _: &SignatureLeft, window, cx| {
+                if s.focus.is_focused(window) {
+                    s.change_selected_signature(false, [-0.005, 0.], cx);
+                }
+            }))
+            .on_action(cx.listener(|s, _: &SignatureRight, window, cx| {
+                if s.focus.is_focused(window) {
+                    s.change_selected_signature(false, [0.005, 0.], cx);
+                }
+            }))
+            .on_action(cx.listener(|s, _: &SignatureUp, window, cx| {
+                if s.focus.is_focused(window) {
+                    s.change_selected_signature(false, [0., -0.005], cx);
+                }
+            }))
+            .on_action(cx.listener(|s, _: &SignatureDown, window, cx| {
+                if s.focus.is_focused(window) {
+                    s.change_selected_signature(false, [0., 0.005], cx);
+                }
+            }))
             .on_action(cx.listener(|s, _: &PrintPdf, window, cx| s.show_print(window, cx)))
             .on_action(cx.listener(|this, _: &DeleteAnnotation, _, cx| this.delete_annotation(cx)))
             .on_action(cx.listener(|this, _: &FindText, window, cx| this.show_search(window, cx)))

@@ -121,7 +121,7 @@ pub(super) fn save_session(dir: &Path, snapshot: &SessionSnapshot) -> anyhow::Re
     write_atomic(dir, "session.json", &bytes)
 }
 
-fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> anyhow::Result<()> {
+pub(super) fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> anyhow::Result<()> {
     std::fs::create_dir_all(dir)?;
     let mut file = tempfile::NamedTempFile::new_in(dir)?;
     file.write_all(bytes)?;

@@ -229,6 +229,24 @@ impl DocumentSession {
         }
         if self.annotation.open {
             bar = bar.child(self.signature_button(cx));
+            if self.annotation.selected.is_some_and(|(page, id)| {
+                self.workspace.as_ref().is_some_and(|w| {
+                    w.annotations(page)
+                        .iter()
+                        .any(|a| a.id == id && a.signature.is_some())
+                })
+            }) {
+                bar = bar.child(
+                    Button::new("duplicate-signature")
+                        .ghost()
+                        .label("Duplikat tanda tangan")
+                        .tooltip("Duplikat: Ctrl+D. Geser: Alt+panah.")
+                        .on_click(cx.listener(|s, _, window, cx| {
+                            s.change_selected_signature(true, [0.02, 0.02], cx);
+                            s.focus.focus(window, cx);
+                        })),
+                )
+            }
         }
         bar.into_any_element()
     }
@@ -458,6 +476,7 @@ impl DocumentSession {
         drop(w);
         if self.signature_pointer(id, point, start, cx) {
             if start {
+                self.focus.focus(window, cx);
                 self.annotation.signature.gesture_bounds = Some(bounds);
             }
             return true;

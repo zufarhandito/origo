@@ -30,6 +30,8 @@ mod reading_position;
 mod search;
 mod shared_workspace;
 mod shell;
+mod signature_library;
+mod signature_templates_ui;
 mod signature_text;
 mod signatures;
 mod splitting;
@@ -45,6 +47,11 @@ actions!(
     pdf_studio,
     [
         DeleteAnnotation,
+        DuplicateSignature,
+        SignatureLeft,
+        SignatureRight,
+        SignatureUp,
+        SignatureDown,
         Open,
         CloseTab,
         NextTab,
@@ -223,6 +230,11 @@ fn main() -> anyhow::Result<()> {
                 KeyBinding::new("ctrl-z", UndoEdit, Some("PdfViewer")),
                 KeyBinding::new("ctrl-y", RedoEdit, Some("PdfViewer")),
                 KeyBinding::new("delete", DeleteAnnotation, Some("PdfViewer")),
+                KeyBinding::new("ctrl-d", DuplicateSignature, Some("PdfViewer")),
+                KeyBinding::new("alt-left", SignatureLeft, Some("PdfViewer")),
+                KeyBinding::new("alt-right", SignatureRight, Some("PdfViewer")),
+                KeyBinding::new("alt-up", SignatureUp, Some("PdfViewer")),
+                KeyBinding::new("alt-down", SignatureDown, Some("PdfViewer")),
                 KeyBinding::new("delete", DeletePages, Some("PageOrganizer")),
                 KeyBinding::new("ctrl-a", SelectPages, Some("PageOrganizer")),
                 KeyBinding::new("alt-up", MoveEarlier, Some("PageOrganizer")),

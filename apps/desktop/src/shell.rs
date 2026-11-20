@@ -21,6 +21,8 @@ pub(super) struct TabId(pub u64);
 pub(super) struct ViewId(pub u64);
 #[derive(Default)]
 pub(super) struct WindowResources {
+    pub templates_dir: Option<PathBuf>,
+    pub templates_lock: Arc<std::sync::Mutex<()>>,
     pub export_owner: AtomicU64,
     pub modal_owner: AtomicU64,
     pub annotation_popup_owner: AtomicU64,
@@ -124,7 +126,10 @@ impl WindowShell {
                 next_id: 1,
                 renderer: PdfiumRenderer::new(&sidecars),
                 sidecars,
-                resources: Arc::default(),
+                resources: Arc::new(WindowResources {
+                    templates_dir: state_dir.clone(),
+                    ..Default::default()
+                }),
                 page_budget,
                 thumbnail_budget,
                 metrics,

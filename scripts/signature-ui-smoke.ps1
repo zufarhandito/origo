@@ -20,6 +20,16 @@ try {
     $field=Find 'Nama atau inisial tanda tangan';$field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('Zufar Handito')
     $null=Wait-State {param($s) $s.signatureAsset -and -not $s.dirty}
     Invoke 'Dancing Script';Invoke 'Biru';Pass 'typed-font-color-offline-preview'
+    $field=Find 'Nama template tanda tangan';$field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('Pribadi')
+    Invoke 'Simpan template';$null=Wait-State {param($s) -not $s.opening -and -not $s.dirty}
+    $null=Find 'Pakai template: Pribadi';Pass 'local-template-save-no-dirty'
+    Invoke 'Pakai template: Pribadi'
+    $field=Find 'Nama template tanda tangan';$field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('Pribadi baru')
+    Invoke 'Ubah nama template';$null=Find 'Pakai template: Pribadi baru'
+    Invoke 'Pakai template: Pribadi baru';Invoke 'Hapus template';$null=Wait-State {param($s) -not $s.opening}
+    Pass 'local-template-use-rename-delete'
+    Invoke 'Ketik'
+
     Invoke 'Inisial';$field=Find 'Nama atau inisial tanda tangan'
     if($field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value -ne 'ZH'){throw 'Initials suggestion missing'}
     $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('ZAH')
@@ -48,6 +58,10 @@ try {
     Stroke 0.4 0.4 0.5 0.5
     $s=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty}
     Pass 'draw-place-drag-one-object'
+    Invoke 'Duplikat tanda tangan';$null=Wait-State {param($s) $s.signatureCount -eq 2}
+    Invoke 'Undo';$s=Wait-State {param($s) $s.signatureCount -eq 1}
+    Pass 'duplicate-signature-single-undo'
+
     $before=$s.signatureRects[0]|ConvertTo-Json -Compress
     $r=$s.signatureRects[0];$x=($r[0][0]+$r[1][0])/2;$y=($r[0][1]+$r[1][1])/2
     Stroke $x $y ($x+0.12) ($y+0.12)
@@ -59,6 +73,12 @@ try {
     Stroke $r[1][0] $r[1][1] ($r[1][0]+0.1) ($r[1][1]+0.05)
     $s=Wait-State {param($s) ($s.signatureRects[0][1][0]-$s.signatureRects[0][0][0]) -gt $width+0.05}
     Pass 'proportional-corner-resize'
+    $beforeNudge=$s.signatureRects[0][0][0]
+    [Windows.Forms.SendKeys]::SendWait('%{RIGHT}')
+    $null=Wait-State {param($s) $s.signatureRects[0][0][0] -gt $beforeNudge}
+    Invoke 'Undo';$s=Wait-State {param($s) [Math]::Abs($s.signatureRects[0][0][0]-$beforeNudge) -lt 0.001}
+    Pass 'keyboard-nudge-single-undo'
+
     $png=Join-Path $directory 'signature.png'
     $bitmap=New-Object Drawing.Bitmap 160,160;$graphics=[Drawing.Graphics]::FromImage($bitmap);$graphics.Clear([Drawing.Color]::White)
     $pen=New-Object Drawing.Pen ([Drawing.Color]::FromArgb(180,20,70,180)),4
