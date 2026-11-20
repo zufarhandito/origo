@@ -74,6 +74,8 @@ impl DocumentSession {
     pub(super) fn close_annotation_popups(&mut self) {
         self.annotation_popup(false);
         self.annotation.popup_open = false;
+        self.annotation.signature.phone = None;
+        self.annotation.signature.phone_qr = None;
         self.annotation.signature.open = false;
         self.annotation.signature.drawing = false;
         self.annotation.signature.gesture = None;

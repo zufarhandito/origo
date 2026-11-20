@@ -1,6 +1,6 @@
 # Riset dan rencana peningkatan tanda tangan
 
-Tanggal: 20 November 2026. Status: **usulan, belum izin implementasi**.
+Tanggal: 20 November 2026. Status awal: usulan. Pemilik kemudian mengotorisasi tahap 1-5 lokal/individu; lihat [fitur aktual](../signatures.md).
 Metode: dokumentasi resmi dan ekstraksi teks halaman publik iLovePDF web;
 pembanding Adobe Acrobat Reader desktop. Bukan uji interaktif vendor, tidak
 mengunggah dokumen. Percobaan fetch HTML mentah tambahan ditolak HTTP 403;
@@ -130,5 +130,7 @@ Rekomendasi: kerjakan 1-3 dahulu, lalu 4, sementara 5 dimulai spike terpisah.
 Pilih relay jika targetnya scan-and-use lintas jaringan; LAN jika prioritas utama
 sepenuhnya lokal. Ini rancangan Origo, bukan klaim arsitektur internal iLovePDF.
 Generator stempel teks/bulat adalah enhancement opsional Origo yang harus dipilih
-secara eksplisit, bukan fitur vendor yang sudah terbukti. Seluruh tahap di atas
-masih plan-only sampai pemilik memilih implementasi berikutnya.
+secara eksplisit, bukan fitur vendor yang sudah terbukti. Pemilik kemudian mengotorisasi tahap 1-5 pada 20 November 2026, memilih QR LAN
+dan pemakaian individu/lokal. Tahap 6 layanan kolaborasi ditunda. Rotasi objek,
+apply multi-page dan SVG tetap follow-up yang belum tersedia. Lihat fitur aktual
+dan handoff untuk hasil tes, commit dan batas implementasi.

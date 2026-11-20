@@ -104,4 +104,4 @@ tetap terlihat pada [matriks perangkat](device-acceptance.md).
 - Catatan `.research/PROJECT_HANDOFF_PRIVATE.md` dan PDF pengguna tetap lokal,
   gitignored, tidak dipindah ke docs, tidak di-commit atau diunggah.
 
-Rencana (belum implementasi): [peningkatan tanda tangan dan QR HP](research/signature-ux-roadmap.md).
+[Riset peningkatan tanda tangan dan QR HP](research/signature-ux-roadmap.md); tahap lokal/individu tersedia sesuai [fitur aktual](signatures.md).

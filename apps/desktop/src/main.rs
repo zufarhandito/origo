@@ -31,6 +31,8 @@ mod search;
 mod shared_workspace;
 mod shell;
 mod signature_library;
+mod signature_phone;
+mod signature_phone_ui;
 mod signature_templates_ui;
 mod signature_text;
 mod signatures;

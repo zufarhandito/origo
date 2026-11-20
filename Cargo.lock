@@ -4617,6 +4617,7 @@ dependencies = [
  "dunce",
  "embed-resource",
  "fontdue",
+ "getrandom 0.3.4",
  "gpui-kit",
  "image",
  "pdf-application",
@@ -4624,6 +4625,7 @@ dependencies = [
  "pdf-engine",
  "pdf-platform",
  "qpdf-adapter",
+ "qrcode",
  "serde_json",
  "smallvec",
  "tempfile",
@@ -4967,6 +4969,12 @@ dependencies = [
  "pdf-platform",
  "serde_json",
 ]
+
+[[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
 
 [[package]]
 name = "quick-error"

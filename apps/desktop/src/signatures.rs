@@ -28,6 +28,10 @@ pub(super) enum SignatureKind {
 #[derive(Default)]
 pub(super) struct SignatureState {
     pub open: bool,
+    pub phone: Option<crate::signature_phone::PhoneSession>,
+    pub phone_qr: Option<Arc<RenderImage>>,
+    pub phone_revision: u64,
+    pub phone_status: Option<String>,
     pub method: SignatureMethod,
     pub kind: SignatureKind,
     pub library: Vec<crate::signature_library::Entry>,
@@ -70,6 +74,10 @@ impl DocumentSession {
                 }
                 s.annotation_popup_changed(*open, cx);
                 s.annotation.signature.open = *open;
+                if !*open {
+                    s.annotation.signature.phone = None;
+                    s.annotation.signature.phone_qr = None;
+                }
                 s.annotation.signature.drawing = false;
                 s.annotation.draft = None;
                 cx.notify();
@@ -133,6 +141,10 @@ impl DocumentSession {
         if self.annotation.signature.kind == SignatureKind::Stamp {
             method = SignatureMethod::Image;
         }
+        self.annotation.signature.phone = None;
+        self.annotation.signature.phone_qr = None;
+        self.annotation.signature.phone_revision += 1;
+        self.annotation.signature.phone_status = None;
         self.annotation.signature.method = method;
         self.annotation.signature.error = None;
         if method == SignatureMethod::Text {
@@ -213,6 +225,9 @@ impl DocumentSession {
                             if s.annotation.signature.strokes.len() >= 128 {
                                 return;
                             }
+                            s.annotation.signature.phone = None;
+                            s.annotation.signature.phone_qr = None;
+                            s.annotation.signature.phone_revision += 1;
                             s.annotation.signature.drawing = true;
                             s.annotation.signature.asset = None;
                             s.annotation.signature.preview = None;
@@ -367,7 +382,8 @@ impl DocumentSession {
                 },
             )
             .when(
-                self.annotation.signature.method == SignatureMethod::Draw,
+                self.annotation.signature.method == SignatureMethod::Draw
+                    && self.annotation.signature.phone.is_none(),
                 |panel| {
                     panel.child(
                         gpui::div()
@@ -426,7 +442,9 @@ impl DocumentSession {
                 ),
             );
         }
-        if self.annotation.signature.method == SignatureMethod::Draw {
+        if self.annotation.signature.method == SignatureMethod::Draw
+            && self.annotation.signature.phone.is_none()
+        {
             panel = panel.child(
                 gpui::div().flex().gap_2().children(
                     ["Hitam", "Biru", "Merah"]
@@ -476,6 +494,9 @@ impl DocumentSession {
                 )
                 .child("Penghapusan latar opsional. Klik lagi untuk mengembalikan gambar asli.");
         }
+        if self.annotation.signature.method == SignatureMethod::Draw {
+            panel = panel.child(self.signature_phone_panel(cx));
+        }
         if let Some(preview) = &self.annotation.signature.preview {
             panel = panel.child(
                 gpui::div()
@@ -483,7 +504,9 @@ impl DocumentSession {
                     .child(gpui::img(preview.clone()).h(px(90.)).max_w_full()),
             );
         }
-        panel = panel.child(self.signature_library_panel(cx));
+        if self.annotation.signature.phone.is_none() {
+            panel = panel.child(self.signature_library_panel(cx));
+        }
         if let Some(error) = &self.annotation.signature.error {
             panel = panel.child(error.clone());
         }
@@ -491,16 +514,17 @@ impl DocumentSession {
             .child(Button::new("signature-undo").ghost().label("Undo goresan").disabled(self.annotation.signature.strokes.is_empty())
                 .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.strokes.pop();s.annotation.signature.asset=None;s.annotation.signature.preview=None;cx.notify();})))
             .child(Button::new("signature-clear").ghost().label("Hapus semua")
-                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.strokes.clear();s.annotation.signature.asset=None;s.annotation.signature.imported=None;s.annotation.signature.preview=None;s.annotation.signature.error=None;cx.notify();})))
+                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.phone=None;s.annotation.signature.phone_qr=None;s.annotation.signature.strokes.clear();s.annotation.signature.asset=None;s.annotation.signature.imported=None;s.annotation.signature.preview=None;s.annotation.signature.error=None;cx.notify();})))
             .child(Button::new("signature-import").ghost().label("Impor gambar")
                 .on_click(cx.listener(|s,_,_,cx|s.import_signature(cx)))))
             .child(Button::new("signature-cancel").ghost().label("Batal tanda tangan")
-                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.open=false;s.annotation.signature.drawing=false;s.annotation_popup_changed(false,cx);cx.notify();})))
+                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.phone=None;s.annotation.signature.phone_qr=None;s.annotation.signature.open=false;s.annotation.signature.drawing=false;s.annotation_popup_changed(false,cx);cx.notify();})))
             .child(Button::new("signature-use").label("Gunakan tanda tangan")
-                .disabled(self.annotation.signature.asset.is_none() && (self.annotation.signature.method!=SignatureMethod::Draw || self.annotation.signature.strokes.iter().all(|s|s.len()<2)))
+                .disabled(self.annotation.signature.phone.is_some() || self.annotation.signature.asset.is_none() && (self.annotation.signature.method!=SignatureMethod::Draw || self.annotation.signature.strokes.iter().all(|s|s.len()<2)))
                 .on_click(cx.listener(|s,_,window,cx|{
                     if s.annotation.signature.asset.is_none() && s.annotation.signature.method==SignatureMethod::Draw {s.annotation.signature.asset=draw_asset_with(&s.annotation.signature.strokes,signature_color(s.annotation.signature.color),s.annotation.signature.thickness).map(Arc::new);}
                     if s.annotation.signature.asset.is_some(){
+                        s.annotation.signature.phone=None;s.annotation.signature.phone_qr=None;
                         s.annotation_popup(false);s.annotation.signature.placing=true;s.annotation.signature.open=false;
                         s.annotation.tool=crate::annotations::Tool::Select;
                         s.status="Klik atau drag di halaman untuk menempatkan tanda tangan. Esc membatalkan.".into();
@@ -513,6 +537,8 @@ impl DocumentSession {
         if self.edits_locked() || self.opening {
             return;
         }
+        self.annotation.signature.phone = None;
+        self.annotation.signature.phone_qr = None;
         let picker = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
@@ -733,7 +759,7 @@ fn signature_delta(delta: [f32; 2], turns: u8) -> [f32; 2] {
         pdf_domain::annotation::rotate([0.5 + delta[0], 0.5 + delta[1]], (4 - turns % 4) % 4);
     [point[0] - 0.5, point[1] - 0.5]
 }
-fn signature_color(index: usize) -> [u8; 3] {
+pub(super) fn signature_color(index: usize) -> [u8; 3] {
     [[25, 25, 25], [30, 80, 180], [180, 35, 45]][index.min(2)]
 }
 fn pad_point(bounds: Bounds<gpui::Pixels>, p: gpui::Point<gpui::Pixels>) -> [f32; 2] {
@@ -746,7 +772,7 @@ fn pad_point(bounds: Bounds<gpui::Pixels>, p: gpui::Point<gpui::Pixels>) -> [f32
 fn draw_asset(strokes: &[Vec<[f32; 2]>]) -> Option<SignatureImage> {
     draw_asset_with(strokes, [25, 25, 25], 0)
 }
-fn draw_asset_with(
+pub(super) fn draw_asset_with(
     strokes: &[Vec<[f32; 2]>],
     color: [u8; 3],
     thickness: usize,

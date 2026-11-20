@@ -1,5 +1,39 @@
 # Pengujian Origo
 
+## Tanda tangan tahap 5: QR LAN individu (20 November 2026)
+
+QR membuka web pad lokal di browser HP, tanpa akun/relay/upload PDF. Listener
+IPv4 pada alamat rute lokal dan port dinamis, token CSPRNG 192 bit, sekali kirim,
+TTL 5 menit. Kiriman masuk sebagai draft/preview, tidak dirty sampai placement.
+Batal/tutup/ganti metode/jenis/view membatalkan sesi. HTTP lokal tanpa TLS;
+gunakan LAN tepercaya, firewall privat/client isolation/VPN dapat menghalangi.
+Body/host/origin/koordinat dibatasi, tidak ada endpoint filesystem. qrcode 0.14.1
+(no image feature) dan getrandom 0.3.4 dipin. Kolaborasi/email/sertifikat ditunda.
+
+Fmt, Clippy desktop/all-targets denied warnings, **20 desktop unit tests** dan
+release build lulus. Tes jaringan mencakup token/origin/payload invalid, single
+receive, expiry/cancel release serta fragmentasi header/body. Windows accepted
+socket awalnya mewarisi nonblocking listener; kini koneksi diterapkan blocking
+dengan read/write timeout 2 detik, dan tes fragmented body lulus.
+`scripts/phone-signature-pad-smoke.cjs` lulus enam pemeriksaan logika JS dengan
+DOM/canvas stub (bukan browser/perangkat nyata). UI LAN lulus GET pad, cancel,
+QR baru, POST/draft tanpa dirty, placement, Save As dan dismiss:
+`.research/signature-phone-ui-cbfa647683c643d2aba2244ac5377627`.
+**18 kasus regresi signature UI** lulus setelah QR ditambah:
+`.research/signature-ui-e5e08885076546948e985266d01a9e8a`.
+Capture QR/preview diperiksa visual. Source hash fixture tetap utuh. Tombol QR
+cancel dipindah ke atas agar tidak bergantung scroll. Template restart/reuse sudah
+lulus tahap 4. Scan kamera, sentuhan HP fisik, dua perangkat sungguhan dan variasi
+firewall/NIC belum diuji; tidak mengklaim interoperabilitas perangkat tersebut.
+
+Build teruji sudah dipasang ke target/release/pdf-studio.exe setelah target
+dipastikan tidak aktif. Tidak ada proses/dokumen pengguna ditutup. Hash kedua exe:
+`CEA3185B5D53D723D46CC7280D1110E4C7B45B5D16F898361999CD3C770762AA`.
+run.cmd memakai build ini. Tahap 1-4 telah di-push: 126d81b, 74353d3, 30b4c92,
+ef32651. Rotasi objek, multi-page apply dan SVG tetap follow-up; fase layanan
+kolaborasi di luar cakupan eksplisit pemilik.
+
+
 ## Tanda tangan tahap 4 (20 November 2026)
 
 Pustaka lokal opt-in (maksimal delapan template), rename/delete/reuse tersedia.

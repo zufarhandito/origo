@@ -35,6 +35,8 @@ impl DocumentSession {
                         2 => SignatureKind::Stamp,
                         _ => SignatureKind::Signature,
                     };
+                    s.annotation.signature.phone = None;
+                    s.annotation.signature.phone_qr = None;
                     s.annotation.signature.method = SignatureMethod::Image;
                     s.annotation.signature.remove_white = false;
                     s.annotation.signature.asset = Some(entry.asset.clone());

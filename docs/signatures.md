@@ -6,8 +6,9 @@ dan arahan pemilik untuk melanjutkan tanda tangan setelah anotator selesai.
 ## Penggunaan
 
 1. Dalam mode Baca, buka **Anotasi > Tanda tangan**.
-2. Gambar di canvas dengan mouse. **Undo goresan** membatalkan goresan terakhir;
-   **Hapus semua** membersihkan draft. Atau pilih **Impor gambar** untuk PNG/JPEG.
+2. Pilih Tanda tangan penuh, Inisial atau Stempel. Untuk tanda tangan/inisial,
+   pilih Ketik, Gambar (mouse/QR HP) atau Dari gambar. Stempel memakai impor PNG/JPEG.
+   Undo goresan membatalkan goresan terakhir; Hapus semua membersihkan draft.
 3. Klik **Gunakan tanda tangan**, lalu klik atau drag di halaman untuk menempatkan.
    Pembuatan draft tidak menandai dokumen berubah; penempatan baru mengubah dirty.
 4. Dalam tool Pilih, drag tanda tangan untuk memindahkannya. Drag kotak sudut kanan
@@ -31,7 +32,7 @@ akan kehilangan ketajaman jika diperbesar jauh di atas resolusi tersebut.
 
 Input maksimal 8 MiB, dimensi maksimal 8192 per sisi, budget decode 64 MiB. Hanya
 PNG/JPEG diterima; file rusak dan gambar sepenuhnya transparan ditolak. Pad maksimal
-128 stroke ? 1024 titik; aset raster dibagi dengan Arc pada snapshot/history.
+128 stroke x 1024 titik; aset raster dibagi dengan Arc pada snapshot/history.
 Maksimal delapan tanda tangan dalam model Workspace (termasuk halaman dihapus yang
 masih dipertahankan untuk Undo) dan delapan saat inspeksi satu sumber.
 
@@ -51,8 +52,7 @@ milik aplikasi dengan validasi terbatas dan menolak key aktif/subtype palsu.
 
 Ini tanda tangan visual, tanpa sertifikat kriptografis, validasi identitas atau audit
 trail. Dukungan PDF yang sudah ditandatangani secara digital mengikuti pembatasan
-lama. Edit Stamp pihak ketiga, SVG, rotasi objek sendiri, pressure sensitivity dan background removal belum
-tersedia. Rotasi halaman ikut memutar tanda tangan bersama isi halaman.
+lama. Edit Stamp pihak ketiga, SVG, rotasi objek sendiri, pressure sensitivity belum tersedia. Rotasi halaman ikut memutar tanda tangan bersama isi halaman.
 
 Lihat [testing](testing.md) untuk hasil aktual dan batas interoperabilitas.
 
@@ -60,7 +60,9 @@ Lihat [testing](testing.md) untuk hasil aktual dan batas interoperabilitas.
 
 [Riset iLovePDF dan roadmap UX](research/signature-ux-roadmap.md), 20 November 2026,
 mencatat kandidat type/font, inisial, stempel, pustaka lokal dan QR HP.
-Seluruhnya usulan, belum diimplementasikan atau diotorisasi oleh riset ini.
+Riset awal dibuat sebelum implementasi. Pemilik kemudian mengotorisasi tahap 1-5
+untuk pemakaian individu dan lokal, termasuk QR LAN. Perilaku aktual dijelaskan
+di bawah; layanan kolaborasi/request/audit/sertifikat ditunda.
 
 ## Editor tahap 1 (20 November 2026)
 
@@ -109,3 +111,23 @@ sedikit per langkah, dibatasi ke halaman. Shortcut berlaku saat canvas fokus,
 sehingga mengetik pada input tidak menggeser objek. Batas delapan objek tetap.
 Rotasi objek dan terapkan ke banyak halaman belum termasuk checkpoint ini.
 Footer Gunakan/Batal serta aksi draft tetap terlihat; isi panjang dapat discroll.
+
+## Gambar dari HP lewat QR LAN (tahap 5)
+
+Dalam metode Gambar, pilih Gambar dari HP. Scan QR dengan browser HP pada jaringan
+yang sama. Tidak perlu akun, instal aplikasi HP, internet atau server relay.
+Halaman lokal menyediakan pad jari/stylus, Undo, Hapus dan Kirim. Origo menerima
+preview; PDF baru berubah setelah Gunakan dan placement, bukan saat gambar diterima.
+PDF tidak dikirim ke HP. Aset/goresan tidak dikirim ke layanan eksternal.
+
+Listener hanya hidup selama sesi gambar: port IPv4 dinamis pada alamat rute lokal,
+token acak 192 bit, sekali pakai dan kedaluwarsa 5 menit. Batal/editor ditutup,
+ganti metode/jenis atau view tidak aktif membatalkan sesi. Buat QR lagi untuk
+mengulang. Host/origin, ukuran HTTP dan koordinat/goresan divalidasi; tidak ada
+endpoint akses filesystem. Payload maksimal 512 KiB, 128 goresan dan 16384 titik.
+
+Transport memakai HTTP lokal tanpa enkripsi: gunakan LAN yang dipercaya. Firewall
+Windows mungkin perlu mengizinkan Origo pada jaringan privat. Guest Wi-Fi dengan
+client isolation, VPN/rute NIC lain atau jaringan tanpa rute IPv4 dapat menghalangi
+koneksi; pemilihan interface manual/HTTPS belum tersedia. Tidak ada kolaborasi,
+request email, validasi identitas atau sertifikat digital dalam fitur ini.
