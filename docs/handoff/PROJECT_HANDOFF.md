@@ -1,5 +1,18 @@
 # Handoff terkini - 19 November 2026
 
+## Riset peningkatan tanda tangan (20 November 2026)
+
+Pemilik meminta analisis iLovePDF dan plan dahulu. Riset primer iLovePDF web dan
+Adobe Reader, kondisi Origo serta urutan task/acceptance disimpan di
+[roadmap tanda tangan](../research/signature-ux-roadmap.md). QR draw HP terkonfirmasi
+panduan resmi; protokol/retensi/default runtime belum diuji. Stempel vendor yang
+terbukti berupa upload, bukan generator stempel. Roadmap mencakup UX jenis/metode,
+type/font + inisial, stempel/kualitas, pustaka/placement, QR dan epic workflow
+request/audit/sertifikat. Semua plan-only; tidak mengubah kode/build aplikasi.
+Validasi docs: sumber primer dibaca, tautan lokal dan whitespace diperiksa.
+Tidak menjalankan tes produk untuk riset dokumentasi.
+
+
 ## Recent files dua baris dan lebar moderat (19 November 2026)
 
 Header/konten Empty State memakai max-width 40 rem (sekitar 640 px), meningkat

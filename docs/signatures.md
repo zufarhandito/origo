@@ -57,3 +57,9 @@ gerak keyboard, template permanen, pressure sensitivity dan background removal b
 tersedia. Rotasi halaman ikut memutar tanda tangan bersama isi halaman.
 
 Lihat [testing](testing.md) untuk hasil aktual dan batas interoperabilitas.
+
+## Rencana lanjutan
+
+[Riset iLovePDF dan roadmap UX](research/signature-ux-roadmap.md), 20 November 2026,
+mencatat kandidat type/font, inisial, stempel, pustaka lokal dan QR HP.
+Seluruhnya usulan, belum diimplementasikan atau diotorisasi oleh riset ini.

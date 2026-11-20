@@ -103,3 +103,5 @@ tetap terlihat pada [matriks perangkat](device-acceptance.md).
 - [LICENSES](../LICENSES/README.md) tetap di dekat notice lisensi; tidak dipindah.
 - Catatan `.research/PROJECT_HANDOFF_PRIVATE.md` dan PDF pengguna tetap lokal,
   gitignored, tidak dipindah ke docs, tidak di-commit atau diunggah.
+
+Rencana (belum implementasi): [peningkatan tanda tangan dan QR HP](research/signature-ux-roadmap.md).
