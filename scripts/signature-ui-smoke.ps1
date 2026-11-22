@@ -60,21 +60,21 @@ function Pointer-Control([string]$Name,[double]$X=0.5,[double]$Y=0.5,[int]$Messa
     $pos=[IntPtr](($point.Y -shl 16) -bor ($point.X -band 0xffff))
     [OrganizerClick]::SendMessage($app.MainWindowHandle,$Message,[IntPtr]$Buttons,$pos)|Out-Null
 }
-function Assert-PageCursor([ValidateSet('Crosshair','IBeam')][string]$Expected) {
+function Assert-PageCursor([ValidateSet('Crosshair','IBeam','Hand','Resize')][string]$Expected,[double]$X=0.43,[double]$Y=0.42) {
     $window=$app.MainWindowHandle
     if([SignatureTestFocus]::GetForegroundWindow() -ne $window){throw 'The test window must be in front for the system cursor check'}
     $rect=(Find 'Isi halaman 1').Current.BoundingRectangle
     $point=New-Object SignatureTestFocus+Point
-    $point.X=[int]($rect.X+$rect.Width*0.43)
-    $point.Y=[int]($rect.Y+$rect.Height*0.42)
+    $point.X=[int]($rect.X+$rect.Width*$X)
+    $point.Y=[int]($rect.Y+$rect.Height*$Y)
     if([SignatureTestFocus]::GetAncestor([SignatureTestFocus]::WindowFromPhysicalPoint($point),2) -ne $window){throw 'The test page is obscured at the cursor check location'}
     $original=New-Object SignatureTestFocus+Point
     if(-not [SignatureTestFocus]::GetPhysicalCursorPos([ref]$original)){throw 'Cannot read the original pointer position'}
     if($point.X -eq $original.X -and $point.Y -eq $original.Y){$point.X++}
     try {
         if(-not [SignatureTestFocus]::SetPhysicalCursorPos($point.X,$point.Y)){throw 'Cannot move the pointer onto the test page'}
-        Pointer-Control 'Isi halaman 1' 0.43 0.42
-        $cursorId=if($Expected -eq 'Crosshair'){32515}else{32513}
+        Pointer-Control 'Isi halaman 1' $X $Y
+        $cursorId=@{Crosshair=32515;IBeam=32513;Hand=32649;Resize=32642}[$Expected]
         $end=(Get-Date).AddSeconds(4)
         $observed=''
         do {
@@ -183,7 +183,7 @@ try {
 
     Pointer-Control 'Anotasi'
     $null=Wait-State {param($s) $s.signaturePlacing -and -not $s.signatureGhost -and $null -eq $s.signatureGhostRect -and $s.revision -eq $initial.revision}
-    Pointer-Control 'Isi halaman 1'
+    Pointer-Control 'Isi halaman 1' 0.37 0.38
     $null=Wait-State {param($s) $s.signatureGhost}
     if([SignatureTestFocus]::GetForegroundWindow() -ne $app.MainWindowHandle){throw 'The test window must be in front for Escape'}
     [Windows.Forms.SendKeys]::SendWait('{ESC}')
@@ -199,7 +199,10 @@ try {
     $preview=Wait-State {param($s) $s.signatureGhost}
     Click-Control 'Isi halaman 1'
     $placed=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty -and -not $s.signatureGhost -and -not $s.signaturePlacing}
-    Assert-PageCursor 'IBeam'
+    Assert-PageCursor 'IBeam' 0.1 0.1
+    $rect=$placed.signatureRects[0]
+    Assert-PageCursor 'Hand' (($rect[0][0]+$rect[1][0])/2) (($rect[0][1]+$rect[1][1])/2)
+    Assert-PageCursor 'Resize' $rect[1][0] $rect[1][1]
     if(-not (Equal-SignatureRect $preview.signatureGhostRect $placed.signatureRects[0])){throw 'Placed initials differ from the last ghost preview'}
     Invoke 'Undo';$null=Wait-State {param($s) $s.signatureCount -eq 0 -and -not $s.dirty -and $s.revision -eq $initial.revision}
     Pass 'initials-edit-place-undo'
@@ -250,6 +253,10 @@ try {
     Invoke 'Redo';$s=Wait-State {param($s) ($s.signatureRects[0]|ConvertTo-Json -Compress) -ne $before}
     Pass 'move-single-undo-redo'
     $r=$s.signatureRects[0];$width=$r[1][0]-$r[0][0]
+    Pointer-Control 'Isi halaman 1' $r[1][0] $r[1][1] 0x201 1
+    Assert-PageCursor 'Resize' 0.1 0.1
+    Pointer-Control 'Isi halaman 1' $r[1][0] $r[1][1] 0x202
+    Assert-PageCursor 'IBeam' 0.1 0.1
     Stroke $r[1][0] $r[1][1] ($r[1][0]+0.1) ($r[1][1]+0.05)
     $s=Wait-State {param($s) ($s.signatureRects[0][1][0]-$s.signatureRects[0][0][0]) -gt $width+0.05}
     Pass 'proportional-corner-resize'

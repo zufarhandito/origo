@@ -19,9 +19,11 @@ dan arahan pemilik untuk melanjutkan tanda tangan setelah anotator selesai.
    Klik, atau tekan lalu geser dan lepas di halaman yang sama, untuk
    menempatkannya. Pratinjau hilang di luar halaman. Tekan Esc untuk batal.
    PDF dan riwayat Undo baru berubah setelah penempatan berhasil.
-4. Dalam tool Pilih, drag tanda tangan untuk memindahkannya. Drag kotak sudut kanan
-   bawah untuk resize proporsional. Garis batas memperlihatkan posisi/ukuran draft;
-   gambar diterapkan saat mouse dilepas. Setiap gesture satu langkah Undo/Redo.
+4. Dalam tool Pilih, kursor tangan menandakan tanda tangan bisa digeser. Kursor
+   panah diagonal menandakan sudut bisa ditarik untuk mengubah ukuran secara
+   proporsional. Pegangan dan arah panah mengikuti rotasi halaman. Garis batas
+   memperlihatkan posisi dan ukuran sementara. Perubahan diterapkan saat mouse
+   dilepas dan dapat dibatalkan dengan satu langkah Undo.
 5. **Hapus anotasi** / Delete menghapus tanda tangan terpilih. Esc membatalkan
    penempatan/gesture; melepas mouse di luar halaman membatalkan gesture tersebut.
 6. **Simpan sebagai** ke file baru. File hasil simpan dapat dibuka ulang dan tanda

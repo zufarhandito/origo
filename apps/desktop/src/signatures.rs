@@ -1210,16 +1210,18 @@ impl DocumentSession {
                     .rev()
                     .find(|a| {
                         a.signature.is_some()
-                            && p[0] >= a.points[0][0] - 0.015
-                            && p[0] <= a.points[1][0] + 0.015
-                            && p[1] >= a.points[0][1] - 0.015
-                            && p[1] <= a.points[1][1] + 0.015
+                            && signature_hit_bounds(a, false)
+                                .iter()
+                                .zip(p)
+                                .all(|([min, max], value)| (*min..=*max).contains(&value))
                     })
                     .cloned()
             });
             if let Some(a) = hit {
-                let resize =
-                    (p[0] - a.points[1][0]).abs() < 0.02 && (p[1] - a.points[1][1]).abs() < 0.02;
+                let resize = signature_hit_bounds(&a, true)
+                    .iter()
+                    .zip(p)
+                    .all(|([min, max], value)| (*min..=*max).contains(&value));
                 self.annotation.selected = Some((page, a.id));
                 self.annotation.signature.gesture = Some((page, a, p, resize));
                 cx.notify();
@@ -1253,6 +1255,19 @@ impl DocumentSession {
         false
     }
 }
+/// Hit ranges on the two unrotated page axes, shared by input and cursors.
+pub(super) fn signature_hit_bounds(a: &Annotation, resize: bool) -> [[f32; 2]; 2] {
+    [0, 1].map(|axis| {
+        let end = a.points[1][axis];
+        let start = if resize {
+            (end - 0.02).max(a.points[0][axis] - 0.015)
+        } else {
+            a.points[0][axis] - 0.015
+        };
+        [start, end + 0.015]
+    })
+}
+
 pub(super) fn signature_page_point(
     bounds: Bounds<gpui::Pixels>,
     cursor: gpui::Point<gpui::Pixels>,

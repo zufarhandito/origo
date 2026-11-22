@@ -1,5 +1,13 @@
 # Pengujian Origo
 
+## Kursor untuk geser dan resize tanda tangan (22 November 2026)
+
+Format, Clippy desktop tanpa warning, 23 unit test, dan build release lulus.
+Tes antarmuka di latar belakang memverifikasi penempatan, pemindahan, dan resize
+proporsional. Pemeriksaan bentuk kursor Windows saat hover, drag, dan lepas
+tersedia di `scripts/signature-ui-smoke.ps1`. Pemeriksaan ini perlu jendela uji
+di depan dan belum selesai pada sesi ini karena jendela lain berada di depan.
+
 ## Kursor penempatan dan resolusi tanda tangan (22 November 2026)
 
 Format, Clippy workspace tanpa warning, 79 unit test, build release, dan smoke

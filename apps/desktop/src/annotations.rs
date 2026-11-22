@@ -701,9 +701,11 @@ pub(super) fn paint_selection(
     let width = bounds.size.width * (right - left);
     let height = bounds.size.height * (bottom - top);
     if a.signature.is_some() {
+        let [x, y] = points[1];
+        let corner = bounds.origin + gpui::point(bounds.size.width * x, bounds.size.height * y);
         window.paint_quad(gpui::fill(
             Bounds::new(
-                origin + gpui::point(width - px(4.), height - px(4.)),
+                corner - gpui::point(px(4.), px(4.)),
                 gpui::size(px(8.), px(8.)),
             ),
             gpui::rgb(0x2563eb),

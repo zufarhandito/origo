@@ -327,9 +327,71 @@ impl DocumentSession {
             };
             let weak = cx.weak_entity();
             let track_ghost = self.active && self.annotation.signature.placement_ghost.is_some();
+            let resize_cursor = if geometry.quarter_turns.is_multiple_of(2) {
+                gpui::CursorStyle::ResizeUpLeftDownRight
+            } else {
+                gpui::CursorStyle::ResizeUpRightDownLeft
+            };
+            let move_cursor = gpui::CursorStyle::PointingHand;
+            let edit_signatures = !track_ghost
+                && self.annotation.open
+                && self.annotation.tool == annotations::Tool::Select
+                && self.mode == ViewerMode::Read
+                && !self.opening
+                && !self.edits_locked();
+            let mut cursor_regions = Vec::new();
+            let mut gesture_cursor = None;
+            if edit_signatures && let Some(workspace) = self.workspace.as_ref() {
+                cursor_regions.extend(
+                    workspace
+                        .annotations(page_id)
+                        .iter()
+                        .filter(|a| a.signature.is_some())
+                        .flat_map(|a| {
+                            [(false, move_cursor), (true, resize_cursor)].map(|(resize, cursor)| {
+                                let [[left, right], [top, bottom]] =
+                                    signatures::signature_hit_bounds(a, resize);
+                                ([[left, top], [right, bottom]], cursor)
+                            })
+                        }),
+                );
+                if self.active
+                    && let Some((page, _, _, resize)) = &self.annotation.signature.gesture
+                    && *page == page_id
+                {
+                    gesture_cursor = Some(if *resize { resize_cursor } else { move_cursor });
+                }
+            }
             canvas(
-                |_, _, _| {},
-                move |bounds, _, window, app| {
+                move |bounds, window, _| {
+                    cursor_regions
+                        .into_iter()
+                        .map(|(corners, cursor)| {
+                            let [a, b] = corners
+                                .map(|p| pdf_domain::annotation::rotate(p, geometry.quarter_turns));
+                            let to_screen = |x: f32, y: f32| {
+                                bounds.origin
+                                    + gpui::point(bounds.size.width * x, bounds.size.height * y)
+                            };
+                            let region = Bounds::from_corners(
+                                to_screen(a[0].min(b[0]), a[1].min(b[1])),
+                                to_screen(a[0].max(b[0]), a[1].max(b[1])),
+                            )
+                            .intersect(&bounds);
+                            (
+                                window.insert_hitbox(region, gpui::HitboxBehavior::Normal),
+                                cursor,
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                },
+                move |bounds, cursor_hitboxes, window, app| {
+                    for (hitbox, cursor) in &cursor_hitboxes {
+                        window.set_cursor_style(*cursor, hitbox);
+                    }
+                    if let Some(cursor) = gesture_cursor {
+                        window.set_window_cursor_style(cursor);
+                    }
                     if let Some((_, a)) = &draft {
                         annotations::paint_draft(
                             a,
@@ -761,7 +823,9 @@ impl Render for DocumentSession {
                                         }
                                     }
                                 }
-                                this.annotation.signature.gesture_bounds = None;
+                                if this.annotation.signature.gesture_bounds.take().is_some() {
+                                    cx.notify();
+                                }
                                 this.finish_annotation(cx);
                                 this.text.dragging = false;
                                 this.text.pending = None;

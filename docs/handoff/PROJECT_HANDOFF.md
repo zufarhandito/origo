@@ -1,9 +1,18 @@
 # Handoff terkini - 22 November 2026
 
+## Kursor untuk geser dan resize tanda tangan
+
+Tool Pilih menampilkan kursor tangan pada badan tanda tangan dan panah diagonal
+di pegangan resize. Kursor mengikuti aksi selama drag dan kembali mengikuti
+area di bawah pointer saat dilepas. Pegangan terlihat di sudut yang menerima
+resize setelah rotasi halaman. Tampilan kursor dan input memakai area yang sama.
+Build untuk `run.cmd` menggunakan SHA-256
+`F514D9509E6A90D53F4A414F88D8F0F358BE657105C39C204709D95182BFCF17`.
+
 ## Kursor penempatan dan resolusi tanda tangan
 
-Kursor silang muncul saat pratinjau penempatan aktif di halaman. Kursor teks
-kembali setelah tanda tangan ditempatkan atau penempatan dibatalkan. Tanda tangan
+Kursor silang muncul saat pratinjau penempatan aktif di halaman. Di luar
+tanda tangan, kursor teks kembali pada halaman berteks. Tanda tangan
 baru dari kanvas desktop dan QR dirender pada kanvas 1024 × 512 piksel sebelum
 dipotong. Aset Ketik dan Unggah memakai batas 1024 piksel per sisi dan 524.288
 piksel total. Viewer dan ekspor PNG menyaring warna berdasarkan alpha. PDF
