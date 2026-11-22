@@ -1,8 +1,13 @@
 //! Local visual signatures with opt-in templates; no certificate fields.
+use crate::signature_templates_ui::GalleryView;
 use crate::*;
+use gpui::StyledImage;
+use gpui::assets::IconName;
+use gpui::component::Icon;
 use gpui::component::{
-    ActiveTheme, Disableable, Selectable,
+    ActiveTheme, Disableable, Selectable, Sizable, StyledExt,
     button::{Button, ButtonVariants},
+    checkbox::Checkbox,
     input::{Input, InputEvent, InputState},
     popover::Popover,
 };
@@ -34,10 +39,12 @@ pub(super) struct SignatureState {
     pub phone_status: Option<String>,
     pub method: SignatureMethod,
     pub kind: SignatureKind,
-    pub library: Vec<crate::signature_library::Entry>,
-    pub library_ready: bool,
-    pub library_loading: bool,
-    pub library_selected: Option<String>,
+    pub gallery: crate::signature_templates_ui::GalleryState,
+    pub editor_revision: u64,
+    save_template: bool,
+    inactive_drafts: [SignatureCategoryDraft; 3],
+    stamp_return_method: SignatureMethod,
+    font_samples: [Option<Arc<RenderImage>>; 2],
     pub library_label: Option<Entity<InputState>>,
     pub text: Option<Entity<InputState>>,
     pub initials: Option<Entity<InputState>>,
@@ -55,6 +62,13 @@ pub(super) struct SignatureState {
     pub gesture_bounds: Option<Bounds<gpui::Pixels>>,
     pub gesture: Option<(PageId, Annotation, [f32; 2], bool)>,
 }
+#[derive(Default)]
+struct SignatureCategoryDraft {
+    strokes: Vec<Vec<[f32; 2]>>,
+    imported: Option<Arc<SignatureImage>>,
+    remove_white: bool,
+}
+
 impl DocumentSession {
     pub(super) fn signature_button(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let owner = cx.entity();
@@ -64,22 +78,25 @@ impl DocumentSession {
                     .ghost()
                     .icon(gpui::assets::IconName::Signature)
                     .label("Tanda tangan")
-                    .disabled(self.edits_locked()),
+                    .disabled(self.edits_locked() || self.opening),
             )
             .open(self.annotation.signature.open)
             .on_open_change(cx.listener(|s, open, window, cx| {
-                s.init_signature_text(window, cx);
-                if *open {
-                    s.load_signature_library(cx);
-                }
                 s.annotation_popup_changed(*open, cx);
                 s.annotation.signature.open = *open;
-                if !*open {
-                    s.annotation.signature.phone = None;
-                    s.annotation.signature.phone_qr = None;
-                }
+                s.annotation.signature.editor_revision += 1;
                 s.annotation.signature.drawing = false;
                 s.annotation.draft = None;
+                if *open {
+                    s.annotation.signature.placing = false;
+                    s.annotation.signature.save_template = false;
+                    s.init_signature_text(window, cx);
+                    s.load_signature_library(cx);
+                    s.refresh_signature_asset(cx);
+                } else {
+                    s.cancel_signature_phone();
+                    s.annotation.signature.gallery.reset_selection();
+                }
                 cx.notify();
             }))
             .content(move |_, window, cx| owner.update(cx, |s, cx| s.signature_panel(window, cx)))
@@ -91,7 +108,7 @@ impl DocumentSession {
         }
         self.annotation.signature.library_label =
             Some(cx.new(|cx| InputState::new(window, cx).placeholder("Nama template (opsional)")));
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder("Nama atau inisial"));
+        let input = cx.new(|cx| InputState::new(window, cx).placeholder("Ketik nama lengkap"));
         cx.subscribe_in(&input, window, |s, _, event: &InputEvent, _, cx| {
             if matches!(event, InputEvent::Change)
                 && s.annotation.signature.method == SignatureMethod::Text
@@ -101,7 +118,7 @@ impl DocumentSession {
         })
         .detach();
         self.annotation.signature.text = Some(input);
-        let initials = cx.new(|cx| InputState::new(window, cx).placeholder("Inisial"));
+        let initials = cx.new(|cx| InputState::new(window, cx).placeholder("Ketik inisial"));
         cx.subscribe_in(&initials, window, |s, _, event: &InputEvent, _, cx| {
             if matches!(event, InputEvent::Change)
                 && s.annotation.signature.method == SignatureMethod::Text
@@ -111,6 +128,12 @@ impl DocumentSession {
         })
         .detach();
         self.annotation.signature.initials = Some(initials);
+        self.annotation.signature.font_samples = std::array::from_fn(|style| {
+            crate::signature_text::render(["Caveat", "Dancing Script"][style], style, [25; 3])
+                .ok()
+                .as_ref()
+                .and_then(asset_preview)
+        });
     }
     fn refresh_signature_text(&mut self, cx: &mut Context<Self>) {
         let state = &mut self.annotation.signature;
@@ -137,59 +160,426 @@ impl DocumentSession {
         }
         cx.notify();
     }
-    fn signature_method(&mut self, mut method: SignatureMethod, cx: &mut Context<Self>) {
-        if self.annotation.signature.kind == SignatureKind::Stamp {
-            method = SignatureMethod::Image;
-        }
-        self.annotation.signature.phone = None;
-        self.annotation.signature.phone_qr = None;
-        self.annotation.signature.phone_revision += 1;
-        self.annotation.signature.phone_status = None;
-        self.annotation.signature.method = method;
-        self.annotation.signature.error = None;
-        if method == SignatureMethod::Text {
-            self.refresh_signature_text(cx);
+    fn signature_method(&mut self, method: SignatureMethod, cx: &mut Context<Self>) {
+        if self.opening {
             return;
         }
-        self.annotation.signature.asset = if method == SignatureMethod::Draw {
-            draw_asset_with(
-                &self.annotation.signature.strokes,
-                signature_color(self.annotation.signature.color),
-                self.annotation.signature.thickness,
+        self.cancel_signature_phone();
+        let state = &mut self.annotation.signature;
+        state.drawing = false;
+        state.phone_status = None;
+        state.method = method;
+        self.refresh_signature_asset(cx);
+    }
+
+    fn refresh_signature_asset(&mut self, cx: &mut Context<Self>) {
+        let state = &mut self.annotation.signature;
+        state.error = None;
+        state.asset = match state.method {
+            SignatureMethod::Text => {
+                self.refresh_signature_text(cx);
+                return;
+            }
+            SignatureMethod::Draw => draw_asset_with(
+                &state.strokes,
+                signature_color(state.color),
+                state.thickness,
             )
-            .map(Arc::new)
-        } else {
-            self.annotation
-                .signature
-                .imported
-                .as_deref()
-                .and_then(|a| image_variant(a, self.annotation.signature.remove_white))
-                .map(Arc::new)
+            .map(Arc::new),
+            SignatureMethod::Image => state.imported.as_ref().and_then(|original| {
+                if state.remove_white {
+                    image_variant(original, true).map(Arc::new)
+                } else {
+                    Some(original.clone())
+                }
+            }),
         };
-        if method == SignatureMethod::Image
-            && self.annotation.signature.remove_white
-            && self.annotation.signature.asset.is_none()
-        {
-            self.annotation.signature.error = Some(
-                "Tidak ada isi tersisa setelah latar putih dihapus. Kembalikan gambar asli.".into(),
-            );
+        if state.method == SignatureMethod::Image && state.remove_white && state.asset.is_none() {
+            state.error =
+                Some("Tidak ada isi tersisa. Klik lagi untuk mengembalikan latar asli.".into());
         }
-        self.annotation.signature.preview = self
-            .annotation
-            .signature
-            .asset
-            .as_deref()
-            .and_then(asset_preview);
+        state.preview = state.asset.as_deref().and_then(asset_preview);
         cx.notify();
     }
+
     fn signature_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let state = &self.annotation.signature;
+        let theme = cx.theme().colors;
+        let view = state.gallery.view;
+        let count = state.gallery.entries.len();
+        let usable = !self.opening
+            && !self.edits_locked()
+            && match view {
+                GalleryView::Gallery => self.selected_signature_template().is_some(),
+                GalleryView::Create => state.phone.is_none() && state.asset.is_some(),
+                GalleryView::Loading => false,
+            };
+        let mut navigation = gpui::div().flex().items_center().justify_between().gap_2();
+        if view == GalleryView::Gallery {
+            navigation = navigation
+                .child(
+                    Button::new("signature-saved-tab")
+                        .outline()
+                        .label(format!("Tersimpan ({count})"))
+                        .selected(true)
+                        .on_click(cx.listener(|s, _, _, cx| s.show_signature_gallery(cx))),
+                )
+                .child(
+                    Button::new("signature-new")
+                        .outline()
+                        .icon(IconName::Plus)
+                        .label("Buat Baru")
+                        .disabled(self.opening)
+                        .on_click(cx.listener(|s, _, _, cx| {
+                            s.annotation.signature.editor_revision += 1;
+                            s.show_signature_creation(cx);
+                        })),
+                );
+        } else if view == GalleryView::Create && count > 0 {
+            navigation = navigation.child(
+                Button::new("signature-back")
+                    .outline()
+                    .icon(IconName::ArrowLeft)
+                    .label("Kembali ke Tersimpan")
+                    .disabled(self.opening)
+                    .on_click(cx.listener(|s, _, _, cx| {
+                        s.cancel_signature_phone();
+                        s.annotation.signature.editor_revision += 1;
+                        s.show_signature_gallery(cx);
+                    })),
+            );
+        }
+        let header = gpui::div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .px_3()
+            .py_2()
+            .border_b_1()
+            .border_color(theme.border)
+            .child(
+                gpui::div()
+                    .text_base()
+                    .font_semibold()
+                    .child("Tanda Tangan & Stempel"),
+            )
+            .when(
+                view == GalleryView::Gallery || (view == GalleryView::Create && count > 0),
+                |el| el.child(navigation),
+            );
+
+        let panel = match view {
+            GalleryView::Loading => gpui::div()
+                .p_4()
+                .child("Memuat template...")
+                .into_any_element(),
+            GalleryView::Gallery => self.signature_gallery_panel(cx),
+            GalleryView::Create => self.signature_creation_panel(cx),
+        };
+        let mut body = gpui::div()
+            .id(("signature-editor-scroll", view as usize))
+            .max_h((window.viewport_size().height - px(305.)).max(px(165.)))
+            .overflow_y_scroll()
+            .w_full()
+            .p_3()
+            .child(panel);
+        if let Some(error) = &self.annotation.signature.gallery.error {
+            body = body.child(
+                gpui::div()
+                    .mt_2()
+                    .text_sm()
+                    .text_color(cx.theme().danger)
+                    .child(error.clone()),
+            );
+        }
+        gpui::div()
+            .w(px(530.))
+            .max_w_full()
+            .flex()
+            .flex_col()
+            .child(header)
+            .child(body)
+            .child(
+                gpui::div()
+                    .w_full()
+                    .flex()
+                    .justify_between()
+                    .items_center()
+                    .px_3()
+                    .py_2()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
+                    .child(
+                        Button::new("signature-cancel")
+                            .outline()
+                            .icon(IconName::X)
+                            .label("Batal")
+                            .accessibility_label("Batal tanda tangan")
+                            .disabled(self.opening)
+                            .on_click(cx.listener(|s, _, window, cx| {
+                                s.dismiss_signature_editor(cx);
+                                s.focus.focus(window, cx);
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        Button::new("signature-use")
+                            .primary()
+                            .icon(IconName::Check)
+                            .label("Gunakan Tanda Tangan")
+                            .disabled(!usable)
+                            .on_click(cx.listener(|s, _, window, cx| s.use_signature(window, cx))),
+                    ),
+            )
+            .into_any_element()
+    }
+
+    fn dismiss_signature_editor(&mut self, cx: &mut Context<Self>) {
+        self.cancel_signature_phone();
+        let state = &mut self.annotation.signature;
+        state.open = false;
+        state.drawing = false;
+        state.editor_revision += 1;
+        state.gallery.reset_selection();
+        self.annotation_popup_changed(false, cx);
+    }
+
+    fn use_signature(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.opening || self.edits_locked() {
+            return;
+        }
+        let state = &self.annotation.signature;
+        match state.gallery.view {
+            GalleryView::Gallery => {
+                if let Some(entry) = self.selected_signature_template() {
+                    self.begin_signature_placement(entry.asset, window, cx);
+                }
+            }
+            GalleryView::Create if state.phone.is_none() => {
+                let Some(asset) = state.asset.clone() else {
+                    return;
+                };
+                if state.save_template {
+                    let label = state
+                        .library_label
+                        .as_ref()
+                        .map(|input| input.read(cx).value().trim().to_owned())
+                        .unwrap_or_default();
+                    self.save_signature_template(asset, state.kind, label, window, cx);
+                } else {
+                    self.begin_signature_placement(asset, window, cx);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub(super) fn begin_signature_placement(
+        &mut self,
+        asset: Arc<SignatureImage>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.annotation.signature.open || self.edits_locked() || self.opening {
+            return;
+        }
+        self.dismiss_signature_editor(cx);
+        self.annotation_popup(false);
+        self.annotation.signature.asset = Some(asset);
+        self.annotation.signature.placing = true;
+        self.annotation.signature.save_template = false;
+        if let Some(input) = self.annotation.signature.library_label.clone() {
+            input.update(cx, |state, cx| state.set_value("", window, cx));
+        }
+        self.annotation.tool = crate::annotations::Tool::Select;
+        self.status =
+            "Klik atau drag di halaman untuk menempatkan tanda tangan. Esc membatalkan.".into();
+        self.focus.focus(window, cx);
+        cx.notify();
+    }
+
+    fn signature_creation_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let kind = self.annotation.signature.kind;
+        let method = self.annotation.signature.method;
+        let qr_active = self.annotation.signature.phone.is_some();
+        let mut panel = gpui::div()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .child(self.signature_categories(cx));
+        if kind != SignatureKind::Stamp {
+            panel = panel.child(self.signature_methods(cx));
+        }
+        panel = panel.child(match method {
+            SignatureMethod::Draw if qr_active => self.signature_phone_panel(cx),
+            SignatureMethod::Draw => self.signature_draw_panel(cx),
+            SignatureMethod::Text => self.signature_text_panel(cx),
+            SignatureMethod::Image => self.signature_upload_panel(cx),
+        });
+        if let Some(error) = &self.annotation.signature.error {
+            panel = panel.child(
+                gpui::div()
+                    .text_sm()
+                    .text_color(cx.theme().danger)
+                    .child(error.clone()),
+            );
+        }
+        if !qr_active {
+            let state = &self.annotation.signature;
+            let can_save = state.gallery.ready && state.gallery.entries.len() < 8;
+            panel = panel.child(
+                Checkbox::new("signature-save-template")
+                    .label("Simpan ke template lokal")
+                    .checked(state.save_template)
+                    .disabled(!can_save || self.opening)
+                    .on_change(cx.listener(|s, checked, _, cx| {
+                        s.annotation.signature.save_template = *checked;
+                        cx.notify();
+                    })),
+            );
+            if state.save_template
+                && let Some(input) = &state.library_label
+            {
+                panel = panel.child(Input::new(input).aria_label("Nama template tanda tangan"));
+            } else if state.gallery.entries.len() >= 8 {
+                panel = panel.child(
+                    gpui::div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("Pustaka penuh. Hapus template untuk menyimpan yang baru."),
+                );
+            }
+        }
+        panel.into_any_element()
+    }
+
+    fn signature_categories(&self, cx: &mut Context<Self>) -> gpui::Div {
+        gpui::div()
+            .flex()
+            .w_full()
+            .gap_1()
+            .p_1()
+            .rounded_lg()
+            .bg(cx.theme().muted)
+            .children(
+                [
+                    (
+                        SignatureKind::Signature,
+                        "Tanda Tangan",
+                        "Tanda tangan penuh",
+                    ),
+                    (SignatureKind::Initials, "Inisial", "Inisial"),
+                    (SignatureKind::Stamp, "Stempel", "Stempel"),
+                ]
+                .into_iter()
+                .map(|(kind, label, accessibility)| {
+                    Button::new(("signature-kind", kind as usize))
+                        .flex_1()
+                        .min_w_0()
+                        .label(label)
+                        .accessibility_label(accessibility)
+                        .selected(self.annotation.signature.kind == kind)
+                        .disabled(self.opening)
+                        .on_click(cx.listener(move |s, _, window, cx| {
+                            s.change_signature_kind(kind, window, cx)
+                        }))
+                }),
+            )
+    }
+
+    fn change_signature_kind(
+        &mut self,
+        kind: SignatureKind,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let state = &mut self.annotation.signature;
+        if state.kind == kind {
+            return;
+        }
+        let method = match (state.kind, kind) {
+            (_, SignatureKind::Stamp) => {
+                state.stamp_return_method = state.method;
+                SignatureMethod::Image
+            }
+            (SignatureKind::Stamp, _) => state.stamp_return_method,
+            _ => state.method,
+        };
+        let previous = SignatureCategoryDraft {
+            strokes: std::mem::take(&mut state.strokes),
+            imported: state.imported.take(),
+            remove_white: state.remove_white,
+        };
+        state.inactive_drafts[state.kind as usize] = previous;
+        let next = std::mem::take(&mut state.inactive_drafts[kind as usize]);
+        state.kind = kind;
+        state.strokes = next.strokes;
+        state.imported = next.imported;
+        state.remove_white = next.remove_white;
+        if kind == SignatureKind::Initials
+            && let Some(input) = state.initials.clone()
+            && input.read(cx).value().is_empty()
+            && let Some(name) = &state.text
+        {
+            let suggestion = name
+                .read(cx)
+                .value()
+                .split_whitespace()
+                .filter_map(|word| word.chars().next())
+                .take(8)
+                .collect::<String>()
+                .to_uppercase();
+            input.update(cx, |input, cx| input.set_value(suggestion, window, cx));
+        }
+        self.signature_method(method, cx);
+    }
+
+    fn signature_methods(&self, cx: &mut Context<Self>) -> gpui::Div {
+        let theme = cx.theme().colors;
+        let active = self.annotation.signature.method;
+        gpui::div()
+            .flex()
+            .gap_2()
+            .border_b_1()
+            .border_color(theme.border)
+            .children(
+                [
+                    (SignatureMethod::Draw, "Gambar", IconName::Pencil),
+                    (SignatureMethod::Text, "Ketik", IconName::Type),
+                    (SignatureMethod::Image, "Unggah", IconName::Image),
+                ]
+                .into_iter()
+                .map(|(method, label, icon)| {
+                    gpui::div()
+                        .pb_1()
+                        .border_b_2()
+                        .border_color(if method == active {
+                            theme.primary
+                        } else {
+                            gpui::transparent_black()
+                        })
+                        .child(
+                            Button::new(("signature-method", method as usize))
+                                .icon(icon)
+                                .label(label)
+                                .selected(method == active)
+                                .disabled(self.opening)
+                                .on_click(
+                                    cx.listener(move |s, _, _, cx| s.signature_method(method, cx)),
+                                ),
+                        )
+                }),
+            )
+    }
+
+    fn signature_draw_panel(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let weak = cx.weak_entity();
         let strokes = self.annotation.signature.strokes.clone();
         let color = signature_color(self.annotation.signature.color);
         let thickness = [2., 4., 6.][self.annotation.signature.thickness.min(2)];
         let pad = gpui::canvas(
-            |_, _, _| {},
-            move |bounds, _, window, _| {
+            |bounds, window, _| window.insert_hitbox(bounds, gpui::HitboxBehavior::Normal),
+            move |bounds, hitbox, window, _| {
                 for stroke in &strokes {
                     let mut path = gpui::PathBuilder::stroke(px(thickness));
                     for (i, p) in stroke.iter().enumerate() {
@@ -213,10 +603,10 @@ impl DocumentSession {
                     }
                 }
                 let down = weak.clone();
-                window.on_mouse_event(move |e: &gpui::MouseDownEvent, phase, _, cx| {
+                window.on_mouse_event(move |e: &gpui::MouseDownEvent, phase, window, cx| {
                     if phase == gpui::DispatchPhase::Bubble
                         && e.button == gpui::MouseButton::Left
-                        && bounds.contains(&e.position)
+                        && hitbox.is_hovered_at(e.position, window)
                     {
                         let _ = down.update(cx, |s, cx| {
                             if !s.annotation.signature.open {
@@ -225,9 +615,7 @@ impl DocumentSession {
                             if s.annotation.signature.strokes.len() >= 128 {
                                 return;
                             }
-                            s.annotation.signature.phone = None;
-                            s.annotation.signature.phone_qr = None;
-                            s.annotation.signature.phone_revision += 1;
+                            s.annotation.signature.phone_status = None;
                             s.annotation.signature.drawing = true;
                             s.annotation.signature.asset = None;
                             s.annotation.signature.preview = None;
@@ -261,16 +649,16 @@ impl DocumentSession {
                 window.on_mouse_event(move |e: &gpui::MouseUpEvent, phase, _, cx| {
                     if phase == gpui::DispatchPhase::Bubble && e.button == gpui::MouseButton::Left {
                         let _ = weak.update(cx, |s, cx| {
-                            s.annotation.signature.drawing = false;
-                            if let Some(asset) = draw_asset_with(
-                                &s.annotation.signature.strokes,
-                                signature_color(s.annotation.signature.color),
-                                s.annotation.signature.thickness,
-                            ) {
-                                s.annotation.signature.preview = asset_preview(&asset);
-                                s.annotation.signature.asset = Some(Arc::new(asset));
+                            if s.annotation.signature.drawing {
+                                s.annotation.signature.drawing = false;
+                                // Make a click behave like a short stroke as well.
+                                if let Some(stroke) = s.annotation.signature.strokes.last_mut()
+                                    && stroke.len() == 1
+                                {
+                                    stroke.push(stroke[0]);
+                                }
+                                s.refresh_signature_asset(cx);
                             }
-                            cx.notify();
                         });
                     }
                 });
@@ -278,311 +666,389 @@ impl DocumentSession {
         )
         .w_full()
         .h(px(180.));
-        let mut panel = gpui::div()
-            .id("signature-editor-scroll")
-            .max_h((window.viewport_size().height - px(330.)).max(px(240.)))
-            .overflow_y_scroll()
-            .w(px(500.))
-            .max_w_full()
+        let state = &self.annotation.signature;
+        let empty = state.strokes.is_empty();
+        let button_bar = gpui::div()
+            .absolute()
+            .top_2()
+            .right_2()
+            .flex()
+            .gap_1()
+            .block_mouse_except_scroll()
+            .child(
+                Button::new("signature-undo")
+                    .outline()
+                    .small()
+                    .icon(IconName::Undo2)
+                    .accessibility_label("Undo goresan")
+                    .tooltip("Undo goresan")
+                    .disabled(empty)
+                    .on_click(cx.listener(|s, _, _, cx| {
+                        s.annotation.signature.strokes.pop();
+                        s.refresh_signature_asset(cx);
+                    })),
+            )
+            .child(
+                Button::new("signature-clear")
+                    .outline()
+                    .small()
+                    .icon(IconName::Trash)
+                    .accessibility_label("Hapus semua")
+                    .tooltip("Hapus semua goresan")
+                    .disabled(empty)
+                    .on_click(cx.listener(|s, _, _, cx| {
+                        s.annotation.signature.strokes.clear();
+                        s.refresh_signature_asset(cx);
+                    })),
+            );
+        let thickness = gpui::div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .child(gpui::div().mr_1().text_sm().child("Ketebalan"))
+            .children(["Tipis", "Sedang", "Tebal"].into_iter().enumerate().map(
+                |(index, label)| {
+                    Button::new(("signature-thickness", index))
+                        .small()
+                        .w(px(36.))
+                        .accessibility_label(label)
+                        .tooltip(label)
+                        .selected(state.thickness == index)
+                        .child(
+                            gpui::div()
+                                .w(px(16.))
+                                .h(px((index + 1) as f32))
+                                .rounded_full()
+                                .bg(cx.theme().foreground),
+                        )
+                        .on_click(cx.listener(move |s, _, _, cx| {
+                            s.annotation.signature.thickness = index;
+                            s.refresh_signature_asset(cx);
+                        }))
+                },
+            ));
+        gpui::div()
             .flex()
             .flex_col()
-            .gap_3()
-            .p_2()
-            .child("Buat tanda tangan")
+            .gap_2()
             .child(
-                gpui::div().flex().gap_2().children(
-                    [
-                        (SignatureKind::Signature, "Tanda tangan penuh"),
-                        (SignatureKind::Initials, "Inisial"),
-                        (SignatureKind::Stamp, "Stempel"),
-                    ]
-                    .into_iter()
-                    .map(|(kind, label)| {
-                        Button::new(("signature-kind", kind as usize))
-                            .ghost()
-                            .label(label)
-                            .selected(self.annotation.signature.kind == kind)
-                            .on_click(cx.listener(move |s, _, window, cx| {
-                                s.annotation.signature.kind = kind;
-                                if kind == SignatureKind::Initials {
-                                    let name = s
-                                        .annotation
-                                        .signature
-                                        .text
-                                        .as_ref()
-                                        .map(|i| i.read(cx).value().to_string())
-                                        .unwrap_or_default();
-                                    if let Some(input) = s.annotation.signature.initials.clone()
-                                        && input.read(cx).value().is_empty()
-                                    {
-                                        let suggestion = name
-                                            .split_whitespace()
-                                            .filter_map(|w| w.chars().next())
-                                            .take(8)
-                                            .collect::<String>()
-                                            .to_uppercase();
-                                        input.update(cx, |i, cx| {
-                                            i.set_value(suggestion, window, cx)
-                                        });
-                                    }
-                                }
-                                s.signature_method(
-                                    if kind == SignatureKind::Stamp {
-                                        SignatureMethod::Image
-                                    } else {
-                                        s.annotation.signature.method
-                                    },
-                                    cx,
-                                );
-                            }))
-                    }),
-                ),
+                gpui::div()
+                    .flex()
+                    .justify_between()
+                    .items_center()
+                    .gap_2()
+                    .child(gpui::div().text_sm().child("Goreskan di area berikut"))
+                    .child(self.signature_phone_button(cx)),
+            )
+            .child(
+                gpui::div()
+                    .id("signature-pad")
+                    .role(gpui::Role::Group)
+                    .aria_label("Area gambar tanda tangan")
+                    .relative()
+                    .w_full()
+                    .rounded_lg()
+                    .overflow_hidden()
+                    .bg(gpui::white())
+                    .border_1()
+                    .border_color(cx.theme().border)
+                    .child(pad)
+                    .child(button_bar),
             )
             .child(
                 gpui::div()
                     .flex()
+                    .justify_between()
+                    .items_center()
                     .gap_2()
-                    .child(
-                        Button::new("signature-method-text")
-                            .ghost()
-                            .label("Ketik")
-                            .disabled(self.annotation.signature.kind == SignatureKind::Stamp)
-                            .selected(self.annotation.signature.method == SignatureMethod::Text)
-                            .on_click(cx.listener(|s, _, _, cx| {
-                                s.signature_method(SignatureMethod::Text, cx)
-                            })),
-                    )
-                    .child(
-                        Button::new("signature-method-draw")
-                            .ghost()
-                            .label("Gambar")
-                            .disabled(self.annotation.signature.kind == SignatureKind::Stamp)
-                            .selected(self.annotation.signature.method == SignatureMethod::Draw)
-                            .on_click(cx.listener(|s, _, _, cx| {
-                                s.signature_method(SignatureMethod::Draw, cx);
-                            })),
-                    )
-                    .child(
-                        Button::new("signature-method-image")
-                            .ghost()
-                            .label("Dari gambar")
-                            .selected(self.annotation.signature.method == SignatureMethod::Image)
-                            .on_click(cx.listener(|s, _, _, cx| {
-                                s.signature_method(SignatureMethod::Image, cx);
-                            })),
-                    ),
+                    .child(self.signature_swatches(cx))
+                    .child(thickness),
             )
-            .child(
-                if self.annotation.signature.method == SignatureMethod::Draw {
-                    "Gambar tanda tangan dengan mouse di area berikut."
-                } else if self.annotation.signature.method == SignatureMethod::Text {
-                    "Ketik nama atau inisial dan pilih gaya tulisan."
-                } else {
-                    "Impor PNG/JPEG. Transparansi PNG dipertahankan."
-                },
-            )
-            .when(
-                self.annotation.signature.method == SignatureMethod::Draw
-                    && self.annotation.signature.phone.is_none(),
-                |panel| {
-                    panel.child(
-                        gpui::div()
-                            .id("signature-pad")
-                            .role(gpui::Role::Group)
-                            .aria_label("Area gambar tanda tangan")
-                            .w_full()
-                            .bg(gpui::rgb(0xffffff))
-                            .border_1()
-                            .border_color(cx.theme().border)
-                            .child(pad),
-                    )
-                },
-            );
-        if self.annotation.signature.method == SignatureMethod::Text {
-            let input = if self.annotation.signature.kind == SignatureKind::Initials {
-                &self.annotation.signature.initials
-            } else {
-                &self.annotation.signature.text
-            };
-            if let Some(input) = input {
-                panel = panel.child(Input::new(input).aria_label("Nama atau inisial tanda tangan"));
-            }
-            panel = panel.child(
-                gpui::div().flex().gap_2().children(
-                    ["Caveat", "Dancing Script"]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(style, name)| {
-                            Button::new(("signature-font", style))
-                                .ghost()
-                                .label(name)
-                                .selected(self.annotation.signature.style == style)
-                                .on_click(cx.listener(move |s, _, _, cx| {
-                                    s.annotation.signature.style = style;
-                                    s.refresh_signature_text(cx);
-                                }))
-                        }),
-                ),
-            );
-            panel = panel.child(
-                gpui::div().flex().gap_2().children(
-                    ["Hitam", "Biru", "Merah"]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(color, name)| {
-                            Button::new(("signature-text-color", color))
-                                .ghost()
-                                .label(name)
-                                .selected(self.annotation.signature.color == color)
-                                .on_click(cx.listener(move |s, _, _, cx| {
-                                    s.annotation.signature.color = color;
-                                    s.refresh_signature_text(cx);
-                                }))
-                        }),
-                ),
-            );
-        }
-        if self.annotation.signature.method == SignatureMethod::Draw
-            && self.annotation.signature.phone.is_none()
-        {
-            panel = panel.child(
-                gpui::div().flex().gap_2().children(
-                    ["Hitam", "Biru", "Merah"]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(color, label)| {
-                            Button::new(("signature-draw-color", color))
-                                .ghost()
-                                .label(label)
-                                .selected(self.annotation.signature.color == color)
-                                .on_click(cx.listener(move |s, _, _, cx| {
-                                    s.annotation.signature.color = color;
-                                    s.signature_method(SignatureMethod::Draw, cx);
-                                }))
-                        }),
-                ),
-            );
-            panel =
-                panel.child(gpui::div().flex().gap_2().children(
-                    ["Tipis", "Sedang", "Tebal"].into_iter().enumerate().map(
-                        |(thickness, label)| {
-                            Button::new(("signature-thickness", thickness))
-                                .ghost()
-                                .label(label)
-                                .selected(self.annotation.signature.thickness == thickness)
-                                .on_click(cx.listener(move |s, _, _, cx| {
-                                    s.annotation.signature.thickness = thickness;
-                                    s.signature_method(SignatureMethod::Draw, cx);
-                                }))
-                        },
-                    ),
-                ));
-        }
-        if self.annotation.signature.method == SignatureMethod::Image {
-            panel = panel
-                .child(
-                    Button::new("signature-remove-white")
-                        .ghost()
-                        .label("Hapus latar putih")
-                        .selected(self.annotation.signature.remove_white)
-                        .disabled(self.annotation.signature.imported.is_none())
-                        .on_click(cx.listener(|s, _, _, cx| {
-                            s.annotation.signature.remove_white =
-                                !s.annotation.signature.remove_white;
-                            s.signature_method(SignatureMethod::Image, cx);
-                        })),
-                )
-                .child("Penghapusan latar opsional. Klik lagi untuk mengembalikan gambar asli.");
-        }
-        if self.annotation.signature.method == SignatureMethod::Draw {
-            panel = panel.child(self.signature_phone_panel(cx));
-        }
-        if let Some(preview) = &self.annotation.signature.preview {
-            panel = panel.child(
-                gpui::div()
-                    .bg(gpui::rgb(0xffffff))
-                    .child(gpui::img(preview.clone()).h(px(90.)).max_w_full()),
-            );
-        }
-        if self.annotation.signature.phone.is_none() {
-            panel = panel.child(self.signature_library_panel(cx));
-        }
-        if let Some(error) = &self.annotation.signature.error {
-            panel = panel.child(error.clone());
-        }
-        gpui::div().w(px(500.)).max_w_full().flex().flex_col().gap_2().child(panel).child(gpui::div().flex().gap_2()
-            .child(Button::new("signature-undo").ghost().label("Undo goresan").disabled(self.annotation.signature.strokes.is_empty())
-                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.strokes.pop();s.annotation.signature.asset=None;s.annotation.signature.preview=None;cx.notify();})))
-            .child(Button::new("signature-clear").ghost().label("Hapus semua")
-                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.phone=None;s.annotation.signature.phone_qr=None;s.annotation.signature.strokes.clear();s.annotation.signature.asset=None;s.annotation.signature.imported=None;s.annotation.signature.preview=None;s.annotation.signature.error=None;cx.notify();})))
-            .child(Button::new("signature-import").ghost().label("Impor gambar")
-                .on_click(cx.listener(|s,_,_,cx|s.import_signature(cx)))))
-            .child(Button::new("signature-cancel").ghost().label("Batal tanda tangan")
-                .on_click(cx.listener(|s,_,_,cx|{s.annotation.signature.phone=None;s.annotation.signature.phone_qr=None;s.annotation.signature.open=false;s.annotation.signature.drawing=false;s.annotation_popup_changed(false,cx);cx.notify();})))
-            .child(Button::new("signature-use").label("Gunakan tanda tangan")
-                .disabled(self.annotation.signature.phone.is_some() || self.annotation.signature.asset.is_none() && (self.annotation.signature.method!=SignatureMethod::Draw || self.annotation.signature.strokes.iter().all(|s|s.len()<2)))
-                .on_click(cx.listener(|s,_,window,cx|{
-                    if s.annotation.signature.asset.is_none() && s.annotation.signature.method==SignatureMethod::Draw {s.annotation.signature.asset=draw_asset_with(&s.annotation.signature.strokes,signature_color(s.annotation.signature.color),s.annotation.signature.thickness).map(Arc::new);}
-                    if s.annotation.signature.asset.is_some(){
-                        s.annotation.signature.phone=None;s.annotation.signature.phone_qr=None;
-                        s.annotation_popup(false);s.annotation.signature.placing=true;s.annotation.signature.open=false;
-                        s.annotation.tool=crate::annotations::Tool::Select;
-                        s.status="Klik atau drag di halaman untuk menempatkan tanda tangan. Esc membatalkan.".into();
-                        s.focus.focus(window,cx);
-                    }
-                    cx.notify();
-                }))).into_any_element()
+            .when_some(state.phone_status.clone(), |el, status| {
+                el.child(gpui::div().text_sm().child(status))
+            })
+            .into_any_element()
     }
+
+    fn signature_swatches(&self, cx: &mut Context<Self>) -> gpui::Div {
+        let theme = cx.theme().colors;
+        gpui::div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .child(gpui::div().mr_1().text_sm().child("Warna"))
+            .children(
+                ["Hitam", "Biru", "Merah"]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(color, label)| {
+                        let [r, g, b] = signature_color(color);
+                        Button::new(("signature-color", color))
+                            .small()
+                            .size(px(30.))
+                            .p_0()
+                            .rounded_full()
+                            .accessibility_label(label)
+                            .tooltip(label)
+                            .selected(color == self.annotation.signature.color)
+                            .border_2()
+                            .border_color(if color == self.annotation.signature.color {
+                                theme.primary
+                            } else {
+                                theme.border
+                            })
+                            .child(
+                                gpui::div()
+                                    .size(px(16.))
+                                    .flex_shrink_0()
+                                    .rounded_full()
+                                    .bg(gpui::rgb(u32::from_be_bytes([0, r, g, b]))),
+                            )
+                            .on_click(cx.listener(move |s, _, _, cx| {
+                                s.annotation.signature.color = color;
+                                s.refresh_signature_asset(cx);
+                            }))
+                    }),
+            )
+    }
+
+    fn signature_text_panel(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let state = &self.annotation.signature;
+        let input = if state.kind == SignatureKind::Initials {
+            &state.initials
+        } else {
+            &state.text
+        };
+        let fonts = gpui::div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .child(gpui::div().mr_1().text_sm().child("Gaya Tulisan"))
+            .children(["Caveat", "Dancing Script"].into_iter().enumerate().map(
+                |(style, label)| {
+                    let mut button = Button::new(("signature-font", style))
+                        .small()
+                        .accessibility_label(label)
+                        .tooltip(label)
+                        .selected(state.style == style)
+                        .on_click(cx.listener(move |s, _, _, cx| {
+                            s.annotation.signature.style = style;
+                            s.refresh_signature_text(cx);
+                        }));
+                    if let Some(sample) = &state.font_samples[style] {
+                        let width = if style == 0 { px(48.) } else { px(84.) };
+                        button = button.child(
+                            gpui::div().rounded_sm().bg(gpui::white()).child(
+                                gpui::img(sample.clone())
+                                    .w(width)
+                                    .h(px(19.))
+                                    .object_fit(gpui::ObjectFit::Contain),
+                            ),
+                        );
+                    } else {
+                        button = button.label(label);
+                    }
+                    button
+                },
+            ));
+        gpui::div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .when_some(input.as_ref(), |el, input| {
+                el.child(Input::new(input).aria_label("Nama atau inisial tanda tangan"))
+            })
+            .child(self.signature_preview_box("Pratinjau tanda tangan", cx))
+            .child(
+                gpui::div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_2()
+                    .child(fonts)
+                    .child(self.signature_swatches(cx)),
+            )
+            .into_any_element()
+    }
+
+    fn signature_preview_box(&self, label: &'static str, cx: &App) -> gpui::Stateful<gpui::Div> {
+        gpui::div()
+            .id("signature-preview")
+            .role(gpui::Role::Group)
+            .aria_label(label)
+            .w_full()
+            .h(px(180.))
+            .p_4()
+            .flex()
+            .items_center()
+            .justify_center()
+            .relative()
+            .rounded_lg()
+            .overflow_hidden()
+            .border_1()
+            .border_color(cx.theme().border)
+            .bg(gpui::rgb(0xf8fafc))
+            .when(
+                self.annotation.signature.method == SignatureMethod::Image,
+                |el| el.child(transparency_grid()),
+            )
+            .when_some(self.annotation.signature.preview.clone(), |el, preview| {
+                el.child(
+                    gpui::img(preview)
+                        .size_full()
+                        .object_fit(gpui::ObjectFit::Contain),
+                )
+            })
+    }
+
+    fn signature_upload_panel(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let theme = cx.theme().colors;
+        let empty = self.annotation.signature.imported.is_none();
+        gpui::div()
+            .id("signature-upload")
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .drag_over::<gpui::ExternalPaths>(|style, _, _, cx| style.bg(cx.theme().muted))
+            .on_drop(cx.listener(|s, paths: &gpui::ExternalPaths, _, cx| {
+                if s.opening || s.edits_locked() {
+                    return;
+                }
+                if let [path] = paths.0.as_slice() {
+                    s.decode_signature_image(path.clone(), cx);
+                } else {
+                    s.annotation.signature.error = Some("Seret satu gambar PNG atau JPEG.".into());
+                    cx.notify();
+                }
+            }))
+            .when(empty, |el| {
+                el.child(
+                    Button::new("signature-import")
+                        .w_full()
+                        .h(px(180.))
+                        .border_2()
+                        .border_dashed()
+                        .border_color(theme.border)
+                        .rounded_lg()
+                        .accessibility_label("Pilih gambar tanda tangan")
+                        .disabled(self.opening)
+                        .child(
+                            gpui::div()
+                                .flex()
+                                .flex_col()
+                                .items_center()
+                                .gap_2()
+                                .child(Icon::new(IconName::Upload).size(px(24.)))
+                                .child(
+                                    gpui::div()
+                                        .font_semibold()
+                                        .child("Klik untuk pilih gambar atau seret ke sini"),
+                                )
+                                .child(
+                                    gpui::div()
+                                        .text_xs()
+                                        .text_color(theme.muted_foreground)
+                                        .child("PNG atau JPEG. Transparansi PNG dipertahankan."),
+                                ),
+                        )
+                        .on_click(cx.listener(|s, _, _, cx| s.import_signature(cx))),
+                )
+            })
+            .when(!empty, |el| {
+                el.child(self.signature_preview_box("Pratinjau gambar tanda tangan", cx))
+                    .child(
+                        gpui::div()
+                            .flex()
+                            .justify_between()
+                            .gap_2()
+                            .child(
+                                Button::new("signature-remove-white")
+                                    .outline()
+                                    .icon(IconName::WandSparkles)
+                                    .label("Hapus latar putih")
+                                    .selected(self.annotation.signature.remove_white)
+                                    .disabled(self.opening)
+                                    .on_click(cx.listener(|s, _, _, cx| {
+                                        s.annotation.signature.remove_white =
+                                            !s.annotation.signature.remove_white;
+                                        s.refresh_signature_asset(cx);
+                                    })),
+                            )
+                            .child(
+                                Button::new("signature-replace-image")
+                                    .outline()
+                                    .icon(IconName::Upload)
+                                    .label("Ganti gambar")
+                                    .disabled(self.opening)
+                                    .on_click(cx.listener(|s, _, _, cx| s.import_signature(cx))),
+                            ),
+                    )
+            })
+            .into_any_element()
+    }
+
     fn import_signature(&mut self, cx: &mut Context<Self>) {
         if self.edits_locked() || self.opening {
             return;
         }
-        self.annotation.signature.phone = None;
-        self.annotation.signature.phone_qr = None;
+        let revision = self.annotation.signature.editor_revision;
         let picker = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
             multiple: false,
-            prompt: Some("Impor tanda tangan PNG atau JPEG".into()),
+            prompt: Some("Unggah gambar PNG atau JPEG".into()),
         });
         self.opening = true;
         cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = picker.await;
-            let path = match result {
+            let path = match picker.await {
                 Ok(Ok(Some(paths))) => paths.into_iter().next(),
                 _ => None,
             };
-            if let Some(path) = path {
-                let task = cx
-                    .background_executor()
-                    .spawn(async move { load_asset(&path) });
-                let result = task.await;
-                let _ = this.update(cx, |s, cx| {
-                    s.opening = false;
-                    match result {
-                        Ok(asset) => {
-                            s.annotation.signature.method = SignatureMethod::Image;
-                            s.annotation.signature.preview = asset_preview(&asset);
-                            s.annotation.signature.asset = Some(Arc::new(asset));
-                            s.annotation.signature.imported = s.annotation.signature.asset.clone();
-                            s.annotation.signature.remove_white = false;
-                            s.annotation.signature.strokes.clear();
-                            s.annotation.signature.error = None;
-                        }
-                        Err(e) => s.annotation.signature.error = Some(e),
-                    }
-                    cx.notify();
-                });
-            } else {
-                let _ = this.update(cx, |s, cx| {
+            let _ = this.update(cx, |s, cx| {
+                if let Some(path) = path
+                    && s.annotation.signature.open
+                    && s.annotation.signature.editor_revision == revision
+                {
+                    s.decode_signature_image(path, cx);
+                } else {
                     s.opening = false;
                     cx.notify();
-                });
-            }
+                }
+            });
         })
         .detach();
     }
+
+    fn decode_signature_image(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        let revision = self.annotation.signature.editor_revision;
+        self.opening = true;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move { load_asset(&path) })
+                .await;
+            let _ = this.update(cx, |s, cx| {
+                s.opening = false;
+                let state = &mut s.annotation.signature;
+                if state.open && state.editor_revision == revision {
+                    match result {
+                        Ok(asset) => {
+                            state.imported = Some(Arc::new(asset));
+                            state.remove_white = false;
+                            s.refresh_signature_asset(cx);
+                        }
+                        Err(error) => state.error = Some(error),
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     pub(super) fn change_selected_signature(
         &mut self,
         duplicate: bool,
@@ -754,6 +1220,28 @@ impl DocumentSession {
         false
     }
 }
+fn transparency_grid() -> impl gpui::IntoElement {
+    gpui::canvas(
+        |_, _, _| (),
+        |bounds, (), window, _| {
+            let tile = px(12.);
+            let cols = (f32::from(bounds.size.width) / f32::from(tile)).ceil() as usize;
+            let rows = (f32::from(bounds.size.height) / f32::from(tile)).ceil() as usize;
+            for y in 0..rows {
+                for x in (y % 2..cols).step_by(2) {
+                    let origin = bounds.origin + gpui::point(tile * x as f32, tile * y as f32);
+                    window.paint_quad(gpui::fill(
+                        Bounds::new(origin, size(tile, tile)),
+                        gpui::rgb(0xeff2f6),
+                    ));
+                }
+            }
+        },
+    )
+    .absolute()
+    .inset_0()
+}
+
 fn signature_delta(delta: [f32; 2], turns: u8) -> [f32; 2] {
     let point =
         pdf_domain::annotation::rotate([0.5 + delta[0], 0.5 + delta[1]], (4 - turns % 4) % 4);

@@ -1,5 +1,37 @@
 # Pengujian Origo
 
+## Redesign tanda tangan, inisial, dan stempel (22 November 2026)
+
+Editor membuka galeri dua kolom jika pustaka berisi template. Form pembuatan
+terpisah menampilkan hanya aksi untuk Gambar, Ketik, Unggah, atau QR aktif.
+Stempel membuka unggahan langsung. Footer tetap memuat Batal dan Gunakan.
+Klik ganda pada kartu langsung masuk ke penempatan di halaman. Nama template
+opsional, dengan nama otomatis per kategori. Edit nama dan konfirmasi hapus
+berlangsung di kartu. Pustaka lokal tetap kompatibel dengan file versi sebelumnya.
+
+Format, Clippy tanpa warning, 20 unit test desktop, dan build release lulus.
+Suite editor 17 kasus memeriksa pergantian mode, preview, drawing, placement,
+undo/redo, PNG lewat picker, serta Save As dan buka ulang. Suite galeri
+memeriksa nama otomatis, restart, klik ganda, rename Enter/blur/Esc, dan hapus.
+Suite QR memeriksa clipboard, kirim goresan LAN, Save As, dan pembatalan.
+Pad HP lulus tes JavaScript. Hash PDF sumber fixture tetap sama.
+
+Bukti UI lokal:
+- Editor `.research/signature-ui-22eb79e702f94076ba1110e8f2fc1679`
+- Galeri `.research/signature-library-ui-d38fd39c881a423598d2e723f8b5c246`
+- QR `.research/signature-phone-ui-15f6077a6e6241eb95152c9ecc09deb1`
+- Footer tetap terlihat saat scroll di viewport 860 x 500
+  `.research/signature-small-window-ui-cfd6a1baabfd469cb592c5069f94f0d4`
+
+Drag-and-drop file dari Explorer belum terverifikasi secara end-to-end karena
+simulasi native tidak menghasilkan drop yang dapat dinilai. QR diuji dengan
+klien lokal. Scan dan sentuhan HP fisik belum diuji.
+
+Build teruji dipasang ke target/release/pdf-studio.exe untuk run.cmd setelah
+target dipastikan tidak aktif. SHA-256 build dan hasil pemasangan identik
+`32FC4AFD8090ECB38B8BA96C5D12BF55C2136C6B8CCC9F969E65E284BB75E7DD`.
+
+
 ## Tanda tangan tahap 5: QR LAN individu (20 November 2026)
 
 QR membuka web pad lokal di browser HP, tanpa akun/relay/upload PDF. Listener

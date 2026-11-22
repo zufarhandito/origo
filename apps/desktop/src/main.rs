@@ -49,6 +49,7 @@ actions!(
     pdf_studio,
     [
         DeleteAnnotation,
+        CancelSignatureRename,
         DuplicateSignature,
         SignatureLeft,
         SignatureRight,
@@ -232,6 +233,11 @@ fn main() -> anyhow::Result<()> {
                 KeyBinding::new("ctrl-z", UndoEdit, Some("PdfViewer")),
                 KeyBinding::new("ctrl-y", RedoEdit, Some("PdfViewer")),
                 KeyBinding::new("delete", DeleteAnnotation, Some("PdfViewer")),
+                KeyBinding::new(
+                    "escape",
+                    CancelSignatureRename,
+                    Some("SignatureTemplateRename"),
+                ),
                 KeyBinding::new("ctrl-d", DuplicateSignature, Some("PdfViewer")),
                 KeyBinding::new("alt-left", SignatureLeft, Some("PdfViewer")),
                 KeyBinding::new("alt-right", SignatureRight, Some("PdfViewer")),

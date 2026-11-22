@@ -74,8 +74,9 @@ impl DocumentSession {
     pub(super) fn close_annotation_popups(&mut self) {
         self.annotation_popup(false);
         self.annotation.popup_open = false;
-        self.annotation.signature.phone = None;
-        self.annotation.signature.phone_qr = None;
+        self.cancel_signature_phone();
+        self.annotation.signature.editor_revision += 1;
+        self.annotation.signature.gallery.reset_selection();
         self.annotation.signature.open = false;
         self.annotation.signature.drawing = false;
         self.annotation.signature.gesture = None;
@@ -544,7 +545,10 @@ impl DocumentSession {
         true
     }
     pub(super) fn finish_annotation(&mut self, cx: &mut Context<Self>) {
-        self.annotation.signature.drawing = false;
+        // The editor canvas owns its gesture and finalizes it in its mouse-up handler.
+        if !self.annotation.signature.open {
+            self.annotation.signature.drawing = false;
+        }
         if let Some((page, a, _, _)) = self.annotation.signature.gesture.take() {
             let all = self.workspace.as_ref().map(|w| {
                 let mut all = w.annotations(page).to_vec();

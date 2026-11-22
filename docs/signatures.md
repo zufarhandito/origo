@@ -6,11 +6,15 @@ dan arahan pemilik untuk melanjutkan tanda tangan setelah anotator selesai.
 ## Penggunaan
 
 1. Dalam mode Baca, buka **Anotasi > Tanda tangan**.
-2. Pilih Tanda tangan penuh, Inisial atau Stempel. Untuk tanda tangan/inisial,
-   pilih Ketik, Gambar (mouse/QR HP) atau Dari gambar. Stempel memakai impor PNG/JPEG.
-   Undo goresan membatalkan goresan terakhir; Hapus semua membersihkan draft.
-3. Klik **Gunakan tanda tangan**, lalu klik atau drag di halaman untuk menempatkan.
-   Pembuatan draft tidak menandai dokumen berubah; penempatan baru mengubah dirty.
+2. Origo membuka **Galeri Template** jika pustaka memuat template. Pilih satu kartu
+   untuk melihat sorotannya dan mengaktifkan **Gunakan Tanda Tangan**, atau klik
+   ganda pada kartu untuk langsung masuk ke penempatan. **Buat Baru** membuka form.
+   Jika pustaka kosong, Origo langsung membuka form pembuatan.
+3. Pilih kategori **Tanda Tangan**, **Inisial**, atau **Stempel**. Gunakan **Gambar**,
+   **Ketik**, atau **Unggah** untuk tanda tangan dan inisial. Stempel langsung
+   membuka unggahan gambar. **Gunakan Tanda Tangan** masuk ke penempatan. Klik
+   atau drag pada halaman untuk menentukan posisi. Dokumen berubah saat objek
+   ditempatkan.
 4. Dalam tool Pilih, drag tanda tangan untuk memindahkannya. Drag kotak sudut kanan
    bawah untuk resize proporsional. Garis batas memperlihatkan posisi/ukuran draft;
    gambar diterapkan saat mouse dilepas. Setiap gesture satu langkah Undo/Redo.
@@ -64,14 +68,19 @@ Riset awal dibuat sebelum implementasi. Pemilik kemudian mengotorisasi tahap 1-5
 untuk pemakaian individu dan lokal, termasuk QR LAN. Perilaku aktual dijelaskan
 di bawah; layanan kolaborasi/request/audit/sertifikat ditunda.
 
-## Editor tahap 1 (20 November 2026)
+## Editor dan galeri (redesign 22 November 2026)
 
-Editor 500 px memisahkan metode Gambar dan Dari gambar, menampilkan preview
-hasil goresan setelah mouse dilepas, serta menyediakan Batal tanda tangan.
-Batal menutup editor tanpa menandai PDF berubah; draft tetap tersedia dalam view.
-Undo goresan membuang cache aset/preview agar hasil tidak memakai goresan lama.
-Impor menampilkan preview dan memilih metode gambar. Penempatan dan ekspor tetap
-memakai alur existing. Tahap type/initial/stamp/library/QR belum termasuk tahap ini.
+Kategori memakai pilihan tiga kolom dan metode memakai tab bergaris dengan ikon.
+Setiap metode menampilkan kontrolnya sendiri. Area gambar menyediakan tombol
+Undo/Hapus di kanvas serta pilihan warna dan ketebalan di bawahnya. Mode Ketik
+menampilkan pratinjau langsung dengan contoh gaya font dan swatch. Unggah menerima
+satu PNG/JPEG dari pemilih file atau seret dari desktop. Sesudah impor, kanvas
+berpola kotak memperlihatkan transparansi, dengan pilihan pulihkan warna latar
+melalui toggle **Hapus latar putih** dan **Ganti gambar**.
+
+Footer **Batal** dan **Gunakan Tanda Tangan** tetap terlihat saat isi digulir.
+Batal menutup editor dan tidak menempatkan objek. Origo mempertahankan draft gambar,
+impor, dan pengaturan latar per kategori selama view dokumen aktif.
 
 ## Ketik dan inisial (tahap 2)
 
@@ -96,26 +105,31 @@ Editor scroll mengikuti tinggi jendela agar kontrol tidak hilang pada layar pend
 
 ## Pustaka lokal dan penempatan (tahap 4)
 
-Isi Nama template lalu Simpan template untuk menyimpan aset secara eksplisit.
-Maksimal delapan template berlabel 1-40 karakter disimpan di signature-library.json
-pada direktori state lokal. File berisi gambar tanda tangan, bukan dokumen PDF;
-file ini tidak dienkripsi. Jangan simpan pada komputer bersama bila tidak diinginkan.
-Pilih Pakai template untuk preview, lalu Gunakan untuk placement. Ubah nama dan
-Hapus template hanya mengubah pustaka; anotasi yang sudah ditempatkan tidak berubah.
-Read/write pustaka berjalan di background dan serial, write atomik; data rusak
-menonaktifkan write agar file lama tidak ditimpa. Metadata file maksimal 10 MiB.
+Centang **Simpan ke template lokal** jika ingin menyimpan saat menekan
+**Gunakan Tanda Tangan**. Kolom nama baru muncul setelah dicentang. Nama kosong
+diisi otomatis menurut kategori, misalnya **Tanda Tangan 1**, dengan nomor
+pertama yang masih tersedia. Maksimal delapan template dengan nama
+1?40 karakter disimpan di `signature-library.json` pada direktori state lokal.
+File ini menyimpan gambar aset dan tidak terenkripsi.
+
+Galeri menampilkan dua kolom kartu dengan badge kategori dan pratinjau. Dari menu
+ikon pada kartu, pilih **Ubah nama** lalu Enter atau pindah fokus untuk menyimpan.
+Esc membatalkan edit nama. **Hapus** membuka konfirmasi di kartu. Menghapus
+template mempertahankan objek yang sudah ditempatkan pada PDF. Pustaka memakai
+penulisan atomik di background, dengan batas 10 MiB. Jika file rusak, Origo
+menampilkan pesan kesalahan dan mempertahankan file lama.
 
 Pilih objek tanda tangan/stempel: Duplikat tanda tangan atau Ctrl+D membuat salinan
 bergeser sedikit sebagai satu langkah Undo. Alt+panah menggeser objek terpilih
 sedikit per langkah, dibatasi ke halaman. Shortcut berlaku saat canvas fokus,
 sehingga mengetik pada input tidak menggeser objek. Batas delapan objek tetap.
 Rotasi objek dan terapkan ke banyak halaman belum termasuk checkpoint ini.
-Footer Gunakan/Batal serta aksi draft tetap terlihat; isi panjang dapat discroll.
 
 ## Gambar dari HP lewat QR LAN (tahap 5)
 
-Dalam metode Gambar, pilih Gambar dari HP. Scan QR dengan browser HP pada jaringan
-yang sama. Tidak perlu akun, instal aplikasi HP, internet atau server relay.
+Dalam metode Gambar, pilih **Gambar dari HP**. Pindai QR dengan kamera HP pada
+jaringan yang sama atau gunakan **Salin tautan** jika perlu membuka alamat secara
+manual. **Batalkan QR** mengembalikan kanvas desktop. Tidak perlu akun, instal aplikasi HP, internet atau server relay.
 Halaman lokal menyediakan pad jari/stylus, Undo, Hapus dan Kirim. Origo menerima
 preview; PDF baru berubah setelah Gunakan dan placement, bukan saat gambar diterima.
 PDF tidak dikirim ke HP. Aset/goresan tidak dikirim ke layanan eksternal.
