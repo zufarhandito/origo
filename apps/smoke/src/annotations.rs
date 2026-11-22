@@ -5,7 +5,10 @@ use pdf_application::{
     export::{ExportControl, ExportPlan, ExportScope, finish_export, prepare_export},
     open_document,
 };
-use pdf_domain::{Command, annotation::Annotation};
+use pdf_domain::{
+    Command,
+    annotation::{Annotation, MAX_SIGNATURES, SignatureImage},
+};
 use pdf_engine::PdfiumRenderer;
 use pdf_platform::LocalOutput;
 use qpdf_adapter::QpdfExporter;
@@ -14,8 +17,80 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     for feature in ["plain", "cropped-signature"] {
         run_fixture(root, renderer, feature)?;
     }
+    run_signature_limit_fixture(root, renderer)?;
     Ok(())
 }
+
+fn run_signature_limit_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
+    let dir = tempfile::tempdir_in(root.join(".research"))?;
+    let source = dir.path().join("source.pdf");
+    let bytes = crate::synthetic::export_safety_pdf("plain");
+    std::fs::write(&source, &bytes)?;
+    let mut workspace = open_document(renderer, &source, SourceId(1))?;
+    let page = workspace.pages()[0].id;
+    let mut state = 1u32;
+    let image = std::sync::Arc::new(SignatureImage {
+        width: SignatureImage::MAX_SIDE,
+        height: SignatureImage::MAX_PIXELS / SignatureImage::MAX_SIDE,
+        rgba: (0..SignatureImage::MAX_PIXELS * 4)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                state as u8
+            })
+            .collect(),
+    });
+    let mut signatures: Vec<_> = (1..=MAX_SIGNATURES)
+        .map(|id| Annotation {
+            id: id as u64,
+            highlight: false,
+            color: [0; 3],
+            width: 1.,
+            points: vec![[0.15, 0.75], [0.65, 0.9]],
+            rectangles: false,
+            signature: Some(image.clone()),
+        })
+        .collect();
+    workspace.execute(Command::Annotate {
+        page,
+        annotations: signatures.clone(),
+    })?;
+    let exporter = QpdfExporter::new(&root.join("sidecars"));
+    let control = ExportControl::default();
+    let output = dir.path().join("large-signatures.pdf");
+    let prepared = prepare_export(
+        ExportPlan::capture(&workspace, 1, ExportScope::All)?,
+        &output,
+        &LocalOutput,
+        &exporter,
+        &control,
+    )?;
+    finish_export(prepared, true, &exporter, renderer, &control)?;
+    let mut reopened = open_document(renderer, &output, SourceId(2))?;
+    let reopened_page = reopened.pages()[0].id;
+    ensure!(reopened.annotations(reopened_page) == signatures);
+    signatures.pop();
+    reopened.execute(Command::Annotate {
+        page: reopened_page,
+        annotations: signatures.clone(),
+    })?;
+    let edited = dir.path().join("large-signatures-edited.pdf");
+    let prepared = prepare_export(
+        ExportPlan::capture(&reopened, 2, ExportScope::All)?,
+        &edited,
+        &LocalOutput,
+        &exporter,
+        &control,
+    )?;
+    finish_export(prepared, true, &exporter, renderer, &control)?;
+    let check = open_document(renderer, &edited, SourceId(3))?;
+    ensure!(check.annotations(check.pages()[0].id) == signatures);
+    ensure!(std::fs::read(&source)? == bytes, "source read-only");
+    println!("PASS annotations: eight full-size high-entropy signatures save, reopen and edit");
+    Ok(())
+}
+
 fn run_fixture(root: &Path, renderer: &PdfiumRenderer, feature: &str) -> Result<()> {
     let dir = tempfile::tempdir_in(root.join(".research"))?;
     let source = dir.path().join("source.pdf");

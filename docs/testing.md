@@ -1,5 +1,24 @@
 # Pengujian Origo
 
+## Kursor penempatan dan resolusi tanda tangan (22 November 2026)
+
+Format, Clippy workspace tanpa warning, 79 unit test, build release, dan smoke
+ekspor lulus. Smoke anotasi memverifikasi delapan aset 1024 × 512 yang sulit
+dikompresi dapat disimpan, dibuka, dihapus satu, dan disimpan kembali. Aset yang
+tersisa dibaca ulang dengan piksel RGBA identik. Byte PDF sumber tetap sama.
+
+Pada PDF sintetis berteks, tes UI Windows memeriksa kursor teks sebelum
+penempatan, kursor silang saat ghost aktif, dan kursor teks kembali setelah
+Esc atau klik. QPDF mengonfirmasi bahwa **Simpan sebagai** menulis goresan uji
+berukuran 624 × 214 piksel setelah crop, dengan dimensi sama dan interpolasi
+pada gambar RGB serta mask alpha. Tes ini juga membuka ulang hasil simpan dan
+menghapus tanda tangan.
+
+Semua 22 skenario editor serta smoke galeri dan QR LAN lulus. QR diuji dengan
+klien lokal. Bukti di `.research/signature-ui-45a7a19397a54c139e532ae7d03ddc24`,
+`.research/signature-library-ui-cef5dea78a8b444a957f9c8ac8100810`, dan
+`.research/signature-phone-ui-aa9b23578f284e58bf21c83393b61f42`.
+
 ## Penghalusan goresan tanda tangan (22 November 2026)
 
 Goresan mouse dan QR berbagi geometri 2:1. Sampel subpiksel digabung, belokan

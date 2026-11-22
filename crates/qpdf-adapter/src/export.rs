@@ -6,6 +6,7 @@ use pdf_application::{
         OPTIMIZE_BASELINE_FILE, PdfExporter, PreflightReport, resolve_source,
     },
 };
+use pdf_domain::annotation::{Annotation, SignatureImage};
 use pdf_platform::{fingerprint, run};
 use serde_json::{Value, json};
 use std::{
@@ -14,6 +15,19 @@ use std::{
     process::Command,
 };
 const JSON_LIMIT: usize = 16 * 1024 * 1024;
+
+fn annotation_json_limit<'a>(mut annotations: impl Iterator<Item = &'a Annotation>) -> usize {
+    // Eight 2 MiB images can occupy almost 22 MiB in base64 before other PDF objects.
+    if annotations.any(|a| {
+        a.signature
+            .as_ref()
+            .is_some_and(|image| image.rgba.len() > SignatureImage::LEGACY_MAX_PIXELS as usize * 4)
+    }) {
+        2 * JSON_LIMIT
+    } else {
+        JSON_LIMIT
+    }
+}
 #[derive(Clone)]
 pub struct QpdfExporter {
     executable: PathBuf,
@@ -107,7 +121,7 @@ impl QpdfExporter {
                     "--json-key=qpdf".into(),
                     source.path.as_os_str().to_owned(),
                 ],
-                JSON_LIMIT,
+                annotation_json_limit(source.annotations.iter().flatten()),
                 control,
             )?;
             if out.code != Some(0) {
@@ -245,7 +259,17 @@ impl PdfExporter for QpdfExporter {
             output
         };
         self.write_job(&job(plan, sources, target)?, work, "job.json", control)?;
-        self.write_annotations(target, work, plan, control)?;
+        let limit = annotation_json_limit(
+            plan.pages()
+                .iter()
+                .flat_map(|page| &page.annotations)
+                .chain(
+                    plan.sources()
+                        .iter()
+                        .flat_map(|s| s.annotations.iter().flatten()),
+                ),
+        );
+        self.write_annotations(target, work, plan, control, limit)?;
         if plan.scope() == ExportScope::Optimized {
             self.check(&baseline, control)?;
             self.write_job(
@@ -256,7 +280,7 @@ impl PdfExporter for QpdfExporter {
             )?;
         }
         if plan.is_single_source_extract() {
-            self.remove_structure_references(output, work, control)?;
+            self.remove_structure_references(output, work, control, limit)?;
         }
         Ok(())
     }
@@ -282,6 +306,7 @@ impl QpdfExporter {
         work: &Path,
         plan: &ExportPlan,
         control: &ExportControl,
+        limit: usize,
     ) -> Result<(), ExportError> {
         if !plan.pages().iter().any(|p| !p.annotations.is_empty())
             && !plan
@@ -292,9 +317,10 @@ impl QpdfExporter {
             return Ok(());
         }
         control.checkpoint()?;
-        let patch = crate::annotations::patch(&self.output_json(output, control)?, plan, work)?;
+        let patch =
+            crate::annotations::patch(&self.output_json(output, control, limit)?, plan, work)?;
         let bytes = serde_json::to_vec(&patch).map_err(|_| ExportError::Inspection)?;
-        if bytes.len() > JSON_LIMIT {
+        if bytes.len() > limit {
             return Err(ExportError::ResourceLimit);
         }
         let file = work.join("annotation-patch.json");
@@ -342,7 +368,12 @@ impl QpdfExporter {
         }
         control.checkpoint()
     }
-    fn output_json(&self, path: &Path, control: &ExportControl) -> Result<Value, ExportError> {
+    fn output_json(
+        &self,
+        path: &Path,
+        control: &ExportControl,
+        limit: usize,
+    ) -> Result<Value, ExportError> {
         let result = self.invoke(
             &[
                 "--json=2".into(),
@@ -351,7 +382,7 @@ impl QpdfExporter {
                 "--json-key=pages".into(),
                 path.as_os_str().to_owned(),
             ],
-            JSON_LIMIT,
+            limit,
             control,
         )?;
         if result.code != Some(0) {
@@ -364,8 +395,9 @@ impl QpdfExporter {
         output: &Path,
         work: &Path,
         control: &ExportControl,
+        limit: usize,
     ) -> Result<(), ExportError> {
-        let json = self.output_json(output, control)?;
+        let json = self.output_json(output, control, limit)?;
         if let Some(patch) = crate::structure::patch(&json)? {
             let bytes = serde_json::to_vec(&patch).map_err(|_| ExportError::Inspection)?;
             if bytes.len() > JSON_LIMIT {
@@ -389,7 +421,7 @@ impl QpdfExporter {
                 return Err(ExportError::Validation);
             }
             control.checkpoint()?;
-            if crate::structure::patch(&self.output_json(&clean, control)?)?.is_some() {
+            if crate::structure::patch(&self.output_json(&clean, control, limit)?)?.is_some() {
                 return Err(ExportError::Validation);
             }
             std::fs::copy(&clean, output).map_err(|_| ExportError::Io)?;

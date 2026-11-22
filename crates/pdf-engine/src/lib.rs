@@ -3,6 +3,7 @@ use pdf_application::{
     ExactPageRenderer, ExactRenderRequest, InspectedDocument, PageGeometry, PageRenderer,
     PdfInspector, RenderError, RenderRequest, RenderedPage, SourceFingerprint,
 };
+use pdf_domain::annotation::{Annotation, MAX_PAGE_ANNOTATIONS, MAX_SIGNATURES, PREFIX};
 use pdfium_render::prelude::*;
 use std::{
     path::{Path, PathBuf},
@@ -577,9 +578,27 @@ fn render(
     })
 }
 
+fn read_annotation(
+    annotation_type: PdfPageAnnotationType,
+    name: Option<String>,
+    signatures_left: &mut usize,
+) -> Result<Option<Annotation>, RenderError> {
+    let Some(name) = name.filter(|name| name.starts_with(PREFIX)) else {
+        return Ok(None);
+    };
+    let stamp = annotation_type == PdfPageAnnotationType::Stamp;
+    if stamp {
+        *signatures_left = signatures_left
+            .checked_sub(1)
+            .ok_or(RenderError::ResourceLimit)?;
+    }
+    Ok(Annotation::from_typed_name(&name, stamp))
+}
+
 fn read_annotations(
     page: &PdfPage<'_>,
-) -> Result<Vec<pdf_domain::annotation::Annotation>, RenderError> {
+    signatures_left: &mut usize,
+) -> Result<Vec<Annotation>, RenderError> {
     let mut result = Vec::new();
     for a in page.annotations().iter() {
         if !matches!(
@@ -590,16 +609,10 @@ fn read_annotations(
         ) {
             continue;
         }
-        if let Some(a) = a
-            .name()
-            .as_deref()
-            .and_then(pdf_domain::annotation::Annotation::from_name)
-        {
+        if let Some(a) = read_annotation(a.annotation_type(), a.name(), signatures_left)? {
             result.push(a);
         }
-        if result.len() > pdf_domain::annotation::MAX_PAGE_ANNOTATIONS
-            || result.iter().filter(|a| a.signature.is_some()).count() > 8
-        {
+        if result.len() > MAX_PAGE_ANNOTATIONS {
             return Err(RenderError::ResourceLimit);
         }
     }
@@ -608,7 +621,7 @@ fn read_annotations(
 fn with_annotations(
     document: &PdfDocument<'_>,
     index: u16,
-    annotations: Option<&[pdf_domain::annotation::Annotation]>,
+    annotations: Option<&[Annotation]>,
     rotation: u8,
     render: impl FnOnce() -> Result<RenderedPage, RenderError>,
 ) -> Result<RenderedPage, RenderError> {
@@ -620,30 +633,35 @@ fn with_annotations(
         .get(i32::from(index))
         .map_err(|_| RenderError::InvalidPage)?;
     let mut hidden = Vec::new();
-    let mut hide_failed = false;
+    let mut hide_error = None;
+    let mut signatures_left = MAX_SIGNATURES;
     for mut a in page.annotations().iter() {
         if matches!(
             a.annotation_type(),
             PdfPageAnnotationType::Ink
                 | PdfPageAnnotationType::Highlight
                 | PdfPageAnnotationType::Stamp
-        ) && a
-            .name()
-            .as_deref()
-            .and_then(pdf_domain::annotation::Annotation::from_name)
-            .is_some()
-        {
-            let previous = a.is_hidden();
-            let failed = a.set_is_hidden(true).is_err();
-            hidden.push((a, previous));
-            if failed {
-                hide_failed = true;
-                break;
+        ) {
+            match read_annotation(a.annotation_type(), a.name(), &mut signatures_left) {
+                Ok(Some(_)) => {
+                    let previous = a.is_hidden();
+                    let failed = a.set_is_hidden(true).is_err();
+                    hidden.push((a, previous));
+                    if failed {
+                        hide_error = Some(RenderError::InvalidPdf);
+                        break;
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    hide_error = Some(error);
+                    break;
+                }
             }
         }
     }
-    let result = if hide_failed {
-        Err(RenderError::InvalidPdf)
+    let result = if let Some(error) = hide_error {
+        Err(error)
     } else {
         render()
     };
@@ -674,15 +692,14 @@ fn with_annotations(
 
 fn read_document_annotations(
     document: &PdfDocument<'_>,
-) -> Result<Vec<Vec<pdf_domain::annotation::Annotation>>, RenderError> {
+) -> Result<Vec<Vec<Annotation>>, RenderError> {
     let mut result = Vec::new();
     let mut points = 0;
-    let mut signatures = 0;
+    let mut signatures_left = MAX_SIGNATURES;
     for page in document.pages().iter() {
-        let annotations = read_annotations(&page)?;
+        let annotations = read_annotations(&page, &mut signatures_left)?;
         points += annotations.iter().map(|a| a.points.len()).sum::<usize>();
-        signatures += annotations.iter().filter(|a| a.signature.is_some()).count();
-        if points > 65536 || signatures > 8 {
+        if points > 65536 {
             return Err(RenderError::ResourceLimit);
         }
         result.push(annotations);

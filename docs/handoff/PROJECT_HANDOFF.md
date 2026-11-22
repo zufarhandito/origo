@@ -1,5 +1,24 @@
 # Handoff terkini - 22 November 2026
 
+## Kursor penempatan dan resolusi tanda tangan
+
+Kursor silang muncul saat pratinjau penempatan aktif di halaman. Kursor teks
+kembali setelah tanda tangan ditempatkan atau penempatan dibatalkan. Tanda tangan
+baru dari kanvas desktop dan QR dirender pada kanvas 1024 × 512 piksel sebelum
+dipotong. Aset Ketik dan Unggah memakai batas 1024 piksel per sisi dan 524.288
+piksel total. Viewer dan ekspor PNG menyaring warna berdasarkan alpha. PDF
+menyertakan raster beresolusi lebih tinggi dan meminta interpolasi untuk gambar
+dan mask. Origo dapat membuka aset lama pada resolusi yang tersimpan.
+
+Metadata aset baru memakai Base64 dengan kompresi lossless jika lebih kecil.
+Pembacaan metadata lama tetap tersedia. Perhatikan batas delapan aset per
+dokumen saat mengubah ekspor atau format penyimpanan. Rincian pengujian ada di
+[pengujian Origo](../testing.md).
+
+Build release lulus tes dan sudah dipasang untuk `run.cmd`. SHA-256 hasil
+pemasangan cocok dengan build uji
+`FC07A0EA70C9756DD5C97BE7A842D502B7D658C193DF2D67CA027631C83230F4`.
+
 ## Penghalusan goresan tanda tangan (22 November 2026)
 
 Goresan mouse dan QR berbagi geometri 2:1. Sampel subpiksel digabung, belokan

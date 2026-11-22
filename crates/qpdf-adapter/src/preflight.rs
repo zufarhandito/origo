@@ -1,5 +1,6 @@
 //! Conservative structural preflight over QPDF inspection JSON v2.
 use pdf_application::export::{ExportError, PreflightReport};
+use pdf_domain::annotation::MAX_SIGNATURES;
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 mod bookmarks;
@@ -14,14 +15,18 @@ fn object<'a>(
         .and_then(|v| v.get("value"))
         .ok_or(ExportError::Inspection)
 }
-fn forbidden(v: &Value, source_copy: bool) -> Result<(), ExportError> {
+fn forbidden(
+    v: &Value,
+    source_copy: bool,
+    remaining_signatures: &mut usize,
+) -> Result<(), ExportError> {
     match v {
         Value::Object(dict) => {
-            if crate::annotations::owned(dict).is_some() {
-                crate::annotations::validate(dict)?;
+            if crate::annotations::owned_name(dict).is_some() {
+                crate::annotations::validate(dict, remaining_signatures)?;
                 for (key, value) in dict {
                     if key != "/Type" {
-                        forbidden(value, source_copy)?;
+                        forbidden(value, source_copy, remaining_signatures)?;
                     }
                 }
                 return Ok(());
@@ -84,12 +89,12 @@ fn forbidden(v: &Value, source_copy: bool) -> Result<(), ExportError> {
                         "dokumen memiliki aksi atau tautan interaktif.",
                     ));
                 }
-                forbidden(value, source_copy)?;
+                forbidden(value, source_copy, remaining_signatures)?;
             }
         }
         Value::Array(array) => {
             for value in array {
-                forbidden(value, source_copy)?;
+                forbidden(value, source_copy, remaining_signatures)?;
             }
         }
         _ => {}
@@ -392,12 +397,14 @@ fn inspect(
     let (bookmarks_loss, checked_bookmarks) =
         bookmarks::inspect(catalog, objects, &tree_pages, outlines)?;
     let mut owned_pages = HashSet::new();
+    let mut remaining_signatures = MAX_SIGNATURES;
     for page in &tree_pages {
         let dict = object(objects, &Value::String(page.clone()))?
             .as_object()
             .ok_or(ExportError::Inspection)?;
         if let Some(list) = dict.get("/Annots") {
-            let list = if list.is_array() {
+            let inline_list = list.is_array();
+            let list = if inline_list {
                 list
             } else {
                 object(objects, list)?
@@ -411,15 +418,14 @@ fn inspect(
                 };
                 v.ok()
                     .and_then(Value::as_object)
-                    .is_some_and(|d| crate::annotations::owned(d).is_some())
+                    .is_some_and(|d| crate::annotations::owned_name(d).is_some())
             }) {
-                for r in list {
-                    let v = if r.is_object() {
-                        r
-                    } else {
-                        object(objects, r)?
-                    };
-                    forbidden(v, allow_structure)?;
+                // Indirect annotations are checked in the object walk below.
+                // Inline dictionaries must be checked before removing /Annots.
+                if inline_list {
+                    for v in list.iter().filter(|v| v.is_object()) {
+                        forbidden(v, allow_structure, &mut remaining_signatures)?;
+                    }
                 }
                 owned_pages.insert(page.clone());
             }
@@ -449,9 +455,13 @@ fn inspect(
                 .ok_or(ExportError::Inspection)?
                 .clone();
             page.remove("/Annots");
-            forbidden(&Value::Object(page), allow_structure)?;
+            forbidden(
+                &Value::Object(page),
+                allow_structure,
+                &mut remaining_signatures,
+            )?;
         } else {
-            forbidden(value, allow_structure)?;
+            forbidden(value, allow_structure, &mut remaining_signatures)?;
         }
     }
     if let Some(info) = trailer.get("/Info")
@@ -542,6 +552,16 @@ mod tests {
         let mut v = json();
         v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!([annotation]);
         assert!(inspect_json(&v, 1).is_ok());
+        let mut many = json();
+        many["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!("4 0 R");
+        many["qpdf"][1]["obj:4 0 R"] =
+            serde_json::json!({"value":vec![annotation.clone(); MAX_SIGNATURES]});
+        assert!(inspect_json(&many, 1).is_ok());
+        many["qpdf"][1]["obj:5 0 R"] = serde_json::json!({"value":annotation});
+        assert!(matches!(
+            inspect_json(&many, 1),
+            Err(ExportError::ResourceLimit)
+        ));
         let mut active = v.clone();
         active["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/A"] =
             serde_json::json!({"/S":"/URI","/URI":"u:example"});

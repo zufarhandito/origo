@@ -4567,6 +4567,8 @@ dependencies = [
 name = "pdf-domain"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "flate2",
  "serde_json",
  "thiserror 2.0.17",
 ]

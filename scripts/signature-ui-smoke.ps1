@@ -1,6 +1,47 @@
 ﻿param([ValidateSet('debug','release')][string]$Profile='release',[string]$ExecutablePath)
 . (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -TestName 'signature-ui' -IsolatedState -ExecutablePath $ExecutablePath
-Add-Type 'using System;using System.Runtime.InteropServices;public static class SignatureTestFocus{[DllImport("user32.dll")]public static extern IntPtr GetForegroundWindow();}'
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class SignatureTestFocus {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Point { public int X; public int Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CursorInfo {
+        public uint Size;
+        public uint Flags;
+        public IntPtr Cursor;
+        public Point Position;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    public static extern bool GetPhysicalCursorPos(out Point point);
+    [DllImport("user32.dll")]
+    public static extern bool SetPhysicalCursorPos(int x, int y);
+    [DllImport("user32.dll")]
+    public static extern IntPtr WindowFromPhysicalPoint(Point point);
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr window, uint flags);
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorInfo(ref CursorInfo info);
+    [DllImport("user32.dll", EntryPoint = "LoadImageW")]
+    private static extern IntPtr LoadImage(IntPtr instance, IntPtr name, uint type, int width, int height, uint flags);
+
+    public static bool HasSystemCursor(int id, out string diagnostic) {
+        var info = new CursorInfo { Size = (uint)Marshal.SizeOf(typeof(CursorInfo)) };
+        // IMAGE_CURSOR with LR_DEFAULTSIZE | LR_SHARED, as used by GPUI.
+        var expected = LoadImage(IntPtr.Zero, (IntPtr)id, 2, 0, 0, 0x8040);
+        var read = GetCursorInfo(ref info);
+        diagnostic = String.Format("read={0}, flags={1}, actual={2}, expected={3}", read, info.Flags, info.Cursor, expected);
+        return expected != IntPtr.Zero && read &&
+            (info.Flags & 1) != 0 && info.Cursor == expected;
+    }
+}
+'@
 $cases=New-Object Collections.Generic.List[object]
 function Pass([string]$Name){Capture ($Name+'.png');$cases.Add([pscustomobject]@{Case=$Name;Status='passed'});$cases.ToArray()|ConvertTo-Json|Set-Content -Encoding UTF8 (Join-Path $directory 'cases.json');Write-Host "PASS signature: $Name"}
 function Assert-NoControl([string[]]$Names) {
@@ -19,6 +60,41 @@ function Pointer-Control([string]$Name,[double]$X=0.5,[double]$Y=0.5,[int]$Messa
     $pos=[IntPtr](($point.Y -shl 16) -bor ($point.X -band 0xffff))
     [OrganizerClick]::SendMessage($app.MainWindowHandle,$Message,[IntPtr]$Buttons,$pos)|Out-Null
 }
+function Assert-PageCursor([ValidateSet('Crosshair','IBeam')][string]$Expected) {
+    $window=$app.MainWindowHandle
+    if([SignatureTestFocus]::GetForegroundWindow() -ne $window){throw 'The test window must be in front for the system cursor check'}
+    $rect=(Find 'Isi halaman 1').Current.BoundingRectangle
+    $point=New-Object SignatureTestFocus+Point
+    $point.X=[int]($rect.X+$rect.Width*0.43)
+    $point.Y=[int]($rect.Y+$rect.Height*0.42)
+    if([SignatureTestFocus]::GetAncestor([SignatureTestFocus]::WindowFromPhysicalPoint($point),2) -ne $window){throw 'The test page is obscured at the cursor check location'}
+    $original=New-Object SignatureTestFocus+Point
+    if(-not [SignatureTestFocus]::GetPhysicalCursorPos([ref]$original)){throw 'Cannot read the original pointer position'}
+    if($point.X -eq $original.X -and $point.Y -eq $original.Y){$point.X++}
+    try {
+        if(-not [SignatureTestFocus]::SetPhysicalCursorPos($point.X,$point.Y)){throw 'Cannot move the pointer onto the test page'}
+        Pointer-Control 'Isi halaman 1' 0.43 0.42
+        $cursorId=if($Expected -eq 'Crosshair'){32515}else{32513}
+        $end=(Get-Date).AddSeconds(4)
+        $observed=''
+        do {
+            $at=New-Object SignatureTestFocus+Point
+            if(-not [SignatureTestFocus]::GetPhysicalCursorPos([ref]$at) -or $at.X -ne $point.X -or $at.Y -ne $point.Y){throw 'The pointer moved during the system cursor check'}
+            # GPUI updates its cached cursor after mouse-move. Ask Windows to
+            # query it again, as it would on the next client-area mouse event.
+            [OrganizerClick]::SendMessage($window,0x20,$window,[IntPtr]0x02000001)|Out-Null
+            if([SignatureTestFocus]::HasSystemCursor($cursorId,[ref]$observed)){return}
+            Start-Sleep -Milliseconds 50
+        } while((Get-Date) -lt $end)
+        throw "The test page did not show the expected Windows cursor $Expected ($observed)"
+    } finally {
+        $current=New-Object SignatureTestFocus+Point
+        if([SignatureTestFocus]::GetPhysicalCursorPos([ref]$current) -and $current.X -eq $point.X -and $current.Y -eq $point.Y){
+            [SignatureTestFocus]::SetPhysicalCursorPos($original.X,$original.Y)|Out-Null
+            Start-Sleep -Milliseconds 60
+        }
+    }
+}
 function Equal-SignatureRect($First,$Second) {
     if($First.Count -ne 2 -or $Second.Count -ne 2){return $false}
     for($point=0;$point -lt 2;$point++){
@@ -27,6 +103,32 @@ function Equal-SignatureRect($First,$Second) {
         }
     }
     return $true
+}
+function Assert-PublishedSignatureResolution([string]$Pdf) {
+    $qpdf=Join-Path (Split-Path $exe) 'sidecars/qpdf/bin/qpdf.exe'
+    $raw=& $qpdf --json=2 --json-stream-data=none --json-key=pages --json-key=qpdf $Pdf
+    if($LASTEXITCODE -ne 0){throw 'QPDF could not inspect the saved signature PDF'}
+    $json=$raw | ConvertFrom-Json
+    $objects=$json.qpdf[1].PSObject.Properties
+    $page=$objects['obj:'+$json.pages[0].object].Value.value
+    $images=@(foreach($ref in $page.'/Annots'){
+        $stamp=$objects['obj:'+$ref].Value.value
+        if($stamp.'/Subtype' -ne '/Stamp'){continue}
+        $appearance=$objects['obj:'+$stamp.'/AP'.'/N'].Value.stream.dict
+        $objects['obj:'+$appearance.'/Resources'.'/XObject'.'/Sig'].Value.stream.dict
+    })
+    if($images.Count -ne 2){throw 'Expected the drawing and stamp image in the saved PDF'}
+    foreach($image in $images){
+        $mask=$objects['obj:'+$image.'/SMask'].Value.stream.dict
+        if($image.'/ColorSpace' -ne '/DeviceRGB' -or $mask.'/ColorSpace' -ne '/DeviceGray' -or
+           $image.'/Interpolate' -ne $true -or $mask.'/Interpolate' -ne $true -or
+           $image.'/Width' -ne $mask.'/Width' -or $image.'/Height' -ne $mask.'/Height'){
+            throw 'Saved signature RGB and soft mask must match and both interpolate'
+        }
+    }
+    $drawing=$images | Where-Object {$_.'/Width' -gt 512} | Select-Object -First 1
+    if(-not $drawing){throw 'The saved drawing did not exceed the previous 512-pixel limit'}
+    Write-Host "Saved drawing image and soft mask: $($drawing.'/Width') x $($drawing.'/Height')"
 }
 function Stroke($x1,$y1,$x2,$y2,[string]$Control='Isi halaman 1',$Node=$null){
     $r=if($Node){$Node.Current.BoundingRectangle}else{(Find $Control).Current.BoundingRectangle}
@@ -43,6 +145,7 @@ function Stroke($x1,$y1,$x2,$y2,[string]$Control='Isi halaman 1',$Node=$null){
 try {
     $null=Wait-State {param($s) $s.pageCount -eq 4 -and -not $s.textLoading}
     Menu-Action 'Tampilan' 'Sesuaikan halaman'
+    Assert-PageCursor 'IBeam'
     Invoke 'Anotasi';Invoke 'Tanda tangan'
     $null=Find 'Area gambar tanda tangan'
     Assert-NoControl @('Nama template tanda tangan','Pilih gambar tanda tangan','Ganti gambar','Hapus latar putih')
@@ -60,6 +163,7 @@ try {
     $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('ZAH')
     Invoke 'Gunakan Tanda Tangan'
     $initial=Wait-State {param($s) $s.signaturePlacing -and -not $s.signaturePanel -and -not $s.dirty}
+    Assert-PageCursor 'Crosshair'
     Pointer-Control 'Isi halaman 1' 0.30 0.32
     $first=Wait-State {param($s) $s.signatureGhost -and $s.signatureGhostRect.Count -eq 2}
     Pointer-Control 'Isi halaman 1'
@@ -84,6 +188,7 @@ try {
     if([SignatureTestFocus]::GetForegroundWindow() -ne $app.MainWindowHandle){throw 'The test window must be in front for Escape'}
     [Windows.Forms.SendKeys]::SendWait('{ESC}')
     $null=Wait-State {param($s) -not $s.signaturePlacing -and -not $s.signatureGhost -and $s.signatureCount -eq 0 -and -not $s.dirty}
+    Assert-PageCursor 'IBeam'
     Pointer-Control 'Isi halaman 1'
     $null=Wait-State {param($s) -not $s.signaturePlacing -and -not $s.signatureGhost -and $s.revision -eq $initial.revision}
     Pass 'signature-ghost-hides-outside-and-escape-cancels'
@@ -94,6 +199,7 @@ try {
     $preview=Wait-State {param($s) $s.signatureGhost}
     Click-Control 'Isi halaman 1'
     $placed=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty -and -not $s.signatureGhost -and -not $s.signaturePlacing}
+    Assert-PageCursor 'IBeam'
     if(-not (Equal-SignatureRect $preview.signatureGhostRect $placed.signatureRects[0])){throw 'Placed initials differ from the last ghost preview'}
     Invoke 'Undo';$null=Wait-State {param($s) $s.signatureCount -eq 0 -and -not $s.dirty -and $s.revision -eq $initial.revision}
     Pass 'initials-edit-place-undo'
@@ -205,6 +311,8 @@ try {
     Close-Window;Invoke 'Batal';$null=Wait-State {param($s) $s.signatureCount -eq 2 -and $s.dirty}
     $saved=Join-Path $directory 'Signed.pdf';$s=Save-Pdf 'Simpan sebagai' $saved
     if(-not $s.exportSuccess -or $s.dirty){throw 'Signature Save As failed'}
+    Assert-PublishedSignatureResolution $saved
+    Pass 'saved-signature-image-and-mask-resolution'
     Picker 'Buka PDF';Fill-Picker $saved
     $s=Wait-State {param($s) $s.tabCount -eq 2 -and $s.signatureCount -eq 2 -and -not $s.dirty}
     Pass 'close-guard-save-reopen-editable-signatures'

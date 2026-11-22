@@ -13,7 +13,9 @@ dan arahan pemilik untuk melanjutkan tanda tangan setelah anotator selesai.
 3. Pilih kategori **Tanda Tangan**, **Inisial**, atau **Stempel**. Gunakan **Gambar**,
    **Ketik**, atau **Unggah** untuk tanda tangan dan inisial. Stempel langsung
    membuka unggahan gambar. **Gunakan Tanda Tangan** masuk ke penempatan. Gambar
-   tembus pandang mengikuti kursor di atas halaman dan tetap di dalam tepinya.
+   tembus pandang mengikuti kursor berbentuk silang di atas halaman dan tetap di
+   dalam tepinya. Kursor teks kembali saat penempatan selesai atau dibatalkan
+   pada halaman yang memiliki teks.
    Klik, atau tekan lalu geser dan lepas di halaman yang sama, untuk
    menempatkannya. Pratinjau hilang di luar halaman. Tekan Esc untuk batal.
    PDF dan riwayat Undo baru berubah setelah penempatan berhasil.
@@ -31,10 +33,12 @@ objek dan history; draft/pad/selection per view.
 
 ## Gambar, kualitas dan privasi
 
-PNG mempertahankan alpha. JPEG mempertahankan latarnya; penghapusan latar putih tersedia secara opsional dengan preview dan reset. Orientasi EXIF diterapkan. Pinggir transparan dipotong otomatis;
-isi gambar tidak dipotong berdasarkan warna. Gambar diperkecil bila perlu ke
-maksimal 131072 piksel total dan 512 piksel per sisi; tidak memperbesar gambar kecil. Tanda tangan gambar
-akan kehilangan ketajaman jika diperbesar jauh di atas resolusi tersebut.
+PNG mempertahankan alpha. JPEG mempertahankan latarnya. Penghapusan latar putih
+opsional dan bisa dikembalikan. Orientasi EXIF diterapkan dan pinggir transparan
+dipotong otomatis. Unggahan mempertahankan resolusi aslinya hingga 1024 piksel
+per sisi dan 524.288 piksel total. Origo mengecilkan gambar yang melampaui batas
+tersebut, dengan rasio aspek tetap. Unggah ulang gambar sumber atau buat ulang
+tanda tangan untuk memperoleh resolusi baru pada aset yang pernah disimpan.
 
 Input maksimal 8 MiB, dimensi maksimal 8192 per sisi, budget decode 64 MiB. Hanya
 PNG/JPEG diterima; file rusak dan gambar sepenuhnya transparan ditolak. Pad maksimal
@@ -53,17 +57,21 @@ Goresan baru dari mouse dan goresan yang diterima dari HP memakai jalur yang sam
 sangat dekat digabung dan belokan landai dilunakkan. Titik awal dan akhir,
 titik kecil, sudut yang jelas, serta pilihan warna dan ketebalan dipertahankan.
 Ujung bulat dan anti-aliasing mengurangi tepi bergerigi dari hasil raster.
-Hasil ini dipakai untuk pratinjau penempatan dan PDF. Aset raster, anotasi,
-dan template yang sudah tersimpan tetap dibaca dengan format yang sama.
+Goresan dirender ke 1024 × 512 piksel sebelum area kosong dipotong. Mode Ketik
+merender font dengan ukuran dua kali lebih besar sebelum menyesuaikan ukuran
+ke batas aset. Pratinjau penempatan dan PDF memakai raster yang dihasilkan.
 
 ## Format output dan batas
 
 Tanda tangan disimpan sebagai anotasi PDF **Stamp** pasif, dengan appearance Form,
-image RGB dan soft mask alpha. Metadata model milik PDF Studio ikut tersimpan di NM.
-Konten halaman asli tidak diratakan menjadi gambar. Viewer/PNG menggunakan kompositor
-alpha yang sama; Save As/Extract/Split/Optimize menangkap objek bersama page plan.
-Metadata lama tanpa aset gambar tetap dibaca. Policy ekspor v6 menerima subset Stamp
-milik aplikasi dengan validasi terbatas dan menolak key aktif/subtype palsu.
+image RGB dan soft mask alpha. Kedua image stream meminta interpolasi dari
+viewer PDF. Viewer Origo dan ekspor PNG memperhitungkan cakupan piksel dan
+transparansi saat menskalakan aset. Metadata model Origo ikut tersimpan di NM.
+Konten halaman asli tetap utuh. Save As/Extract/Split/Optimize menangkap objek
+bersama page plan. Origo tetap membaca anotasi dan template lama. Untuk mengedit
+tanda tangan dengan metadata baru, gunakan Origo versi ini atau lebih baru.
+Policy ekspor v6 menerima subset Stamp milik aplikasi dengan validasi terbatas
+dan menolak key aktif atau subtype palsu.
 
 Ini tanda tangan visual, tanpa sertifikat kriptografis, validasi identitas atau audit
 trail. Dukungan PDF yang sudah ditandatangani secara digital mengikuti pembatasan
@@ -106,11 +114,9 @@ raster yang sama. Tidak ada font installation atau upload.
 
 Jenis Stempel memakai impor PNG/JPEG. Tombol Hapus latar putih bersifat opt-in,
 klik lagi mengembalikan aset asli; gambar warna tidak otomatis direcolor.
-Batas total raster tetap 131072 piksel (512 KiB RGBA/aset); masing-masing sisi
-boleh sampai 512 sehingga stempel persegi dapat sekitar 362 x 362 dan stempel
-tinggi tidak dipaksa ke rasio tanda tangan lebar. Batas delapan objek tidak naik.
-Metadata lama tetap diterima, tetapi build lama mungkin menolak aset yang tingginya
-melebihi 256 px. Template SVG/generator stempel belum tersedia.
+Stempel mengikuti batas raster yang sama seperti unggahan tanda tangan. Stempel
+persegi dapat memakai hingga 724 × 724 piksel, dan rasio aspek gambar dipertahankan.
+Template SVG/generator stempel belum tersedia.
 Draw kini memiliki warna Hitam/Biru/Merah dan ketebalan Tipis/Sedang/Tebal.
 Editor scroll mengikuti tinggi jendela agar kontrol tidak hilang pada layar pendek.
 
@@ -127,7 +133,7 @@ Galeri menampilkan dua kolom kartu dengan badge kategori dan pratinjau. Dari men
 ikon pada kartu, pilih **Ubah nama** lalu Enter atau pindah fokus untuk menyimpan.
 Esc membatalkan edit nama. **Hapus** membuka konfirmasi di kartu. Menghapus
 template mempertahankan objek yang sudah ditempatkan pada PDF. Pustaka memakai
-penulisan atomik di background, dengan batas 10 MiB. Jika file rusak, Origo
+penulisan atomik di background, dengan batas 22 MiB. Jika file rusak, Origo
 menampilkan pesan kesalahan dan mempertahankan file lama.
 
 Pilih objek tanda tangan/stempel: Duplikat tanda tangan atau Ctrl+D membuat salinan

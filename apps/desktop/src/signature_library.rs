@@ -7,7 +7,8 @@ pub(super) struct Entry {
     pub kind: usize,
     pub asset: Arc<SignatureImage>,
 }
-const LIMIT: u64 = 10 * 1024 * 1024;
+// Up to eight 2 MiB RGBA assets, plus base64 and JSON overhead.
+const LIMIT: u64 = 22 * 1024 * 1024;
 pub(super) fn load(dir: &Path) -> anyhow::Result<Vec<Entry>> {
     let file = match std::fs::File::open(dir.join("signature-library.json")) {
         Ok(f) => f,

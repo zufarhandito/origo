@@ -503,7 +503,10 @@ impl DocumentSession {
         } else {
             div().into_any_element()
         };
+        let placing_signature =
+            !thumbnail && self.active && self.annotation.signature.placement_ghost.is_some();
         let selectable = !thumbnail
+            && !placing_signature
             && self
                 .text
                 .pages
@@ -515,6 +518,7 @@ impl DocumentSession {
                 this.role(gpui::Role::Document)
                     .aria_label(format!("Isi halaman {}", index + 1))
             })
+            .when(placing_signature, |this| this.cursor_crosshair())
             .when(selectable, |this| this.cursor_text())
             .w(px(width))
             .h(px(height))

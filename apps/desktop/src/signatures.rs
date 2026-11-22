@@ -1412,8 +1412,24 @@ pub(super) fn draw_asset_with(
     )?)
 }
 pub(super) fn crop_asset(image: image::RgbaImage) -> Option<SignatureImage> {
+    let (x, y, width, height) = visible_bounds(&image)?;
+    let image = if (width, height) == image.dimensions() {
+        image
+    } else {
+        image::imageops::crop_imm(&image, x, y, width, height).to_image()
+    };
+    Some(SignatureImage {
+        width,
+        height,
+        rgba: image.into_raw(),
+    })
+}
+
+fn visible_bounds(
+    image: &impl image::GenericImageView<Pixel = image::Rgba<u8>>,
+) -> Option<(u32, u32, u32, u32)> {
     let mut bounds = [image.width(), image.height(), 0, 0];
-    for (x, y, p) in image.enumerate_pixels() {
+    for (x, y, p) in image.pixels() {
         if p[3] > 0 {
             bounds[0] = bounds[0].min(x);
             bounds[1] = bounds[1].min(y);
@@ -1424,19 +1440,32 @@ pub(super) fn crop_asset(image: image::RgbaImage) -> Option<SignatureImage> {
     if bounds[0] >= bounds[2] || bounds[1] >= bounds[3] {
         return None;
     }
-    let cropped = image::imageops::crop_imm(
-        &image,
+    Some((
         bounds[0],
         bounds[1],
         bounds[2] - bounds[0],
         bounds[3] - bounds[1],
-    )
-    .to_image();
-    Some(SignatureImage {
-        width: cropped.width(),
-        height: cropped.height(),
-        rgba: cropped.into_raw(),
-    })
+    ))
+}
+
+pub(super) fn downsize_asset(image: image::DynamicImage) -> image::RgbaImage {
+    let (w, h) = (f64::from(image.width()), f64::from(image.height()));
+    let max_side = f64::from(SignatureImage::MAX_SIDE);
+    let scale = (f64::from(SignatureImage::MAX_PIXELS) / (w * h))
+        .sqrt()
+        .min(max_side / w)
+        .min(max_side / h);
+    if scale < 1. {
+        image
+            .resize_exact(
+                (w * scale).floor().max(1.) as u32,
+                (h * scale).floor().max(1.) as u32,
+                image::imageops::FilterType::Lanczos3,
+            )
+            .into_rgba8()
+    } else {
+        image.into_rgba8()
+    }
 }
 fn load_asset(path: &std::path::Path) -> Result<SignatureImage, String> {
     use image::ImageDecoder;
@@ -1474,24 +1503,14 @@ fn load_asset(path: &std::path::Path) -> Result<SignatureImage, String> {
     let mut image = image::DynamicImage::from_decoder(decoder)
         .map_err(|_| "Gambar rusak atau terlalu besar.")?;
     image.apply_orientation(orientation);
-    let (w, h) = (image.width() as f64, image.height() as f64);
-    let scale = (512. * 256. / (w * h))
-        .sqrt()
-        .min(512. / w)
-        .min(512. / h)
-        .min(1.);
-    let image = if scale < 1. {
-        image
-            .resize_exact(
-                (w * scale).floor().max(1.) as u32,
-                (h * scale).floor().max(1.) as u32,
-                image::imageops::FilterType::Lanczos3,
-            )
-            .to_rgba8()
-    } else {
-        image.to_rgba8()
-    };
-    crop_asset(image).ok_or_else(|| "Gambar sepenuhnya transparan.".into())
+    if image.color().has_alpha() {
+        let (x, y, width, height) =
+            visible_bounds(&image).ok_or("Gambar sepenuhnya transparan.")?;
+        if (width, height) != (image.width(), image.height()) {
+            image = image.crop_imm(x, y, width, height);
+        }
+    }
+    crop_asset(downsize_asset(image)).ok_or_else(|| "Gambar sepenuhnya transparan.".into())
 }
 fn image_variant(asset: &SignatureImage, remove_white: bool) -> Option<SignatureImage> {
     let mut image = image::RgbaImage::from_raw(asset.width, asset.height, asset.rgba.clone())?;
@@ -1578,8 +1597,8 @@ mod tests {
         let asset = load_asset(&path).map_err(anyhow::Error::msg)?;
         assert!(asset.valid());
         assert_eq!(asset.width, asset.height);
-        assert!(asset.height > 256);
-        assert!(asset.width * asset.height <= 512 * 256);
+        assert_eq!(asset.height, 600);
+        assert!(asset.width * asset.height <= SignatureImage::MAX_PIXELS);
         let original = image_variant(&asset, false).ok_or_else(|| anyhow::anyhow!("original"))?;
         assert_eq!(original, asset);
         let removed = image_variant(&asset, true).ok_or_else(|| anyhow::anyhow!("removed"))?;
@@ -1599,20 +1618,21 @@ mod tests {
         let asset = draw_asset(&[vec![[0.2, 0.3], [0.7, 0.6]]])
             .ok_or_else(|| anyhow::anyhow!("empty draw"))?;
         assert!(asset.valid());
-        assert!(asset.width < 512 && asset.height < 256);
+        assert!((513..530).contains(&asset.width));
+        assert!((151..170).contains(&asset.height));
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("alpha.png");
-        let mut image = image::RgbaImage::new(40, 30);
-        image.put_pixel(15, 10, image::Rgba([0, 40, 120, 128]));
+        let mut image = image::RgbaImage::new(1200, 800);
+        image.put_pixel(1100, 700, image::Rgba([0, 40, 120, 128]));
         image.save(&path)?;
         let imported = load_asset(&path).map_err(anyhow::Error::msg)?;
         assert_eq!((imported.width, imported.height), (1, 1));
         assert_eq!(imported.rgba, [0, 40, 120, 128]);
         let jpeg = dir.path().join("image.jpg");
-        image::RgbImage::from_pixel(1000, 400, image::Rgb([255, 255, 255])).save(&jpeg)?;
+        image::RgbImage::from_pixel(1500, 600, image::Rgb([255, 255, 255])).save(&jpeg)?;
         let imported = load_asset(&jpeg).map_err(anyhow::Error::msg)?;
         assert!(imported.valid());
-        assert_eq!(imported.width, 512);
+        assert_eq!(imported.width, 1024);
         std::fs::write(&path, b"invalid image")?;
         assert!(load_asset(&path).is_err());
         image::RgbaImage::new(10, 10).save(&path)?;

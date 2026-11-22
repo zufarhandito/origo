@@ -1,9 +1,14 @@
 //! Bounded, page-relative passive annotations. Coordinates precede page rotation.
+use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
+use std::io::Write;
 
 pub const MAX_POINTS: usize = 4096;
 pub const MAX_PAGE_ANNOTATIONS: usize = 256;
+pub const MAX_SIGNATURES: usize = 8;
 pub const PREFIX: &str = "pdf-studio-annotation-v1:";
+const MAX_SIGNATURE_BYTES: usize = SignatureImage::MAX_PIXELS as usize * 4;
+const MAX_NAME_BYTES: usize = MAX_SIGNATURE_BYTES.div_ceil(3) * 4 + 256;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Annotation {
     pub id: u64,
@@ -48,15 +53,25 @@ impl Annotation {
                 self.rectangles,
                 self.signature
                     .as_ref()
-                    .map(|s| json!([s.width, s.height, s.hex()]))
+                    .map(|s| json!([s.width, s.height, s.encode()]))
             ])
         )
     }
     pub fn from_name(name: &str) -> Option<Self> {
-        if name.len() > 1_100_000 {
+        Self::parse_name(name, None)
+    }
+    pub fn from_typed_name(name: &str, signature: bool) -> Option<Self> {
+        Self::parse_name(name, Some(signature))
+    }
+    fn parse_name(name: &str, expected_signature: Option<bool>) -> Option<Self> {
+        if name.len() > MAX_NAME_BYTES {
             return None;
         }
         let v: Value = serde_json::from_str(name.strip_prefix(PREFIX)?).ok()?;
+        let signature = v.get(6).filter(|v| !v.is_null());
+        if expected_signature.is_some_and(|expected| expected != signature.is_some()) {
+            return None;
+        }
         let a = Self {
             id: v.get(0)?.as_u64()?,
             highlight: v.get(1)?.as_bool()?,
@@ -73,8 +88,8 @@ impl Annotation {
                 .map(|p| Some([p.get(0)?.as_f64()? as f32, p.get(1)?.as_f64()? as f32]))
                 .collect::<Option<Vec<_>>>()?,
             rectangles: v.get(5)?.as_bool()?,
-            signature: match v.get(6).filter(|v| !v.is_null()) {
-                Some(s) => Some(std::sync::Arc::new(SignatureImage::from_hex(
+            signature: match signature {
+                Some(s) => Some(std::sync::Arc::new(SignatureImage::decode(
                     u32::try_from(s[0].as_u64()?).ok()?,
                     u32::try_from(s[1].as_u64()?).ok()?,
                     s[2].as_str()?,
@@ -93,29 +108,80 @@ pub struct SignatureImage {
     pub rgba: Vec<u8>,
 }
 impl SignatureImage {
+    pub const MAX_SIDE: u32 = 1024;
+    pub const MAX_PIXELS: u32 = 1024 * 512;
+    pub const LEGACY_MAX_PIXELS: u32 = 512 * 256;
+
     pub fn valid(&self) -> bool {
-        self.width > 0
-            && self.height > 0
-            && self.width <= 512
-            && self.height <= 512
-            && u64::from(self.width) * u64::from(self.height) <= 512 * 256
-            && self.rgba.len() == self.width as usize * self.height as usize * 4
+        Self::byte_count(self.width, self.height) == Some(self.rgba.len())
     }
-    fn hex(&self) -> String {
-        self.rgba.iter().map(|b| format!("{b:02x}")).collect()
+
+    fn byte_count(width: u32, height: u32) -> Option<usize> {
+        if !(1..=Self::MAX_SIDE).contains(&width) || !(1..=Self::MAX_SIDE).contains(&height) {
+            return None;
+        }
+        let pixels = width * height;
+        (pixels <= Self::MAX_PIXELS).then_some(pixels as usize * 4)
     }
-    fn from_hex(width: u32, height: u32, text: &str) -> Option<Self> {
-        if width == 0
-            || height == 0
-            || width > 512
+
+    fn encode(&self) -> String {
+        let mut compressed =
+            flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+        if compressed.write_all(&self.rgba).is_ok()
+            && let Ok(compressed) = compressed.finish()
+            && compressed.len() < self.rgba.len()
+        {
+            return format!("z:{}", STANDARD.encode(compressed));
+        }
+        format!("b:{}", STANDARD.encode(&self.rgba))
+    }
+
+    fn decode(width: u32, height: u32, text: &str) -> Option<Self> {
+        let expected = Self::byte_count(width, height)?;
+        let encoded_size = expected.div_ceil(3) * 4;
+        let rgba = if let Some(encoded) = text.strip_prefix("z:") {
+            if encoded.len() > encoded_size {
+                return None;
+            }
+            let bytes = STANDARD.decode(encoded).ok()?;
+            // Leave space for one excess byte and reject truncated or trailing data.
+            let mut rgba = vec![0; expected + 1];
+            let mut decoder = flate2::Decompress::new(true);
+            let status = decoder
+                .decompress(&bytes, &mut rgba, flate2::FlushDecompress::Finish)
+                .ok()?;
+            if status != flate2::Status::StreamEnd
+                || decoder.total_in() != bytes.len() as u64
+                || decoder.total_out() != expected as u64
+            {
+                return None;
+            }
+            rgba.truncate(expected);
+            rgba
+        } else if let Some(encoded) = text.strip_prefix("b:") {
+            if encoded.len() != encoded_size {
+                return None;
+            }
+            STANDARD.decode(encoded).ok()?
+        } else {
+            Self::decode_legacy(width, height, expected, text)?
+        };
+        (rgba.len() == expected).then_some(Self {
+            width,
+            height,
+            rgba,
+        })
+    }
+
+    fn decode_legacy(width: u32, height: u32, expected: usize, text: &str) -> Option<Vec<u8>> {
+        if width > 512
             || height > 512
-            || u64::from(width) * u64::from(height) > 512 * 256
-            || text.len() != width as usize * height as usize * 8
+            || expected > Self::LEGACY_MAX_PIXELS as usize * 4
+            || text.len() != expected * 2
         {
             return None;
         }
-        let rgba = text
-            .as_bytes()
+        text.as_bytes()
             .as_chunks::<2>()
             .0
             .iter()
@@ -127,12 +193,7 @@ impl SignatureImage {
                 };
                 Some(digit(p[0])? * 16 + digit(p[1])?)
             })
-            .collect::<Option<Vec<_>>>()?;
-        Some(Self {
-            width,
-            height,
-            rgba,
-        })
+            .collect()
     }
 }
 pub fn rotate(mut point: [f32; 2], turns: u8) -> [f32; 2] {
@@ -161,28 +222,68 @@ mod tests {
             })),
         };
         assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
+        let legacy = format!(
+            "{PREFIX}[7,false,[0,0,0],1,[[0.1,0.2],[0.6,0.4]],false,[2,1,\"0000000014283c80\"]]"
+        );
+        assert_eq!(Annotation::from_name(&legacy), Some(a.clone()));
         let square = SignatureImage {
-            width: 362,
-            height: 362,
-            rgba: vec![0; 362 * 362 * 4],
+            width: 724,
+            height: 724,
+            rgba: vec![0; 724 * 724 * 4],
         };
         assert!(square.valid());
+        assert!(square.encode().starts_with("z:"));
         a.signature = Some(std::sync::Arc::new(square));
         assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
         assert!(
             !SignatureImage {
-                width: 512,
-                height: 512,
-                rgba: vec![0; 512 * 512 * 4]
+                width: 1024,
+                height: 513,
+                rgba: vec![0; 1024 * 513 * 4]
             }
             .valid()
         );
         a.points.swap(0, 1);
         assert!(!a.valid());
         assert!(Annotation::from_name(&a.name()).is_none());
-        assert!(SignatureImage::from_hex(513, 1, "").is_none());
-        assert!(SignatureImage::from_hex(1, 1, "zzzzzzzz").is_none());
+        assert!(SignatureImage::decode(1025, 1, "").is_none());
+        assert!(SignatureImage::decode(1, 1, "zzzzzzzz").is_none());
+        assert!(SignatureImage::decode(1, 1, "b:AAAA").is_none());
+        let compressed = SignatureImage {
+            width: 100,
+            height: 1,
+            rgba: vec![0; 400],
+        }
+        .encode();
+        assert!(SignatureImage::decode(99, 1, &compressed).is_none());
+        assert!(SignatureImage::decode(101, 1, &compressed).is_none());
+        assert!(SignatureImage::decode(100, 1, &compressed[..compressed.len() - 4]).is_none());
     }
+
+    #[test]
+    fn maximum_signature_falls_back_to_bounded_base64() {
+        let mut state = 1u32;
+        let image = SignatureImage {
+            width: SignatureImage::MAX_SIDE,
+            height: SignatureImage::MAX_PIXELS / SignatureImage::MAX_SIDE,
+            rgba: (0..MAX_SIGNATURE_BYTES)
+                .map(|_| {
+                    state ^= state << 13;
+                    state ^= state >> 17;
+                    state ^= state << 5;
+                    state as u8
+                })
+                .collect(),
+        };
+        let encoded = image.encode();
+        assert!(encoded.starts_with("b:"));
+        assert_eq!(encoded.len(), 2 + MAX_SIGNATURE_BYTES.div_ceil(3) * 4);
+        assert_eq!(
+            SignatureImage::decode(image.width, image.height, &encoded),
+            Some(image)
+        );
+    }
+
     #[test]
     fn roundtrip_and_invalid_metadata_are_bounded() {
         let a = Annotation {
@@ -198,7 +299,9 @@ mod tests {
         let mut bad = a;
         bad.points[0][0] = f32::INFINITY;
         assert!(!bad.valid());
-        assert!(Annotation::from_name(&format!("{PREFIX}{}", "x".repeat(1_100_001))).is_none());
+        assert!(
+            Annotation::from_name(&format!("{PREFIX}{}", "x".repeat(MAX_NAME_BYTES))).is_none()
+        );
         for turn in 0..4 {
             let point = [0.25, 0.75];
             assert_eq!(rotate(rotate(point, turn), (4 - turn) % 4), point);

@@ -1,14 +1,23 @@
 //! Write passive, editable annotation objects and deterministic appearance streams.
 use pdf_application::export::{ExportError, ExportPlan};
-use pdf_domain::annotation::Annotation;
+use pdf_domain::annotation::{Annotation, PREFIX};
 use serde_json::{Map, Value, json};
 use std::path::Path;
 
-pub(crate) fn owned(dict: &Map<String, Value>) -> Option<Annotation> {
-    Annotation::from_name(dict.get("/NM")?.as_str()?.strip_prefix("u:")?)
+pub(crate) fn owned_name(dict: &Map<String, Value>) -> Option<&str> {
+    let name = dict.get("/NM")?.as_str()?.strip_prefix("u:")?;
+    name.starts_with(PREFIX).then_some(name)
 }
-pub(crate) fn validate(dict: &Map<String, Value>) -> Result<(), ExportError> {
-    let a = owned(dict).ok_or(ExportError::Inspection)?;
+
+fn owned(dict: &Map<String, Value>) -> Option<Annotation> {
+    let stamp = dict.get("/Subtype").and_then(Value::as_str) == Some("/Stamp");
+    Annotation::from_typed_name(owned_name(dict)?, stamp)
+}
+
+pub(crate) fn validate(
+    dict: &Map<String, Value>,
+    remaining_signatures: &mut usize,
+) -> Result<(), ExportError> {
     let keys = [
         "/Type",
         "/Subtype",
@@ -26,14 +35,26 @@ pub(crate) fn validate(dict: &Map<String, Value>) -> Result<(), ExportError> {
     ];
     if dict.keys().any(|k| !keys.contains(&k.as_str()))
         || dict.get("/Type").and_then(Value::as_str) != Some("/Annot")
-        || dict.get("/Subtype").and_then(Value::as_str)
-            != Some(if a.signature.is_some() {
-                "/Stamp"
-            } else if a.rectangles {
-                "/Highlight"
-            } else {
-                "/Ink"
-            })
+    {
+        return Err(ExportError::Unsupported(
+            "anotasi diubah di luar subset pasif yang didukung.",
+        ));
+    }
+    let subtype = dict.get("/Subtype").and_then(Value::as_str);
+    if subtype == Some("/Stamp") {
+        *remaining_signatures = remaining_signatures
+            .checked_sub(1)
+            .ok_or(ExportError::ResourceLimit)?;
+    }
+    let a = owned(dict).ok_or(ExportError::Inspection)?;
+    if subtype
+        != Some(if a.signature.is_some() {
+            "/Stamp"
+        } else if a.rectangles {
+            "/Highlight"
+        } else {
+            "/Ink"
+        })
     {
         return Err(ExportError::Unsupported(
             "anotasi diubah di luar subset pasif yang didukung.",
@@ -224,8 +245,8 @@ pub(crate) fn patch(doc: &Value, plan: &ExportPlan, work: &Path) -> Result<Value
                 .map_err(|_| ExportError::Io)?;
                 updates.insert(format!("obj:{annot_ref}"),json!({"value":{"/Type":"/Annot","/Subtype":"/Stamp","/Rect":rect,"/NM":format!("u:{}",a.name()),"/C":[0,0,0],"/CA":1,"/F":4,"/P":page_ref,"/AP":{"/N":ap_ref}}}));
                 updates.insert(format!("obj:{ap_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Form","/BBox":rect,"/Resources":{"/XObject":{"/Sig":image_ref}}},"datafile":ap.to_str().ok_or(ExportError::Io)?}}));
-                updates.insert(format!("obj:{image_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Image","/Width":image.width,"/Height":image.height,"/ColorSpace":"/DeviceRGB","/BitsPerComponent":8,"/SMask":mask_ref},"datafile":rgb.to_str().ok_or(ExportError::Io)?}}));
-                updates.insert(format!("obj:{mask_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Image","/Width":image.width,"/Height":image.height,"/ColorSpace":"/DeviceGray","/BitsPerComponent":8},"datafile":alpha.to_str().ok_or(ExportError::Io)?}}));
+                updates.insert(format!("obj:{image_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Image","/Width":image.width,"/Height":image.height,"/ColorSpace":"/DeviceRGB","/BitsPerComponent":8,"/Interpolate":true,"/SMask":mask_ref},"datafile":rgb.to_str().ok_or(ExportError::Io)?}}));
+                updates.insert(format!("obj:{mask_ref}"),json!({"stream":{"dict":{"/Type":"/XObject","/Subtype":"/Image","/Width":image.width,"/Height":image.height,"/ColorSpace":"/DeviceGray","/BitsPerComponent":8,"/Interpolate":true},"datafile":alpha.to_str().ok_or(ExportError::Io)?}}));
                 annots.push(json!(annot_ref));
                 continue;
             }

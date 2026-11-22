@@ -33,7 +33,7 @@ pub(super) fn render(text: &str, style: usize, color: [u8; 3]) -> Result<Signatu
     }
     let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
     layout.reset(&LayoutSettings::default());
-    layout.append(&[font], &TextStyle::new(text, 96., 0));
+    layout.append(&[font], &TextStyle::new(text, 192., 0));
     let glyphs = layout.glyphs();
     let left = glyphs
         .iter()
@@ -61,35 +61,29 @@ pub(super) fn render(text: &str, style: usize, color: [u8; 3]) -> Result<Signatu
     if width > 16384 || height > 512 {
         return Err("Nama terlalu panjang untuk dirender.".into());
     }
-    let mut image = image::RgbaImage::new(width, height);
-    for g in glyphs {
-        let (_, mask) = font.rasterize_config(g.key);
-        for y in 0..g.height {
-            for x in 0..g.width {
-                let alpha = mask[y * g.width + x];
+    let [r, g, b] = color;
+    let mut image = image::RgbaImage::from_pixel(width, height, image::Rgba([r, g, b, 0]));
+    for glyph in glyphs {
+        let (_, mask) = font.rasterize_config(glyph.key);
+        for y in 0..glyph.height {
+            for x in 0..glyph.width {
+                let alpha = mask[y * glyph.width + x];
                 let (px, py) = (
-                    (g.x as i32 - left + 2) as u32 + x as u32,
-                    (g.y as i32 - top + 2) as u32 + y as u32,
+                    (glyph.x as i32 - left + 2) as u32 + x as u32,
+                    (glyph.y as i32 - top + 2) as u32 + y as u32,
                 );
                 if px < width && py < height && alpha > 0 {
                     let prev = image.get_pixel(px, py)[3] as u16;
                     let a = alpha as u16 + prev * (255 - alpha as u16) / 255;
-                    image.put_pixel(px, py, image::Rgba([color[0], color[1], color[2], a as u8]));
+                    image.put_pixel(px, py, image::Rgba([r, g, b, a as u8]));
                 }
             }
         }
     }
-    let mut image = image::DynamicImage::ImageRgba8(image)
-        .thumbnail(512, 256)
-        .to_rgba8();
-    for p in image.pixels_mut() {
-        if p[3] > 0 {
-            p[0] = color[0];
-            p[1] = color[1];
-            p[2] = color[2];
-        }
-    }
-    super::signatures::crop_asset(image).ok_or_else(|| "Nama tidak menghasilkan gambar.".into())
+    super::signatures::crop_asset(super::signatures::downsize_asset(
+        image::DynamicImage::ImageRgba8(image),
+    ))
+    .ok_or_else(|| "Nama tidak menghasilkan gambar.".into())
 }
 #[cfg(test)]
 mod tests {
@@ -99,6 +93,7 @@ mod tests {
             let a =
                 super::render("Zufar Handito", style, [20, 60, 150]).map_err(anyhow::Error::msg)?;
             assert!(a.valid());
+            assert!(a.width > 512);
             assert!(
                 a.rgba
                     .as_chunks::<4>()

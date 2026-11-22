@@ -1,5 +1,5 @@
-//! Raster projection shared by the viewer and PNG export. PDF output stays vector.
-use pdf_domain::annotation::{Annotation, rotate};
+//! Raster projection shared by the viewer and PNG export.
+use pdf_domain::annotation::{Annotation, SignatureImage, rotate};
 
 pub fn composite(
     rgba: &mut [u8],
@@ -24,6 +24,17 @@ pub fn composite(
             let x1 = (corners[0][0].max(corners[1][0]) * width as f32).ceil() as usize;
             let y0 = (corners[0][1].min(corners[1][1]) * height as f32).floor() as usize;
             let y1 = (corners[0][1].max(corners[1][1]) * height as f32).ceil() as usize;
+            let (page_x, page_y) = if turns.is_multiple_of(2) {
+                (width, height)
+            } else {
+                (height, width)
+            };
+            let signature_width = (a.points[1][0] - a.points[0][0]) * page_x as f32;
+            let signature_height = (a.points[1][1] - a.points[0][1]) * page_y as f32;
+            let footprint = [
+                (image.width as f32 / signature_width).max(1.),
+                (image.height as f32 / signature_height).max(1.),
+            ];
             for y in y0.min(h)..y1.min(h) {
                 for x in x0.min(w)..x1.min(w) {
                     let p = rotate(
@@ -38,17 +49,8 @@ pub fn composite(
                     if !(0. ..1.).contains(&u) || !(0. ..1.).contains(&v) {
                         continue;
                     }
-                    let offset = ((v * image.height as f32) as usize * image.width as usize
-                        + (u * image.width as f32) as usize)
-                        * 4;
-                    let src = &image.rgba[offset..offset + 4];
-                    let dst = &mut rgba[(y * w + x) * 4..(y * w + x) * 4 + 4];
-                    for c in 0..3 {
-                        dst[c] = ((u32::from(src[c]) * u32::from(src[3])
-                            + u32::from(dst[c]) * (255 - u32::from(src[3]))
-                            + 127)
-                            / 255) as u8;
-                    }
+                    let offset = (y * w + x) * 4;
+                    blend_signature(image, [u, v], footprint, &mut rgba[offset..offset + 4]);
                 }
             }
             continue;
@@ -144,9 +146,63 @@ pub fn composite(
     }
 }
 
+fn blend_signature(image: &SignatureImage, [u, v]: [f32; 2], [dx, dy]: [f32; 2], dst: &mut [u8]) {
+    let width = image.width as f32;
+    let height = image.height as f32;
+    let (x, y) = (u * width, v * height);
+    let (left, right) = ((x - dx / 2.).max(0.), (x + dx / 2.).min(width));
+    let (top, bottom) = ((y - dy / 2.).max(0.), (y + dy / 2.).min(height));
+    let area = (right - left) * (bottom - top);
+    let mut alpha = 0.;
+    let mut ink = [0.; 3];
+    // Average the source area for small previews. A one-texel footprint gives
+    // bilinear interpolation when enlarged. Mix premultiplied colors in both cases.
+    for row in top as usize..bottom.ceil() as usize {
+        let overlap_y = bottom.min(row as f32 + 1.) - top.max(row as f32);
+        for col in left as usize..right.ceil() as usize {
+            let offset = (row * image.width as usize + col) * 4;
+            let source = &image.rgba[offset..offset + 4];
+            let overlap_x = right.min(col as f32 + 1.) - left.max(col as f32);
+            let weight = overlap_x * overlap_y / area * (f32::from(source[3]) / 255.);
+            alpha += weight;
+            for (ink, channel) in ink.iter_mut().zip(source) {
+                *ink += f32::from(*channel) * weight;
+            }
+        }
+    }
+    for (channel, ink) in dst.iter_mut().zip(ink) {
+        *channel = (ink + f32::from(*channel) * (1. - alpha)).round() as u8;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn signature_resampling_preserves_thin_ink_and_ignores_invisible_rgb() {
+        let signature = Annotation {
+            id: 1,
+            highlight: false,
+            color: [255, 0, 0],
+            width: 1.,
+            points: vec![[0., 0.], [1., 1.]],
+            rectangles: false,
+            signature: Some(std::sync::Arc::new(SignatureImage {
+                width: 4,
+                height: 1,
+                rgba: [0, 0, 255, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 255, 0].to_vec(),
+            })),
+        };
+        let mut narrow = [255; 8];
+        composite(&mut narrow, 1, 2, 1., 1, std::slice::from_ref(&signature));
+        assert_eq!(narrow, [255, 128, 128, 255, 255, 255, 255, 255]);
+
+        let mut wide = [255; 32];
+        composite(&mut wide, 8, 1, 8., 0, &[signature]);
+        assert_eq!(&wide[8..12], &[255, 64, 64, 255]);
+    }
+
     #[test]
     fn highlighter_preserves_black_text_and_does_not_stack_its_own_crossing() {
         let a = Annotation {

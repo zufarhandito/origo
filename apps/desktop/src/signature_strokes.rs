@@ -4,7 +4,10 @@ use tiny_skia::{FillRule, LineCap, LineJoin, Mask, PathBuilder, Stroke, Transfor
 
 pub(super) const WIDTH: u32 = 512;
 pub(super) const HEIGHT: u32 = 256;
-const OVERSAMPLE: u32 = 4;
+// Keep the same subpixel grid as the editor while retaining more of its samples.
+const OUTPUT_SCALE: u32 = 2;
+const OVERSAMPLE: u32 = 2;
+const SAMPLE_SCALE: u32 = OUTPUT_SCALE * OVERSAMPLE;
 const MIN_SAMPLE_GAP: f32 = 0.8;
 const MAX_CORNER_TRIM: f32 = 3.0;
 
@@ -27,7 +30,7 @@ pub(super) fn stroke_width(thickness: usize) -> f32 {
 }
 
 /// Coalesce subpixel samples and soften shallow turns without rounding cusps.
-/// Geometry is in output pixels so the distance threshold is isotropic.
+/// Geometry is in pad pixels so the distance threshold is isotropic.
 pub(super) fn smooth(stroke: &[InkPoint]) -> Option<InkPath> {
     let mut samples = stroke
         .iter()
@@ -92,8 +95,8 @@ pub(super) fn rasterize(
         .filter_map(|stroke| smooth(stroke))
         .peekable();
     paths.peek()?;
-    let mut mask = Mask::new(WIDTH * OVERSAMPLE, HEIGHT * OVERSAMPLE)?;
-    let transform = Transform::from_scale(OVERSAMPLE as f32, OVERSAMPLE as f32);
+    let mut mask = Mask::new(WIDTH * SAMPLE_SCALE, HEIGHT * SAMPLE_SCALE)?;
+    let transform = Transform::from_scale(SAMPLE_SCALE as f32, SAMPLE_SCALE as f32);
     let stroke = Stroke {
         width,
         line_cap: LineCap::Round,
@@ -127,7 +130,7 @@ pub(super) fn rasterize(
         }
         if let Some(outline) = builder
             .finish()
-            .and_then(|line| line.stroke(&stroke, OVERSAMPLE as f32))
+            .and_then(|line| line.stroke(&stroke, SAMPLE_SCALE as f32))
         {
             mask.fill_path(&outline, FillRule::Winding, false, transform);
         }
@@ -136,22 +139,26 @@ pub(super) fn rasterize(
     let pixels = mask.data();
     let stride = mask.width() as usize;
     let [r, g, b] = color;
-    Some(RgbaImage::from_fn(WIDTH, HEIGHT, |x, y| {
-        let mut coverage = 0u32;
-        for dy in 0..OVERSAMPLE {
-            let row = (y * OVERSAMPLE + dy) as usize * stride;
-            for dx in 0..OVERSAMPLE {
-                coverage += u32::from(pixels[row + (x * OVERSAMPLE + dx) as usize]);
+    Some(RgbaImage::from_fn(
+        WIDTH * OUTPUT_SCALE,
+        HEIGHT * OUTPUT_SCALE,
+        |x, y| {
+            let mut coverage = 0u32;
+            for dy in 0..OVERSAMPLE {
+                let row = (y * OVERSAMPLE + dy) as usize * stride;
+                for dx in 0..OVERSAMPLE {
+                    coverage += u32::from(pixels[row + (x * OVERSAMPLE + dx) as usize]);
+                }
             }
-        }
-        let samples = OVERSAMPLE * OVERSAMPLE;
-        let alpha = ((coverage + samples / 2) / samples) as u8;
-        if alpha == 0 {
-            Rgba([0; 4])
-        } else {
-            Rgba([r, g, b, alpha])
-        }
-    }))
+            let samples = OVERSAMPLE * OVERSAMPLE;
+            let alpha = ((coverage + samples / 2) / samples) as u8;
+            if alpha == 0 {
+                Rgba([0; 4])
+            } else {
+                Rgba([r, g, b, alpha])
+            }
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -182,10 +189,10 @@ mod tests {
             0,
         )
         .ok_or_else(|| anyhow::anyhow!("missing raster"))?;
-        assert_eq!(image.dimensions(), (512, 256));
+        assert_eq!(image.dimensions(), (1024, 512));
         assert!(image.pixels().any(|pixel| (1..255).contains(&pixel[3])));
-        assert!(image.get_pixel(409, 51)[3] > 0);
-        assert_eq!(image.get_pixel(256, 51)[3], 0);
+        assert!(image.get_pixel(819, 102)[3] > 0);
+        assert_eq!(image.get_pixel(512, 102)[3], 0);
         assert!(
             image
                 .pixels()
