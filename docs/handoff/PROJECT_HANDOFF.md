@@ -1,5 +1,26 @@
 # Handoff terkini - 22 November 2026
 
+## Penghalusan goresan tanda tangan (22 November 2026)
+
+Goresan mouse dan QR berbagi geometri 2:1. Sampel subpiksel digabung, belokan
+landai memakai kurva kuadratik, dan titik serta sudut tajam dipertahankan.
+Kanvas memakai ujung serta sambungan bulat. Aset menggunakan raster 4x dan
+cakupan alpha per piksel pada hasil 512 x 256 sebelum crop. Warna, ketebalan,
+format aset dan kompatibilitas template tetap dipertahankan.
+
+Format, Clippy tanpa warning, 23 unit test desktop, build release, 21 skenario
+editor UI, dan smoke QR LAN lulus. Tampilan ghost saat drag dan hasil sesudah
+lepas diperiksa. Bukti editor
+`.research/signature-ui-daa07e111d4b4d8ba2a3f4d1cf97b359`
+dan QR `.research/signature-phone-ui-7560cb5725de47c2ac3e7040c382b8a4`.
+QR diuji dengan klien lokal. Pemindaian kamera dan sentuhan HP fisik belum diuji.
+
+Build gabungan dipasang untuk run.cmd setelah executable utama dipastikan tidak
+aktif. SHA-256 build dan hasil pemasangan identik
+`3C607F97ACDFE622CD8FFCCEFE9A59ECE19EEAFF47423FCA171D7B0C92F90C15`.
+Commit awal untuk ghost adalah `d3394a7`.
+
+
 ## Pratinjau penempatan tanda tangan (22 November 2026)
 
 Tanda tangan, inisial, dan stempel muncul semitransparan di bawah kursor saat

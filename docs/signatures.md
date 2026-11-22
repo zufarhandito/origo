@@ -47,6 +47,15 @@ masih terbuka; tanda tangan yang ditempatkan tersimpan di PDF hasil ekspor. Meta
 berisi raster tanda tangan agar bisa diedit ulang, sehingga penerima file juga
 menerima gambar tersebut.
 
+## Penghalusan goresan
+
+Goresan baru dari mouse dan goresan yang diterima dari HP memakai jalur yang sama. Sampel yang
+sangat dekat digabung dan belokan landai dilunakkan. Titik awal dan akhir,
+titik kecil, sudut yang jelas, serta pilihan warna dan ketebalan dipertahankan.
+Ujung bulat dan anti-aliasing mengurangi tepi bergerigi dari hasil raster.
+Hasil ini dipakai untuk pratinjau penempatan dan PDF. Aset raster, anotasi,
+dan template yang sudah tersimpan tetap dibaca dengan format yang sama.
+
 ## Format output dan batas
 
 Tanda tangan disimpan sebagai anotasi PDF **Stamp** pasif, dengan appearance Form,

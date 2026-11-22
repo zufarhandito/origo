@@ -272,17 +272,18 @@ impl DocumentSession {
                 |el| el.child(navigation),
             );
 
+        let body_height = (window.viewport_size().height - px(305.)).max(px(165.));
         let panel = match view {
             GalleryView::Loading => gpui::div()
                 .p_4()
                 .child("Memuat template...")
                 .into_any_element(),
             GalleryView::Gallery => self.signature_gallery_panel(cx),
-            GalleryView::Create => self.signature_creation_panel(cx),
+            GalleryView::Create => self.signature_creation_panel(body_height, cx),
         };
         let mut body = gpui::div()
             .id(("signature-editor-scroll", view as usize))
-            .max_h((window.viewport_size().height - px(305.)).max(px(165.)))
+            .max_h(body_height)
             .overflow_y_scroll()
             .w_full()
             .p_3()
@@ -404,7 +405,11 @@ impl DocumentSession {
         cx.notify();
     }
 
-    fn signature_creation_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    fn signature_creation_panel(
+        &mut self,
+        body_height: gpui::Pixels,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
         let kind = self.annotation.signature.kind;
         let method = self.annotation.signature.method;
         let qr_active = self.annotation.signature.phone.is_some();
@@ -418,7 +423,7 @@ impl DocumentSession {
         }
         panel = panel.child(match method {
             SignatureMethod::Draw if qr_active => self.signature_phone_panel(cx),
-            SignatureMethod::Draw => self.signature_draw_panel(cx),
+            SignatureMethod::Draw => self.signature_draw_panel((body_height - px(30.)) * 2., cx),
             SignatureMethod::Text => self.signature_text_panel(cx),
             SignatureMethod::Image => self.signature_upload_panel(cx),
         });
@@ -578,36 +583,19 @@ impl DocumentSession {
             )
     }
 
-    fn signature_draw_panel(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    fn signature_draw_panel(
+        &self,
+        max_pad_width: gpui::Pixels,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
         let weak = cx.weak_entity();
         let strokes = self.annotation.signature.strokes.clone();
         let color = signature_color(self.annotation.signature.color);
-        let thickness = [2., 4., 6.][self.annotation.signature.thickness.min(2)];
+        let thickness = self.annotation.signature.thickness;
         let pad = gpui::canvas(
             |bounds, window, _| window.insert_hitbox(bounds, gpui::HitboxBehavior::Normal),
             move |bounds, hitbox, window, _| {
-                for stroke in &strokes {
-                    let mut path = gpui::PathBuilder::stroke(px(thickness));
-                    for (i, p) in stroke.iter().enumerate() {
-                        let p = bounds.origin
-                            + gpui::point(bounds.size.width * p[0], bounds.size.height * p[1]);
-                        if i == 0 {
-                            path.move_to(p);
-                        } else {
-                            path.line_to(p);
-                        }
-                    }
-                    if let Ok(path) = path.build() {
-                        window.paint_path(
-                            path,
-                            gpui::rgb(
-                                (u32::from(color[0]) << 16)
-                                    | (u32::from(color[1]) << 8)
-                                    | u32::from(color[2]),
-                            ),
-                        );
-                    }
-                }
+                paint_signature_ink(window, bounds, &strokes, color, thickness);
                 let down = weak.clone();
                 window.on_mouse_event(move |e: &gpui::MouseDownEvent, phase, window, cx| {
                     if phase == gpui::DispatchPhase::Bubble
@@ -657,12 +645,6 @@ impl DocumentSession {
                         let _ = weak.update(cx, |s, cx| {
                             if s.annotation.signature.drawing {
                                 s.annotation.signature.drawing = false;
-                                // Make a click behave like a short stroke as well.
-                                if let Some(stroke) = s.annotation.signature.strokes.last_mut()
-                                    && stroke.len() == 1
-                                {
-                                    stroke.push(stroke[0]);
-                                }
                                 s.refresh_signature_asset(cx);
                             }
                         });
@@ -671,7 +653,7 @@ impl DocumentSession {
             },
         )
         .w_full()
-        .h(px(180.));
+        .aspect_ratio(2.0);
         let state = &self.annotation.signature;
         let empty = state.strokes.is_empty();
         let button_bar = gpui::div()
@@ -753,6 +735,8 @@ impl DocumentSession {
                     .aria_label("Area gambar tanda tangan")
                     .relative()
                     .w_full()
+                    .max_w(max_pad_width)
+                    .mx_auto()
                     .rounded_lg()
                     .overflow_hidden()
                     .bg(gpui::white())
@@ -1351,6 +1335,63 @@ fn signature_delta(delta: [f32; 2], turns: u8) -> [f32; 2] {
 pub(super) fn signature_color(index: usize) -> [u8; 3] {
     [[25, 25, 25], [30, 80, 180], [180, 35, 45]][index.min(2)]
 }
+fn paint_signature_ink(
+    window: &mut Window,
+    bounds: Bounds<gpui::Pixels>,
+    strokes: &[Vec<[f32; 2]>],
+    [r, g, b]: [u8; 3],
+    thickness: usize,
+) {
+    use crate::signature_strokes::{self, HEIGHT, Segment, WIDTH};
+    use lyon_tessellation::{LineCap, LineJoin};
+
+    let scale_x = f32::from(bounds.size.width) / WIDTH as f32;
+    let scale_y = f32::from(bounds.size.height) / HEIGHT as f32;
+    let project = |[x, y]: [f32; 2]| bounds.origin + gpui::point(px(x * scale_x), px(y * scale_y));
+    let color = gpui::rgb(u32::from_be_bytes([0, r, g, b]));
+    let stroke_width = signature_strokes::stroke_width(thickness) * scale_x.min(scale_y);
+    if stroke_width <= 0. {
+        return;
+    }
+    let options = gpui::StrokeOptions::default()
+        .with_line_width(stroke_width)
+        .with_line_cap(LineCap::Round)
+        .with_line_join(LineJoin::Round);
+
+    for stroke in strokes
+        .iter()
+        .filter_map(|stroke| signature_strokes::smooth(stroke))
+    {
+        let first = project(stroke.start);
+        if stroke.segments.is_empty() {
+            let radius = px(stroke_width / 2.);
+            window.paint_quad(gpui::quad(
+                Bounds::new(
+                    first - gpui::point(radius, radius),
+                    size(radius * 2., radius * 2.),
+                ),
+                radius,
+                color,
+                px(0.),
+                gpui::transparent_black(),
+                gpui::BorderStyle::default(),
+            ));
+            continue;
+        }
+        let mut path = gpui::PathBuilder::fill().with_style(gpui::PathStyle::Stroke(options));
+        path.move_to(first);
+        for segment in stroke.segments {
+            match segment {
+                Segment::LineTo(end) => path.line_to(project(end)),
+                Segment::CurveTo { control, end } => path.curve_to(project(end), project(control)),
+            }
+        }
+        if let Ok(path) = path.build() {
+            window.paint_path(path, color);
+        }
+    }
+}
+
 fn pad_point(bounds: Bounds<gpui::Pixels>, p: gpui::Point<gpui::Pixels>) -> [f32; 2] {
     [
         (f32::from(p.x - bounds.origin.x) / f32::from(bounds.size.width)).clamp(0., 1.),
@@ -1366,31 +1407,9 @@ pub(super) fn draw_asset_with(
     color: [u8; 3],
     thickness: usize,
 ) -> Option<SignatureImage> {
-    let mut rgba = vec![0; 512 * 256 * 4];
-    for stroke in strokes {
-        for pair in stroke.windows(2) {
-            let (p, q) = (pair[0], pair[1]);
-            let dx = (q[0] - p[0]) * 512.;
-            let dy = (q[1] - p[1]) * 256.;
-            let steps = dx.abs().max(dy.abs()).ceil() as usize;
-            for i in 0..=steps {
-                let t = i as f32 / steps.max(1) as f32;
-                let x = (p[0] * 511. + dx * t) as i32;
-                let y = (p[1] * 255. + dy * t) as i32;
-                let radius = (thickness.min(2) + 1) as i32;
-                for oy in -radius..=radius {
-                    for ox in -radius..=radius {
-                        let (x, y) = (x + ox, y + oy);
-                        if (0..512).contains(&x) && (0..256).contains(&y) {
-                            let at = (y as usize * 512 + x as usize) * 4;
-                            rgba[at..at + 4].copy_from_slice(&[color[0], color[1], color[2], 255]);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    crop_asset(image::RgbaImage::from_raw(512, 256, rgba)?)
+    crop_asset(crate::signature_strokes::rasterize(
+        strokes, color, thickness,
+    )?)
 }
 pub(super) fn crop_asset(image: image::RgbaImage) -> Option<SignatureImage> {
     let mut bounds = [image.width(), image.height(), 0, 0];

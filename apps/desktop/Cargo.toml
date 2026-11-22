@@ -13,8 +13,10 @@ serde_json.workspace = true
 dunce.workspace = true
 gpui-kit.workspace = true
 image.workspace = true
+lyon_tessellation = "=1.0.23"
 smallvec.workspace = true
 tempfile.workspace = true
+tiny-skia = { version = "=0.11.4", default-features = false, features = ["std"] }
 pdf-application.workspace = true
 pdf-domain.workspace = true
 pdf-engine.workspace = true

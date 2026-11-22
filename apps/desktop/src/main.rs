@@ -33,6 +33,7 @@ mod shell;
 mod signature_library;
 mod signature_phone;
 mod signature_phone_ui;
+mod signature_strokes;
 mod signature_templates_ui;
 mod signature_text;
 mod signatures;

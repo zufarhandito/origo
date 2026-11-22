@@ -4620,6 +4620,7 @@ dependencies = [
  "getrandom 0.3.4",
  "gpui-kit",
  "image",
+ "lyon_tessellation",
  "pdf-application",
  "pdf-domain",
  "pdf-engine",
@@ -4629,6 +4630,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "tempfile",
+ "tiny-skia",
 ]
 
 [[package]]
