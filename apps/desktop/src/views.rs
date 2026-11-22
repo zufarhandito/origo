@@ -10,6 +10,9 @@ use gpui_kit::component::{
 };
 use gpui_kit::{IntoElement, MouseButton, Render, canvas, div, img, list};
 use pdf_application::viewer::RenderKind;
+use std::{cell::Cell, rc::Rc};
+
+type PaintedSignatureGhost = Rc<Cell<Option<[[f32; 2]; 2]>>>;
 
 impl DocumentSession {
     // Canvas listeners are window-global: clipping alone does not exclude the
@@ -149,7 +152,7 @@ impl DocumentSession {
                         .child(
                             list(self.thumbnail_list.clone(), move |index, _, cx| {
                                 weak.update(cx, |this, cx| {
-                                    this.item(index, RenderKind::Thumbnail, cx)
+                                    this.item(index, RenderKind::Thumbnail, None, cx)
                                 })
                                 .unwrap_or_else(|_| div().into_any_element())
                             })
@@ -195,6 +198,7 @@ impl DocumentSession {
         &mut self,
         index: usize,
         kind: RenderKind,
+        painted_ghost: Option<PaintedSignatureGhost>,
         cx: &mut Context<Self>,
     ) -> gpui_kit::AnyElement {
         let Some(workspace) = self.workspace.as_ref() else {
@@ -290,6 +294,7 @@ impl DocumentSession {
             .signature
             .gesture
             .as_ref()
+            .filter(|_| self.annotation.signature.placement_ghost.is_none())
             .filter(|(id, _, _, _)| *id == page_id)
             .map(|(_, a, _, _)| a.clone())
             .or(selected_annotation);
@@ -321,9 +326,10 @@ impl DocumentSession {
                 Vec::new()
             };
             let weak = cx.weak_entity();
+            let track_ghost = self.active && self.annotation.signature.placement_ghost.is_some();
             canvas(
                 |_, _, _| {},
-                move |bounds, _, window, _| {
+                move |bounds, _, window, app| {
                     if let Some((_, a)) = &draft {
                         annotations::paint_draft(
                             a,
@@ -372,6 +378,44 @@ impl DocumentSession {
                     // Global window listeners must honor the page's visible clip. A
                     // scrolled-off page can otherwise intercept toolbar/sidebar clicks.
                     let input_clip = window.content_mask().bounds;
+                    let pointer = window.mouse_position();
+                    if track_ghost
+                        && bounds.contains(&pointer)
+                        && input_clip.contains(&pointer)
+                        && let Ok(Some((image, rect))) = weak.read_with(app, |view, _| {
+                            if !view.document_input_allowed(pointer, window) {
+                                return None;
+                            }
+                            view.signature_ghost_at(page_id, geometry, bounds, pointer)
+                        })
+                    {
+                        let [a, b] = rect.map(|point| {
+                            pdf_domain::annotation::rotate(point, geometry.quarter_turns)
+                        });
+                        let image_bounds = Bounds::new(
+                            bounds.origin
+                                + gpui::point(
+                                    bounds.size.width * a[0].min(b[0]),
+                                    bounds.size.height * a[1].min(b[1]),
+                                ),
+                            gpui::size(
+                                bounds.size.width * (a[0] - b[0]).abs(),
+                                bounds.size.height * (a[1] - b[1]).abs(),
+                            ),
+                        );
+                        let _ = window.paint_image(
+                            image_bounds,
+                            image_bounds,
+                            gpui::Corners::default(),
+                            image,
+                            0,
+                            false,
+                        );
+                        if let Some(ghost) = &painted_ghost {
+                            ghost.set(Some(rect));
+                        }
+                    }
+
                     let down = weak.clone();
                     window.on_mouse_event(
                         move |event: &gpui::MouseDownEvent, phase, window, cx| {
@@ -598,9 +642,16 @@ impl Render for DocumentSession {
             self.conversion_hub(window, cx)
         } else if has_document {
             let weak = cx.weak_entity();
+            // Use the picture actually painted in this frame for optional UI diagnostics.
+            let track_ghost = self.active && self.annotation.signature.placement_ghost.is_some();
+            let painted_ghost =
+                (track_ghost && self.metrics.is_some()).then(|| Rc::new(Cell::new(None)));
+            let list_ghost = painted_ghost.clone();
             let main_list = list(self.page_list.clone(), move |index, _, cx| {
-                weak.update(cx, |this, cx| this.item(index, RenderKind::Page, cx))
-                    .unwrap_or_else(|_| div().into_any_element())
+                weak.update(cx, |this, cx| {
+                    this.item(index, RenderKind::Page, list_ghost.clone(), cx)
+                })
+                .unwrap_or_else(|_| div().into_any_element())
             });
             let content_width = self.content_width();
             let weak = cx.weak_entity();
@@ -625,20 +676,86 @@ impl Render for DocumentSession {
                         });
                     }
                 },
-                move |bounds, _, window, _| {
+                move |bounds, _, window, app| {
+                    if let Some(ghost) = &painted_ghost {
+                        let rect = ghost.take();
+                        let weak = scroll_weak.clone();
+                        if weak
+                            .read_with(app, |view, _| {
+                                view.annotation.signature.signature_ghost_rect != rect
+                            })
+                            .unwrap_or(false)
+                        {
+                            app.defer(move |cx| {
+                                let _ = weak.update(cx, |view, cx| {
+                                    if view.annotation.signature.placement_ghost.is_some() {
+                                        view.annotation.signature.signature_ghost_rect = rect;
+                                        view.report(cx);
+                                    }
+                                });
+                            });
+                        }
+                    }
+                    if track_ghost {
+                        let move_view = scroll_weak.clone();
+                        window.on_mouse_event(
+                            move |_: &gpui::MouseMoveEvent, phase, window, cx| {
+                                if phase == gpui::DispatchPhase::Capture {
+                                    let _ = move_view.update(cx, |s, _| {
+                                        s.annotation.signature.ghost_pointer_exited = false
+                                    });
+                                    window.refresh();
+                                }
+                            },
+                        );
+                        let exit_view = scroll_weak.clone();
+                        window.on_mouse_event(
+                            move |_: &gpui::MouseExitEvent, phase, window, cx| {
+                                if phase == gpui::DispatchPhase::Capture {
+                                    let _ = exit_view.update(cx, |s, _| {
+                                        s.annotation.signature.ghost_pointer_exited = true
+                                    });
+                                    window.refresh();
+                                }
+                            },
+                        );
+                    }
                     let release_weak = scroll_weak.clone();
-                    window.on_mouse_event(move |event: &gpui::MouseUpEvent, phase, _, cx| {
+                    window.on_mouse_event(move |event: &gpui::MouseUpEvent, phase, window, cx| {
                         if phase == gpui::DispatchPhase::Capture
                             && event.button == MouseButton::Left
                         {
                             let _ = release_weak.update(cx, |this, cx| {
-                                if this
-                                    .annotation
-                                    .signature
-                                    .gesture_bounds
-                                    .is_some_and(|b| !b.contains(&event.position))
+                                if let Some(page_bounds) = this.annotation.signature.gesture_bounds
                                 {
-                                    this.annotation.signature.gesture = None;
+                                    if !page_bounds.contains(&event.position)
+                                        || (this.annotation.signature.placement_ghost.is_some()
+                                            && (!bounds.contains(&event.position)
+                                                || !this.document_input_allowed(
+                                                    event.position,
+                                                    window,
+                                                )))
+                                    {
+                                        this.annotation.signature.gesture = None;
+                                    } else if this.annotation.signature.placement_ghost.is_some()
+                                        && let Some((page, _, _, _)) =
+                                            &this.annotation.signature.gesture
+                                    {
+                                        let page = *page;
+                                        let index = this.workspace.as_ref().and_then(|w| {
+                                            w.pages().iter().position(|p| p.id == page)
+                                        });
+                                        if let Some(index) = index {
+                                            this.annotation_pointer(
+                                                index,
+                                                page_bounds,
+                                                event.position,
+                                                false,
+                                                window,
+                                                cx,
+                                            );
+                                        }
+                                    }
                                 }
                                 this.annotation.signature.gesture_bounds = None;
                                 this.finish_annotation(cx);

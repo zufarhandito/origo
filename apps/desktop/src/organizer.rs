@@ -98,7 +98,7 @@ impl DocumentSession {
         cx: &mut Context<Self>,
     ) {
         self.annotation.draft = None;
-        self.annotation.signature.gesture = None;
+        self.cancel_signature_placement(cx);
         let top = self.page_list.logical_scroll_top();
         let old_height = self
             .page_list

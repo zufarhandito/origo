@@ -12,9 +12,11 @@ dan arahan pemilik untuk melanjutkan tanda tangan setelah anotator selesai.
    Jika pustaka kosong, Origo langsung membuka form pembuatan.
 3. Pilih kategori **Tanda Tangan**, **Inisial**, atau **Stempel**. Gunakan **Gambar**,
    **Ketik**, atau **Unggah** untuk tanda tangan dan inisial. Stempel langsung
-   membuka unggahan gambar. **Gunakan Tanda Tangan** masuk ke penempatan. Klik
-   atau drag pada halaman untuk menentukan posisi. Dokumen berubah saat objek
-   ditempatkan.
+   membuka unggahan gambar. **Gunakan Tanda Tangan** masuk ke penempatan. Gambar
+   tembus pandang mengikuti kursor di atas halaman dan tetap di dalam tepinya.
+   Klik, atau tekan lalu geser dan lepas di halaman yang sama, untuk
+   menempatkannya. Pratinjau hilang di luar halaman. Tekan Esc untuk batal.
+   PDF dan riwayat Undo baru berubah setelah penempatan berhasil.
 4. Dalam tool Pilih, drag tanda tangan untuk memindahkannya. Drag kotak sudut kanan
    bawah untuk resize proporsional. Garis batas memperlihatkan posisi/ukuran draft;
    gambar diterapkan saat mouse dilepas. Setiap gesture satu langkah Undo/Redo.

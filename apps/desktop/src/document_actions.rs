@@ -56,8 +56,7 @@ impl DocumentSession {
                 }
                 if this.annotation.signature.placing || this.annotation.signature.gesture.is_some()
                 {
-                    this.annotation.signature.placing = false;
-                    this.annotation.signature.gesture = None;
+                    this.cancel_signature_placement(cx);
                     cx.notify();
                     return;
                 }

@@ -1,5 +1,19 @@
 # Pengujian Origo
 
+## Pratinjau penempatan tanda tangan (22 November 2026)
+
+Tanda tangan, inisial, dan stempel muncul semitransparan di bawah kursor saat
+menentukan posisi di atas PDF. Pratinjau dan penempatan berbagi perhitungan
+ukuran dan batas halaman. Rotasi mengikuti orientasi PDF. Klik atau lepas setelah
+drag pada halaman yang sama membuat satu perubahan yang dapat di-Undo. Esc dan
+lepas di luar halaman membatalkan penempatan.
+
+Tes UI memeriksa hover, batas tepi, kecocokan posisi klik dan drag, Esc, serta
+Undo dan regresi Save As/buka ulang. Bukti lokal
+`.research/signature-ui-fd9f94dc238d4807b1e7659fc0dd2e3a`.
+Tes unit memeriksa batas dan rasio aspek pada empat orientasi halaman.
+
+
 ## Redesign tanda tangan, inisial, dan stempel (22 November 2026)
 
 Editor membuka galeri dua kolom jika pustaka berisi template. Form pembuatan

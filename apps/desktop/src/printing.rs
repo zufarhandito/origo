@@ -59,7 +59,7 @@ impl DocumentSession {
             current,
             error: None,
         });
-        self.close_annotation_popups();
+        self.close_annotation_popups(cx);
         self.error_popup = true;
         self.resources
             .modal_owner

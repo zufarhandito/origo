@@ -714,7 +714,7 @@ impl WindowShell {
                                 s.active = false;
                                 s.visible_for_render = false;
                                 s.annotation.draft = None;
-                                s.close_annotation_popups();
+                                s.close_annotation_popups(cx);
                                 s.invalidate_work();
                                 s.clear_bitmaps(cx);
                             });

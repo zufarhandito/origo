@@ -403,11 +403,14 @@ impl WindowShell {
                         s.queue = RenderQueue::new(32 / divided);
                         s.queue.reset(s.generation);
                     }
+                    if s.active && !focused {
+                        s.cancel_signature_placement(cx);
+                    }
                     s.active = focused;
                     s.visible_for_render = visible;
                     if !visible {
                         s.annotation.draft = None;
-                        s.close_annotation_popups();
+                        s.close_annotation_popups(cx);
                     }
                     s.split_presentation = split;
                     if !visible {

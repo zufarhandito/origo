@@ -26,6 +26,8 @@ impl DocumentSession {
             "printDialog": self.print_dialog.is_some(),
             "signaturePanel": self.annotation.signature.open,
             "signaturePlacing": self.annotation.signature.placing,
+            "signatureGhost": self.annotation.signature.signature_ghost_rect.is_some(),
+            "signatureGhostRect": self.annotation.signature.signature_ghost_rect,
             "signatureStrokes": self.annotation.signature.strokes.len(),
             "signatureAsset": self.annotation.signature.asset.is_some(),
             "signatureError": self.annotation.signature.error.is_some(),

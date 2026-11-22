@@ -10,6 +10,24 @@ function Assert-NoControl([string[]]$Names) {
         if($ui.FindFirst([Windows.Automation.TreeScope]::Descendants,$condition)){throw "Unexpected control: $name"}
     }
 }
+function Pointer-Control([string]$Name,[double]$X=0.5,[double]$Y=0.5,[int]$Message=0x200,[int]$Buttons=0) {
+    $rect=(Find $Name).Current.BoundingRectangle
+    $point=New-Object OrganizerClick+Point
+    $point.X=[int]($rect.X+$rect.Width*$X)
+    $point.Y=[int]($rect.Y+$rect.Height*$Y)
+    [OrganizerClick]::ScreenToClient($app.MainWindowHandle,[ref]$point)|Out-Null
+    $pos=[IntPtr](($point.Y -shl 16) -bor ($point.X -band 0xffff))
+    [OrganizerClick]::SendMessage($app.MainWindowHandle,$Message,[IntPtr]$Buttons,$pos)|Out-Null
+}
+function Equal-SignatureRect($First,$Second) {
+    if($First.Count -ne 2 -or $Second.Count -ne 2){return $false}
+    for($point=0;$point -lt 2;$point++){
+        for($axis=0;$axis -lt 2;$axis++){
+            if([Math]::Abs($First[$point][$axis]-$Second[$point][$axis]) -gt 0.002){return $false}
+        }
+    }
+    return $true
+}
 function Stroke($x1,$y1,$x2,$y2,[string]$Control='Isi halaman 1',$Node=$null){
     $r=if($Node){$Node.Current.BoundingRectangle}else{(Find $Control).Current.BoundingRectangle}
     $start=New-Object OrganizerClick+Point;$start.X=[int]($r.X+$r.Width*$x1);$start.Y=[int]($r.Y+$r.Height*$y1)
@@ -41,10 +59,43 @@ try {
     if($field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value -ne 'ZH'){throw 'Initials suggestion missing'}
     $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('ZAH')
     Invoke 'Gunakan Tanda Tangan'
-    $null=Wait-State {param($s) $s.signaturePlacing -and -not $s.signaturePanel -and -not $s.dirty}
+    $initial=Wait-State {param($s) $s.signaturePlacing -and -not $s.signaturePanel -and -not $s.dirty}
+    Pointer-Control 'Isi halaman 1' 0.30 0.32
+    $first=Wait-State {param($s) $s.signatureGhost -and $s.signatureGhostRect.Count -eq 2}
+    Pointer-Control 'Isi halaman 1'
+    $preview=Wait-State {param($s) $s.signatureGhost -and -not (Equal-SignatureRect $first.signatureGhostRect $s.signatureGhostRect)}
+    if($preview.signatureGhostRect[0][0] -le $first.signatureGhostRect[0][0] -or
+       $preview.signatureGhostRect[0][1] -le $first.signatureGhostRect[0][1]){throw 'Ghost did not follow cursor toward the page center'}
+    if($preview.revision -ne $initial.revision -or $preview.dirty -or $preview.signatureCount -ne 0){throw 'Hover modified PDF before placement'}
+    Pass 'signature-ghost-follows-cursor-without-edit'
+
+    Pointer-Control 'Isi halaman 1' 0.98 0.02
+    $edge=Wait-State {param($s) $s.signatureGhost -and -not (Equal-SignatureRect $preview.signatureGhostRect $s.signatureGhostRect)}
+    $edgeRect=$edge.signatureGhostRect
+    if($edgeRect[0][0] -lt -0.001 -or $edgeRect[0][1] -lt -0.001 -or
+       $edgeRect[1][0] -gt 1.001 -or $edgeRect[1][1] -gt 1.001 -or
+       [Math]::Abs($edgeRect[1][0]-1.0) -gt 0.002){throw 'Ghost did not clamp to the page edge'}
+    Pass 'signature-ghost-clamps-to-page'
+
+    Pointer-Control 'Anotasi'
+    $null=Wait-State {param($s) $s.signaturePlacing -and -not $s.signatureGhost -and $null -eq $s.signatureGhostRect -and $s.revision -eq $initial.revision}
+    Pointer-Control 'Isi halaman 1'
+    $null=Wait-State {param($s) $s.signatureGhost}
+    if([SignatureTestFocus]::GetForegroundWindow() -ne $app.MainWindowHandle){throw 'The test window must be in front for Escape'}
+    [Windows.Forms.SendKeys]::SendWait('{ESC}')
+    $null=Wait-State {param($s) -not $s.signaturePlacing -and -not $s.signatureGhost -and $s.signatureCount -eq 0 -and -not $s.dirty}
+    Pointer-Control 'Isi halaman 1'
+    $null=Wait-State {param($s) -not $s.signaturePlacing -and -not $s.signatureGhost -and $s.revision -eq $initial.revision}
+    Pass 'signature-ghost-hides-outside-and-escape-cancels'
+
+    Invoke 'Tanda tangan';Invoke 'Gunakan Tanda Tangan'
+    $null=Wait-State {param($s) $s.signaturePlacing -and -not $s.signaturePanel}
+    Pointer-Control 'Isi halaman 1'
+    $preview=Wait-State {param($s) $s.signatureGhost}
     Click-Control 'Isi halaman 1'
-    $null=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty}
-    Invoke 'Undo';$null=Wait-State {param($s) $s.signatureCount -eq 0 -and -not $s.dirty}
+    $placed=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty -and -not $s.signatureGhost -and -not $s.signaturePlacing}
+    if(-not (Equal-SignatureRect $preview.signatureGhostRect $placed.signatureRects[0])){throw 'Placed initials differ from the last ghost preview'}
+    Invoke 'Undo';$null=Wait-State {param($s) $s.signatureCount -eq 0 -and -not $s.dirty -and $s.revision -eq $initial.revision}
     Pass 'initials-edit-place-undo'
     Invoke 'Tanda tangan';Invoke 'Tanda tangan penuh';Invoke 'Gambar'
     if((Find 'Gunakan Tanda Tangan').Current.IsEnabled){throw 'Empty drawing must be disabled'}
@@ -70,8 +121,16 @@ try {
     $null=Wait-State {param($s) $s.signatureCount -eq 0 -and -not $s.dirty}
     Pass 'drop-outside-page-cancels-placement'
     Invoke 'Tanda tangan';Invoke 'Gunakan Tanda Tangan'
-    Stroke 0.4 0.4 0.5 0.5
-    $s=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty}
+    Pointer-Control 'Isi halaman 1' 0.4 0.4
+    $beforeDrag=Wait-State {param($s) $s.signatureGhost -and $s.signaturePlacing}
+    Pointer-Control 'Isi halaman 1' 0.4 0.4 0x201 1
+    Pointer-Control 'Isi halaman 1' 0.52 0.55 0x200 1
+    $drag=Wait-State {param($s) $s.signatureGhost -and -not $s.signaturePlacing -and -not (Equal-SignatureRect $beforeDrag.signatureGhostRect $s.signatureGhostRect)}
+    if($drag.dirty -or $drag.signatureCount -ne 0){throw 'Drag applied the signature before release'}
+    Pass 'signature-ghost-follows-drag-without-edit'
+    Pointer-Control 'Isi halaman 1' 0.52 0.55 0x202
+    $s=Wait-State {param($s) $s.signatureCount -eq 1 -and $s.dirty -and -not $s.signatureGhost}
+    if(-not (Equal-SignatureRect $drag.signatureGhostRect $s.signatureRects[0])){throw 'Dropped signature differs from its drag preview'}
     Pass 'draw-place-drag-one-object'
     Invoke 'Duplikat tanda tangan';$null=Wait-State {param($s) $s.signatureCount -eq 2}
     Invoke 'Undo';$s=Wait-State {param($s) $s.signatureCount -eq 1}

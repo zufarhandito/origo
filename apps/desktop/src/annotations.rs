@@ -71,7 +71,7 @@ impl DocumentSession {
             });
         }
     }
-    pub(super) fn close_annotation_popups(&mut self) {
+    pub(super) fn close_annotation_popups(&mut self, cx: &mut Context<Self>) {
         self.annotation_popup(false);
         self.annotation.popup_open = false;
         self.cancel_signature_phone();
@@ -79,20 +79,18 @@ impl DocumentSession {
         self.annotation.signature.gallery.reset_selection();
         self.annotation.signature.open = false;
         self.annotation.signature.drawing = false;
-        self.annotation.signature.gesture = None;
+        self.cancel_signature_placement(cx);
     }
 
     pub(super) fn toggle_annotations(&mut self, cx: &mut Context<Self>) {
         if self.edits_locked() {
             return;
         }
-        self.close_annotation_popups();
+        self.close_annotation_popups(cx);
         self.annotation.open = !self.annotation.open;
         self.annotation.draft = None;
         self.annotation.selected = None;
         self.annotation.tool = Tool::Select;
-        self.annotation.signature.placing = false;
-        self.annotation.signature.gesture = None;
         cx.notify();
     }
     pub(super) fn annotation_bar(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
@@ -168,8 +166,7 @@ impl DocumentSession {
                         .selected(selected)
                         .disabled(self.edits_locked())
                         .on_click(cx.listener(move |s, _, window, cx| {
-                            s.annotation.signature.placing = false;
-                            s.annotation.signature.gesture = None;
+                            s.cancel_signature_placement(cx);
                             s.annotation.tool =
                                 if tool == Tool::Highlight && !s.annotation.text_only {
                                     Tool::Marker
@@ -467,15 +464,7 @@ impl DocumentSession {
         let Ok(g) = w.geometry(index) else {
             return true;
         };
-        let point = rotate(
-            [
-                (f32::from(position.x - bounds.origin.x) / f32::from(bounds.size.width))
-                    .clamp(0., 1.),
-                (f32::from(position.y - bounds.origin.y) / f32::from(bounds.size.height))
-                    .clamp(0., 1.),
-            ],
-            (4 - g.quarter_turns) % 4,
-        );
+        let point = crate::signatures::signature_page_point(bounds, position, g.quarter_turns);
         drop(w);
         if self.signature_pointer(id, point, start, cx) {
             if start {
@@ -549,7 +538,13 @@ impl DocumentSession {
         if !self.annotation.signature.open {
             self.annotation.signature.drawing = false;
         }
-        if let Some((page, a, _, _)) = self.annotation.signature.gesture.take() {
+        let gesture = self.annotation.signature.gesture.take();
+        if !self.annotation.signature.placing && self.annotation.signature.placement_ghost.is_some()
+        {
+            self.cancel_signature_placement(cx);
+            cx.notify();
+        }
+        if let Some((page, a, _, _)) = gesture {
             let all = self.workspace.as_ref().map(|w| {
                 let mut all = w.annotations(page).to_vec();
                 if let Some(old) = all.iter_mut().find(|old| old.id == a.id) {

@@ -54,6 +54,7 @@ impl DocumentSession {
             return;
         }
         cx.stop_active_drag(window);
+        self.cancel_signature_placement(cx);
         self.page_dragging = false;
         self.mode = mode;
         if mode == ViewerMode::Organize {

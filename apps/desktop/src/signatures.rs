@@ -12,7 +12,7 @@ use gpui::component::{
     popover::Popover,
 };
 use pdf_domain::{
-    PageId,
+    PageGeometry, PageId,
     annotation::{Annotation, SignatureImage},
 };
 
@@ -58,6 +58,10 @@ pub(super) struct SignatureState {
     pub asset: Option<Arc<SignatureImage>>,
     pub preview: Option<Arc<RenderImage>>,
     pub placing: bool,
+    pub placement_ghost: Option<[Option<Arc<RenderImage>>; 4]>,
+    pub ghost_pointer_exited: bool,
+    pub signature_ghost_rect: Option<[[f32; 2]; 2]>,
+
     pub error: Option<String>,
     pub gesture_bounds: Option<Bounds<gpui::Pixels>>,
     pub gesture: Option<(PageId, Annotation, [f32; 2], bool)>,
@@ -88,7 +92,7 @@ impl DocumentSession {
                 s.annotation.signature.drawing = false;
                 s.annotation.draft = None;
                 if *open {
-                    s.annotation.signature.placing = false;
+                    s.cancel_signature_placement(cx);
                     s.annotation.signature.save_template = false;
                     s.init_signature_text(window, cx);
                     s.load_signature_library(cx);
@@ -385,6 +389,8 @@ impl DocumentSession {
         }
         self.dismiss_signature_editor(cx);
         self.annotation_popup(false);
+        self.cancel_signature_placement(cx);
+        self.annotation.signature.placement_ghost = Some(ghost_images(&asset));
         self.annotation.signature.asset = Some(asset);
         self.annotation.signature.placing = true;
         self.annotation.signature.save_template = false;
@@ -1114,6 +1120,47 @@ impl DocumentSession {
         self.annotation.selected = Some((page, asset.id));
         cx.notify();
     }
+    pub(super) fn cancel_signature_placement(&mut self, cx: &mut Context<Self>) {
+        let state = &mut self.annotation.signature;
+        state.placing = false;
+        state.gesture = None;
+        state.gesture_bounds = None;
+        state.ghost_pointer_exited = false;
+        state.signature_ghost_rect = None;
+        if let Some(images) = state.placement_ghost.take() {
+            self.release_images(images.into_iter().flatten().collect(), cx);
+        }
+    }
+
+    pub(super) fn signature_ghost_at(
+        &self,
+        page: PageId,
+        geometry: PageGeometry,
+        bounds: Bounds<gpui::Pixels>,
+        cursor: gpui::Point<gpui::Pixels>,
+    ) -> Option<(Arc<RenderImage>, [[f32; 2]; 2])> {
+        let state = &self.annotation.signature;
+        let images = state.placement_ghost.as_ref()?;
+        if !self.active
+            || !self.annotation.open
+            || self.mode != ViewerMode::Read
+            || state.ghost_pointer_exited
+            || self.edits_locked()
+            || (!state.placing
+                && !state
+                    .gesture
+                    .as_ref()
+                    .is_some_and(|(id, _, _, _)| *id == page))
+        {
+            return None;
+        }
+        let point = signature_page_point(bounds, cursor, geometry.quarter_turns);
+        Some((
+            images[usize::from(geometry.quarter_turns % 4)].clone()?,
+            signature_placement_rect(state.asset.as_deref()?, geometry, point),
+        ))
+    }
+
     pub(super) fn signature_pointer(
         &mut self,
         page: PageId,
@@ -1121,7 +1168,11 @@ impl DocumentSession {
         start: bool,
         cx: &mut Context<Self>,
     ) -> bool {
-        if self.annotation.signature.placing {
+        if self.annotation.signature.placing || self.annotation.signature.placement_ghost.is_some()
+        {
+            if !start && self.annotation.signature.placing {
+                return true;
+            }
             let Some(asset) = self.annotation.signature.asset.clone() else {
                 return false;
             };
@@ -1131,39 +1182,37 @@ impl DocumentSession {
             let Some(index) = w.pages().iter().position(|a| a.id == page) else {
                 return false;
             };
-            let Ok(g) = w.geometry(index) else {
+            let Ok(geometry) = w.geometry(index) else {
                 return false;
             };
-            let (page_width, page_height) = if g.quarter_turns % 2 == 1 {
-                (g.height_points, g.width_points)
-            } else {
-                (g.width_points, g.height_points)
-            };
-            let ratio = asset.height as f32 / asset.width as f32 * page_width / page_height;
-            let width = 0.3_f32.min(0.25 / ratio);
-            let height = width * ratio;
-            let left = (p[0] - width / 2.).clamp(0., 1. - width);
-            let top = (p[1] - height / 2.).clamp(0., 1. - height);
             drop(w);
-            if start {
+            let corners = signature_placement_rect(&asset, geometry, p);
+            if start && self.annotation.signature.placing {
                 let id = self
                     .workspace
                     .as_mut()
                     .map(|mut w| w.allocate_annotation_id())
                     .unwrap_or(1);
-                let a = Annotation {
+                let annotation = Annotation {
                     id,
                     highlight: false,
                     color: [0, 0, 0],
                     width: 1.,
-                    points: vec![[left, top], [left + width, top + height]],
+                    points: corners.to_vec(),
                     rectangles: false,
                     signature: Some(asset),
                 };
                 self.annotation.selected = Some((page, id));
-                self.annotation.signature.gesture = Some((page, a, p, false));
-                cx.notify();
+                self.annotation.signature.gesture = Some((page, annotation, p, false));
                 self.annotation.signature.placing = false;
+                cx.notify();
+            } else if let Some((gesture_page, annotation, _, _)) =
+                &mut self.annotation.signature.gesture
+                && *gesture_page == page
+                && annotation.points.as_slice() != corners.as_slice()
+            {
+                annotation.points.copy_from_slice(&corners);
+                cx.notify();
             }
             return true;
         }
@@ -1220,6 +1269,58 @@ impl DocumentSession {
         false
     }
 }
+pub(super) fn signature_page_point(
+    bounds: Bounds<gpui::Pixels>,
+    cursor: gpui::Point<gpui::Pixels>,
+    turns: u8,
+) -> [f32; 2] {
+    pdf_domain::annotation::rotate(pad_point(bounds, cursor), (4 - turns % 4) % 4)
+}
+
+fn signature_placement_rect(
+    asset: &SignatureImage,
+    geometry: PageGeometry,
+    point: [f32; 2],
+) -> [[f32; 2]; 2] {
+    // Annotation coordinates precede page rotation. Workspace sizes are displayed sizes.
+    let (width, height) = if geometry.quarter_turns % 2 == 1 {
+        (geometry.height_points, geometry.width_points)
+    } else {
+        (geometry.width_points, geometry.height_points)
+    };
+    let ratio = asset.height as f32 / asset.width as f32 * width / height;
+    let width = 0.3_f32.min(0.25 / ratio);
+    let height = width * ratio;
+    let left = (point[0] - width / 2.).clamp(0., 1. - width);
+    let top = (point[1] - height / 2.).clamp(0., 1. - height);
+    [
+        [left, top],
+        [(left + width).min(1.), (top + height).min(1.)],
+    ]
+}
+
+fn ghost_images(asset: &SignatureImage) -> [Option<Arc<RenderImage>>; 4] {
+    let Some(mut image) = image::RgbaImage::from_raw(asset.width, asset.height, asset.rgba.clone())
+    else {
+        return std::array::from_fn(|_| None);
+    };
+    for pixel in image.pixels_mut() {
+        pixel[3] = (u16::from(pixel[3]) * 2 / 3) as u8;
+        pixel.0.swap(0, 2);
+    }
+    std::array::from_fn(|turns| {
+        let rotated = match turns {
+            1 => image::imageops::rotate90(&image),
+            2 => image::imageops::rotate180(&image),
+            3 => image::imageops::rotate270(&image),
+            _ => image.clone(),
+        };
+        Some(Arc::new(RenderImage::new(smallvec::smallvec![
+            image::Frame::new(rotated)
+        ])))
+    })
+}
+
 fn transparency_grid() -> impl gpui::IntoElement {
     gpui::canvas(
         |_, _, _| (),
@@ -1406,6 +1507,36 @@ pub(super) fn asset_preview(asset: &SignatureImage) -> Option<Arc<RenderImage>> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn placement_is_bounded_and_preserves_aspect_at_all_page_rotations() {
+        let asset = SignatureImage {
+            width: 4,
+            height: 3,
+            rgba: vec![255; 48],
+        };
+        for turns in 0..4 {
+            let (width, height) = if turns % 2 == 0 {
+                (600., 800.)
+            } else {
+                (800., 600.)
+            };
+            let geometry = PageGeometry {
+                width_points: width,
+                height_points: height,
+                quarter_turns: turns,
+            };
+            for cursor in [[0., 0.], [0.5, 0.5], [1., 1.], [1., 0.]] {
+                let point = pdf_domain::annotation::rotate(cursor, (4 - turns) % 4);
+                let [a, b] = signature_placement_rect(&asset, geometry, point);
+                assert!(a[0] >= 0. && a[1] >= 0. && b[0] <= 1. && b[1] <= 1.);
+                let [a, b] = [a, b].map(|p| pdf_domain::annotation::rotate(p, turns));
+                let aspect = (b[0] - a[0]).abs() * width / ((b[1] - a[1]).abs() * height);
+                let expected = if turns % 2 == 0 { 4. / 3. } else { 3. / 4. };
+                assert!((aspect - expected).abs() < 0.001);
+            }
+        }
+    }
+
     #[test]
     fn keyboard_delta_follows_display_rotation() {
         for turns in 0..4 {
