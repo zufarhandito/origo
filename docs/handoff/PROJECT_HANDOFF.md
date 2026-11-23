@@ -21,6 +21,12 @@ konfirmasi cakupan. Build Windows yang diuji sudah dipasang untuk `run.cmd`,
 dengan SHA-256
 `5A2DAE88AD5BF613357EA64DBD9501AF991570BDD1262136315E61D1CF049ABF`.
 
+Uji 1.000 halaman scan sintetis selesai dalam 517,74 detik pada runner.
+Viewer menyelesaikan batch 1.024 halaman setelah restart, dengan puncak working
+set gabungan teramati 231,2 MiB. Salinan memuat teks OCR di setiap halaman dan
+hash sumber identik. Fixture 1.025 halaman ditolak. Batas file sumber 128 MiB.
+Lihat [hasil pengujian dokumen panjang](../testing.md#penerimaan-ocr-dokumen-panjang-23-november-2026).
+
 ## Kursor untuk geser dan resize tanda tangan
 
 Tool Pilih menampilkan kursor tangan pada badan tanda tangan dan panah diagonal

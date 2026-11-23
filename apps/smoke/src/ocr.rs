@@ -3,8 +3,8 @@ use pdf_application::export::ExportControl;
 use pdf_application::{PdfInspector, SourceId, Workspace, open_document, text::TextRequest};
 use pdf_engine::PdfiumRenderer;
 use pdf_ocr::{
-    BatchPlan, Cached, DocumentPage, Language, OcrError, PageStatus, Raster, Recognizer, Store,
-    Tesseract,
+    BatchPlan, Cached, DocumentPage, Language, MAX_BATCH_PAGES, OcrError, PageStatus, Raster,
+    Recognizer, Store, Tesseract,
 };
 use std::{
     path::Path,
@@ -196,8 +196,17 @@ pub fn batch_smoke(root: &Path, fixtures: &Path, count: usize) -> Result<()> {
     Ok(())
 }
 
-pub fn write_batch_fixture(fixtures: &Path) -> Result<()> {
-    std::fs::write(fixtures.join("batch.pdf"), make_book(fixtures, 300, true)?)?;
+pub fn write_batch_fixture(fixtures: &Path, scan_pages: Option<usize>) -> Result<()> {
+    let count = scan_pages.unwrap_or(300);
+    ensure!((1..=MAX_BATCH_PAGES + 1).contains(&count));
+    let name = scan_pages.map_or_else(
+        || "batch.pdf".to_owned(),
+        |count| format!("batch-{count}.pdf"),
+    );
+    std::fs::write(
+        fixtures.join(name),
+        make_book(fixtures, count, scan_pages.is_none())?,
+    )?;
     Ok(())
 }
 

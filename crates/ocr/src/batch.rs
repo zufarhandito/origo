@@ -237,18 +237,18 @@ mod tests {
             }
         );
         assert_eq!(resumed.failed_pages(), [1]);
-        assert_eq!(
-            resumed
-                .claim_next()
-                .ok_or("interrupted page missing")?
-                .1
-                .request
-                .page_index,
-            1
-        );
+        let (_, pending) = resumed.claim_next().ok_or("interrupted page missing")?;
+        assert_eq!(pending.request.page_index, 1);
         resumed.retry_failed();
         assert!(resumed.failed_pages().is_empty());
         assert_eq!(resumed.progress().remaining(), 999);
+        std::fs::write(path, b"different source")?;
+        assert!(matches!(
+            BatchPlan::load(vec![pending], &store),
+            Err(DocumentError::Render(
+                pdf_application::RenderError::SourceChanged
+            ))
+        ));
         Ok(())
     }
 }

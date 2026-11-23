@@ -93,10 +93,16 @@ batal, tujuan sudah ada, dan hash PDF sumber.
 
 ## 7. Uji penerimaan dan penyelesaian
 
-- [ ] Ukur durasi, puncak RAM gabungan, ukuran cache, dan responsivitas viewer
+- [x] Ukur durasi, puncak RAM gabungan, ukuran cache, dan responsivitas viewer
   pada Windows dengan fixture 1, 100, 1.000, dan 1.024 halaman. Uji penolakan
   dokumen di atas batas dengan pesan yang jelas.
-- [ ] Jalankan batch panjang pada laptop target, termasuk minimize, tray,
+- [x] Jalankan batch panjang pada laptop target, termasuk minimize, tray,
   restart, dan ekspor. Tetapkan batas performa berdasarkan hasil pengukuran.
-- [ ] Catat hasil dan batas dukungan aktual, lalu commit dan push setiap tahap
+- [x] Catat hasil dan batas dukungan aktual, lalu commit dan push setiap tahap
   yang selesai sesuai aturan repo.
+
+**Bukti penerimaan.** Runner menyelesaikan 1.000 halaman scan sintetis dalam
+517,74 detik. Viewer menyelesaikan dan mengekspor 1.024 halaman setelah restart.
+Puncak working set gabungan yang teramati di tray adalah 231,2 MiB. Batas
+dukungan saat ini 1.024 halaman per sumber dan 128 MiB per file. Lihat
+[catatan pengujian](../testing.md) untuk ukuran fixture, waktu, dan batas sampel.

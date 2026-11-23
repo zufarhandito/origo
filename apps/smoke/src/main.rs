@@ -128,7 +128,11 @@ fn main() -> Result<()> {
         let fixtures = std::env::args_os()
             .nth(2)
             .context("OCR fixture directory required")?;
-        return ocr::write_batch_fixture(&PathBuf::from(fixtures));
+        let count = std::env::args()
+            .nth(3)
+            .map(|value| value.parse())
+            .transpose()?;
+        return ocr::write_batch_fixture(&PathBuf::from(fixtures), count);
     }
     if std::env::args().nth(1).as_deref() == Some("--ocr-export-smoke") {
         let fixtures = std::env::args_os()

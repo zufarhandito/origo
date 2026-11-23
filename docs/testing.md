@@ -1,5 +1,46 @@
 # Pengujian Origo
 
+## Penerimaan OCR dokumen panjang (23 November 2026)
+
+Windows 11 x64, Intel Core i7-13620H, RAM terlihat 15,73 GiB. Runner release memproses
+gambar scan sintetis melalui PDFium dan Tesseract. Fixture 1 halaman memakai
+raster 2480 × 3508 dan fixture panjang memakai raster 1240 × 1754. Setiap
+halaman scan diproses berdasarkan identitasnya sendiri. PDF panjang memakai satu
+gambar berulang dengan teks pendek.
+
+| Halaman | Durasi runner | SQLite | Puncak working set gabungan teramati |
+| ---: | ---: | ---: | ---: |
+| 1 | 1,26 dtk | 24 KiB | 78,0 MiB |
+| 100 | 46,23 dtk | 80 KiB | 58,3 MiB |
+| 1.000 | 517,74 dtk | 552 KiB | 63,6 MiB |
+| 1.024 | 555,13 dtk | 572 KiB | — |
+
+Sampel RAM runner mencakup proses smoke dan satu worker Tesseract. Bukti
+1 dan 100 halaman ada di `.research/ocr-small-benchmark-43061217f3324ae191c43f2a4f425f74`.
+Hash sumber cocok pada setiap ukuran. Runner dan viewer menolak fixture 1.025
+halaman. Viewer menampilkan pemberitahuan batas
+sumber daya dan tidak membuka tab. Bukti `.research/ocr-limit-ui-74cf7effe79d46fea6fb331df02776b2`.
+
+Uji viewer di Windows memproses 1.024 halaman dengan minimize, tray, jeda,
+prioritas halaman aktif, dan restart. Pencarian, lompat halaman dan zoom
+berhasil saat batch berjalan. Setelah membuka ulang viewer dengan 10 halaman
+sudah tersimpan, sisa batch selesai dalam 510,9 detik sejak proses viewer
+dimulai. SQLite berukuran 620 KiB. Puncak working set gabungan yang teramati
+adalah 231,2 MiB pada sampel di tray. Pemantauan sempat dimulai ulang pada
+proses uji yang sama karena satu snapshot metrik kosong ketika ditulis.
+Ekspor menghasilkan 1.024 halaman. `pypdf` menemukan kalimat acuan pada setiap
+halaman salinan dan pemeriksaan SHA-256 mengonfirmasi PDF sumber identik.
+Bukti `.research/ocr-batch-ui-59e46bb06ba64f99a098ad522e440fdd`.
+
+Untuk mengulang uji, siapkan gambar dengan `scripts/new-ocr-fixtures.ps1`.
+Gunakan `pdf-smoke --write-ocr-batch-fixture .research/ocr-fixtures 1024`, lalu
+`scripts/ocr-batch-ui-smoke.ps1 -Fixture .research/ocr-fixtures/batch-1024.pdf -Complete`
+dengan executable release dan sidecar tersedia. Fmt, Clippy workspace tanpa
+warning, 84 unit test, build desktop release, dan smoke ekspor native lulus.
+Tes SQLite mensimulasikan penyimpanan penuh dan memastikan hasil lama serta
+checkpoint tetap dapat dibaca. Tes batch juga memeriksa perubahan fingerprint
+sumber dan satu giliran yang berhenti sebelum hasil ditulis.
+
 ## Ekspor PDF dengan lapisan OCR (23 November 2026)
 
 `pdf-smoke --ocr-export-smoke .research/ocr-fixtures` memeriksa snapshot hasil
