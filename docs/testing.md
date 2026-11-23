@@ -1,5 +1,31 @@
 # Pengujian Origo
 
+## Instalasi Windows dan pembaruan Preview
+
+`scripts/installer-ui-smoke.ps1` memakai ID `Origo.Preview.Fixture` dan feed
+lokal khusus tes. Setup memasang 0.1.0 per pengguna. Viewer menyiapkan paket
+0.1.1 dengan checksum yang cocok. Peluncuran kedua saat dokumen masih punya
+edit tidak mengakhiri proses pertama. Membatalkan konfirmasi keluar
+mempertahankan edit dan versi yang sedang dipakai.
+
+Setelah keluar melalui konfirmasi normal, launcher instalasi menerapkan
+0.1.1 dan membuka viewer lagi. Bintang di tab muncul kembali dan hash
+`favorites.json` serta PDF sintetis cocok. Viewer masih bisa membuka PDF
+setelah indeks feed dipindah sementara. Bukti lokal ada di
+`.research/installer-ui-8ebdf8f7217140afabd2ef366d6d7bd2`.
+
+Pada aplikasi yang sudah diperbarui, tes UI ekspor OCR dan batch tray lulus
+dengan mesin dari paket instalasi. Bukti lokal ada di
+`.research/ocr-export-ui-341fda4dd81c46e997606a98029319e5` dan
+`.research/ocr-batch-ui-04afb5c41d1f4e24bf046d42e98d87a5`.
+
+Format, Clippy workspace, 84 unit test dan build release lulus. Payload
+terverifikasi berisi 1.193 berkas dan lolos pemeriksaan impor Windows x64.
+Setup Origo Preview 0.1.0 berukuran 52,7 MiB dan SHA-256-nya
+`155D5E6595059B28A6077E7B84590BDBB777F18C56CA343A1C06F3D5A4C0B269`.
+Pemasangan Origo Preview 0.1.0 selesai pada akun Windows pengembang.
+Shortcut **Origo Preview** di Start Menu mengarah ke pemasangan preview.
+
 ## Cache bitmap saat membaca dan mengubah zoom
 
 `scripts/viewer-cache-ui-smoke.ps1` membandingkan build release sebelum dan

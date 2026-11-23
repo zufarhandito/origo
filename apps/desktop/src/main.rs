@@ -185,8 +185,17 @@ fn cache_budget(name: &str, default: usize, min: usize, max: usize) -> anyhow::R
     anyhow::ensure!((min..=max).contains(&value), "Invalid cache size: {name}");
     Ok(value * 1024 * 1024)
 }
+#[cfg(windows)]
+mod updates;
+
 fn main() -> anyhow::Result<()> {
     let executable = std::env::current_exe()?;
+    #[cfg(windows)]
+    let installed = match updates::start(&executable)? {
+        updates::Startup::Unmanaged => None,
+        updates::Startup::Installed(app) => Some(app),
+        updates::Startup::Exit => return Ok(()),
+    };
     let sidecars = executable
         .parent()
         .ok_or_else(|| anyhow::anyhow!("Executable directory missing"))?
@@ -216,6 +225,17 @@ fn main() -> anyhow::Result<()> {
             );
         }
     }
+    let version = env!("CARGO_PKG_VERSION").to_owned();
+    #[cfg(windows)]
+    let version = if let Some(installed) = &installed {
+        if state_dir.is_none() {
+            state_dir = installed.state_dir.clone();
+        }
+        installed.check_in_background();
+        installed.version()
+    } else {
+        version
+    };
     let page_budget = cache_budget("PDF_STUDIO_PAGE_CACHE_MIB", 128, 128, 512)?;
     let thumbnail_budget = cache_budget("PDF_STUDIO_THUMBNAIL_CACHE_MIB", 16, 16, 64)?;
     gpui_kit::application()
@@ -304,6 +324,7 @@ fn main() -> anyhow::Result<()> {
                             sidecars: sidecars.clone(),
                             page_budget,
                             thumbnail_budget,
+                            version: version.clone(),
                             metrics: metrics.clone(),
                             state_dir: state_dir.clone().or_else(local_state::directory),
                             initial: initial.clone(),

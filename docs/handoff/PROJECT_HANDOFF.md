@@ -1,5 +1,14 @@
 # Handoff terkini - 23 November 2026
 
+## Installer dan auto-update Origo Preview
+
+Preview 0.1.0 sudah dipasang per pengguna dengan shortcut **Origo Preview**
+di Start Menu. Setup dan feed lokal tersedia di `dist/origo-preview`.
+Uji fixture terpisah memasang 0.1.0, menyiapkan 0.1.1, menghormati konfirmasi
+edit belum disimpan, lalu membuka 0.1.1 dari launcher dengan favorit yang
+sama. OCR dan tray juga lulus di aplikasi yang terpasang. Lihat
+[panduan installer](../installer.md) dan [hasil tes](../testing.md#instalasi-windows-dan-pembaruan-preview).
+
 ## Pelepasan cache bitmap viewer
 
 Viewer melepas raster halaman yang resolusinya tidak lagi cocok setelah zoom

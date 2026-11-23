@@ -1,11 +1,11 @@
 # Creates an internal test candidate. Does not publish or certify a release.
-param([switch]$SkipBuild, [string]$RuntimeDirectory)
+param([switch]$SkipBuild, [string]$RuntimeDirectory, [string]$ExecutablePath, [switch]$StageOnly, [string]$UpdateFeed)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'distribution-support.ps1')
 Push-Location $root
 try {
-    if (-not $SkipBuild) {
+    if (-not $SkipBuild -and -not $ExecutablePath) {
         & cargo build --locked --offline --release -p pdf-studio
         if ($LASTEXITCODE) { throw 'Release build failed' }
     }
@@ -17,7 +17,11 @@ try {
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
     $package = Join-Path $dist $name
     New-Item -ItemType Directory -Path $package | Out-Null
-    Copy-Item -LiteralPath (Join-Path $root 'target/release/pdf-studio.exe') -Destination $package
+    if (!$ExecutablePath) { $ExecutablePath = Join-Path $root 'target/release/pdf-studio.exe' }
+    Copy-Item -LiteralPath $ExecutablePath -Destination (Join-Path $package 'pdf-studio.exe')
+    if ($UpdateFeed) {
+        [IO.File]::WriteAllText((Join-Path $package 'origo-update-feed.txt'), $UpdateFeed)
+    }
     Copy-Item -LiteralPath (Join-Path $root 'sidecars.lock.json') -Destination $package
     $nativeStage = Join-Path $dist ($name + '-verified-inputs')
     New-Item -ItemType Directory -Path $nativeStage | Out-Null
@@ -40,6 +44,27 @@ try {
             Copy-Item -LiteralPath (Join-Path $source $part) -Destination $destination -Recurse
         }
     }
+    $ocr = Join-Path $root 'sidecars/ocr'
+    $ocrDestination = Join-Path $package 'sidecars/ocr'
+    $ocrHashes = @{
+        'pdf.ttf' = 'C7845420925A23D88ED830A63957B8AF85A66A8DAF8D9FC90E843673B2EF1A59'
+        'tessdata/eng.traineddata' = '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2'
+        'tessdata/ind.traineddata' = '69786901da87ab8766c1ea7fbb10b28f2110c14da3f6c8f2735df131fba95d88'
+    }
+    foreach ($file in @('tesseract.exe','pdf.ttf','tessdata/eng.traineddata','tessdata/ind.traineddata','tessdata/configs/tsv',
+            'licenses/tesseract.txt','licenses/tessdata.txt','licenses/leptonica.txt')) {
+        $from = Join-Path $ocr $file
+        if (!(Test-Path -LiteralPath $from -PathType Leaf)) { throw "OCR runtime incomplete. Run scripts/build-ocr-sidecar.ps1. Missing $file" }
+        if ($ocrHashes.ContainsKey($file) -and (Get-FileHash -LiteralPath $from).Hash -ne $ocrHashes[$file]) { throw "OCR checksum mismatch: $file" }
+        $to = Join-Path $ocrDestination $file
+        New-Item -ItemType Directory -Path (Split-Path $to) -Force | Out-Null
+        Copy-Item -LiteralPath $from -Destination $to
+    }
+    $tesseract = Join-Path $ocrDestination 'tesseract.exe'
+    $ocrVersion = & $tesseract --version
+    if ($LASTEXITCODE -or $ocrVersion[0] -ne 'tesseract 5.5.4') { throw 'Unexpected Tesseract version' }
+    $languages = & $tesseract --tessdata-dir (Join-Path $ocrDestination 'tessdata') --list-langs
+    if ($LASTEXITCODE -or 'eng' -notin $languages -or 'ind' -notin $languages) { throw 'OCR language test failed' }
     if (-not $RuntimeDirectory) {
         if ($env:VCToolsRedistDir) { $RuntimeDirectory = Join-Path $env:VCToolsRedistDir 'x64/Microsoft.VC143.CRT' }
         else {
@@ -70,6 +95,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $root 'docs/release-checklist.md') -Destination (Join-Path $package 'RELEASE-CHECKLIST.md')
     $files = Get-DistributionFiles $package
     Write-DistributionJson $files (Join-Path $package 'files.sha256.json')
+    if ($StageOnly) { Write-Output $package; return }
     $zip = Join-Path $dist ($name + '.zip')
     # Some upstream archives use a Unix-epoch mtime, outside ZIP's 1980+ range.
     # Normalize only our owned copy; source archives/files remain untouched.

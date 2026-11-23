@@ -64,6 +64,7 @@ pub(super) struct WindowShell {
     resources: Arc<WindowResources>,
     page_budget: usize,
     thumbnail_budget: usize,
+    version: String,
     metrics: Option<PathBuf>,
     focus: FocusHandle,
     tab_scroll: ScrollHandle,
@@ -113,6 +114,7 @@ impl WindowShell {
             sidecars,
             page_budget,
             thumbnail_budget,
+            version,
             metrics,
             state_dir,
             initial,
@@ -158,6 +160,7 @@ impl WindowShell {
                 }),
                 page_budget,
                 thumbnail_budget,
+                version,
                 metrics,
                 focus: cx.focus_handle(),
                 tab_scroll: ScrollHandle::new(),
@@ -885,6 +888,7 @@ pub(super) struct ShellOptions {
     pub sidecars: PathBuf,
     pub page_budget: usize,
     pub thumbnail_budget: usize,
+    pub version: String,
     pub metrics: Option<PathBuf>,
     pub state_dir: Option<PathBuf>,
     pub initial: Option<PathBuf>,
@@ -982,17 +986,21 @@ impl WindowShell {
             ),
             Help | About => {
                 let message = if matches!(action, Help) {
-                    "Ctrl+O Buka PDF · Ctrl+W Tutup tab · Ctrl+Tab / Ctrl+Shift+Tab Pindah tab\nCtrl+Shift+S Simpan sebagai · Ctrl+Shift+O Impor PDF\nCtrl+Z / Ctrl+Y Undo / Redo · Ctrl+C Salin\nCtrl+F Cari teks · F3 / Shift+F3 Hasil berikutnya / sebelumnya\nCtrl+G Halaman · Ctrl+0 Fit halaman · Ctrl+1 Fit lebar"
+                    "Ctrl+O Buka PDF · Ctrl+W Tutup tab · Ctrl+Tab / Ctrl+Shift+Tab Pindah tab\nCtrl+Shift+S Simpan sebagai · Ctrl+Shift+O Impor PDF\nCtrl+Z / Ctrl+Y Undo / Redo · Ctrl+C Salin\nCtrl+F Cari teks · F3 / Shift+F3 Hasil berikutnya / sebelumnya\nCtrl+G Halaman · Ctrl+0 Fit halaman · Ctrl+1 Fit lebar".to_owned()
                 } else {
-                    "Origo 0.1.0\nPengatur PDF lokal untuk Windows. Sumber tetap utuh; output disimpan ke file baru."
+                    format!(
+                        "Origo {}\nPengatur PDF lokal untuk Windows. Ekspor disimpan ke file baru.",
+                        self.version
+                    )
                 };
+                let message: gpui::SharedString = message.into();
                 window.open_alert_dialog(cx, move |d, _, _| {
                     d.title(if matches!(action, Help) {
                         "Shortcut"
                     } else {
                         "Tentang Origo"
                     })
-                    .description(message)
+                    .description(message.clone())
                     .centered()
                 });
             }
