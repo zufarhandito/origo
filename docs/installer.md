@@ -29,9 +29,11 @@ setelah manifest dan feed yang tertanam diperiksa kembali.
 ## Siklus pembaruan
 
 Origo mengecek feed setelah membuka aplikasi dan setiap 30 menit selama
-berjalan. Paket versi baru disiapkan di latar belakang. Saat dibuka lagi,
-Origo menerapkan paket yang sudah siap sebelum membuka jendela. Kegagalan
-mengakses feed membiarkan aplikasi tetap tersedia. Versi terpasang terlihat di
+berjalan. Paket versi baru disiapkan di latar belakang. Mulai Preview 0.1.2,
+Origo menampilkan pemberitahuan di dalam jendela saat paket siap dipasang.
+Saat dibuka lagi, Origo menerapkan paket yang sudah siap sebelum membuka
+jendela, lalu memberi tahu versi yang sedang aktif. Kegagalan mengakses feed
+membiarkan aplikasi tetap tersedia. Versi terpasang juga terlihat di
 **Bantuan > Tentang Origo**.
 
 Origo Preview menggunakan satu proses per instalasi. Proses mempertahankan

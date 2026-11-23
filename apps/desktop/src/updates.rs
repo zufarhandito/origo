@@ -1,5 +1,11 @@
 //! Installed Windows builds check their packaged feed outside the UI thread.
 use anyhow::Context as _;
+use gpui_kit::{
+    AnyWindowHandle, App, InteractiveElement, IntoElement, ParentElement,
+    StatefulInteractiveElement, Styled,
+    component::{WindowExt, notification::Notification},
+    div,
+};
 use std::{
     fs::{File, OpenOptions, TryLockError},
     path::{Path, PathBuf},
@@ -21,6 +27,7 @@ pub(super) enum Startup {
 pub(super) struct Installed {
     manager: UpdateManager,
     _instance: File,
+    restarted: bool,
     pub state_dir: Option<PathBuf>,
 }
 
@@ -80,6 +87,7 @@ pub(super) fn start(executable: &Path) -> anyhow::Result<Startup> {
     Ok(Startup::Installed(Installed {
         manager,
         _instance: instance,
+        restarted,
         state_dir: preview.then(|| root.join("UserData")),
     }))
 }
@@ -89,20 +97,71 @@ impl Installed {
         self.manager.get_current_version_as_string()
     }
 
-    pub fn check_in_background(&self) {
+    pub fn notifications(&self) -> impl FnOnce(AnyWindowHandle, &mut App) + use<> {
         let manager = self.manager.clone();
-        let _ = std::thread::Builder::new()
-            .name("origo-update".into())
-            .spawn(move || {
-                loop {
-                    if manager.get_update_pending_restart().is_none()
-                        && let Ok(UpdateCheck::UpdateAvailable(update)) =
-                            manager.check_for_updates()
-                    {
-                        let _ = manager.download_updates(&update, None);
-                    }
-                    std::thread::sleep(Duration::from_secs(30 * 60));
+        let restarted = self.restarted;
+        move |window, cx| {
+            cx.spawn(async move |cx| {
+                if restarted {
+                    let message =
+                        format!("Origo {} sekarang aktif.", manager.get_current_version());
+                    let _ = window.update(cx, |_, window, cx| {
+                        window.push_notification(update_notice(message, false), cx);
+                    });
                 }
-            });
+                loop {
+                    let check = manager.clone();
+                    let ready = cx
+                        .background_executor()
+                        .spawn(async move {
+                            if let Some(asset) = check.get_update_pending_restart() {
+                                return Some(asset.Version);
+                            }
+                            let Ok(UpdateCheck::UpdateAvailable(update)) =
+                                check.check_for_updates()
+                            else {
+                                return None;
+                            };
+                            check.download_updates(&update, None).ok()?;
+                            Some(update.TargetFullRelease.Version)
+                        })
+                        .await;
+                    if let Some(version) = ready {
+                        let message = format!(
+                            "Origo {version} siap dipasang. Keluar dan buka lagi untuk memperbarui."
+                        );
+                        let _ = window.update(cx, |_, window, cx| {
+                            window.push_notification(update_notice(message, true), cx);
+                        });
+                        break;
+                    }
+                    cx.background_executor()
+                        .timer(Duration::from_secs(30 * 60))
+                        .await;
+                }
+            })
+            .detach();
+        }
     }
+}
+
+fn update_notice(message: String, ready: bool) -> Notification {
+    use gpui_kit::component::notification::NotificationType;
+    Notification::new()
+        .with_type(if ready {
+            NotificationType::Info
+        } else {
+            NotificationType::Success
+        })
+        .placement(gpui_kit::Anchor::BottomRight)
+        .autohide(!ready)
+        .content(move |_, _, _| {
+            div()
+                .id("update-notification")
+                .role(gpui_kit::Role::Alert)
+                .aria_label(message.clone())
+                .text_sm()
+                .child(message.clone())
+                .into_any_element()
+        })
 }

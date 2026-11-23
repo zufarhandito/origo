@@ -231,11 +231,12 @@ fn main() -> anyhow::Result<()> {
         if state_dir.is_none() {
             state_dir = installed.state_dir.clone();
         }
-        installed.check_in_background();
         installed.version()
     } else {
         version
     };
+    #[cfg(windows)]
+    let notifications = installed.as_ref().map(updates::Installed::notifications);
     let page_budget = cache_budget("PDF_STUDIO_PAGE_CACHE_MIB", 128, 128, 512)?;
     let thumbnail_budget = cache_budget("PDF_STUDIO_THUMBNAIL_CACHE_MIB", 16, 16, 64)?;
     gpui_kit::application()
@@ -332,6 +333,10 @@ fn main() -> anyhow::Result<()> {
                     )
                 },
             );
+            #[cfg(windows)]
+            if let (Ok((window, _)), Some(notifications)) = (&result, notifications) {
+                notifications(*window, cx);
+            }
             if let Err(error) = result {
                 eprintln!("Jendela tidak dapat dibuka: {error}");
                 cx.quit();

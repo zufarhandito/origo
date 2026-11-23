@@ -1,5 +1,14 @@
 # Pengujian Origo
 
+## Notifikasi pembaruan Preview
+
+Smoke installer memeriksa pesan siap dipasang sesudah paket 0.1.1 selesai
+diunduh serta pesan versi aktif setelah launcher membuka 0.1.1. Notifikasi
+siap dipasang tampil di kanan bawah. Panel Alat tetap bisa dipakai dan
+uji pembatalan keluar mempertahankan edit. Format, Clippy, 84 unit test,
+serta build release lulus. Bukti lokal ada di
+`.research/installer-ui-1606a516fca34e2da79a9677a25d2d4c`.
+
 ## Tombol favorit pada tab aktif
 
 Pada build release Preview 0.1.1, tes UI memeriksa bahwa tombol bintang

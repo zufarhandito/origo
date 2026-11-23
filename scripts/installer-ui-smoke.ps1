@@ -37,6 +37,8 @@ try {
     $limit = (Get-Date).AddSeconds(30)
     while (!(Test-Path -LiteralPath $download -PathType Leaf) -and (Get-Date) -lt $limit) { Start-Sleep -Milliseconds 150 }
     if ((Get-FileHash -LiteralPath $download).Hash -ne (Get-FileHash -LiteralPath (Join-Path $feed $package)).Hash) { throw 'Staged update checksum mismatch' }
+    $null = Find 'Origo 0.1.1 siap dipasang. Keluar dan buka lagi untuk memperbarui.'
+    Capture 'update-ready.png'
     Assert-Version '0.1.0'
     Write-Host 'PASS updater: version 0.1.1 downloaded by the installed viewer'
 
@@ -70,6 +72,8 @@ try {
     if (!$owner -or !(Test-Path -LiteralPath $metrics)) { throw 'Updated app did not reopen' }
     $app = Get-Process -Id $owner.ProcessId
     Assert-Version '0.1.1'
+    $null = Find 'Origo 0.1.1 sekarang aktif.'
+    Capture 'update-active.png'
     $null = Wait-State {param($s) $s.pageCount -gt 0 -and $s.starredTabIds.Count -eq 1}
     if ((Get-FileHash -LiteralPath $favorites).Hash -ne $favoriteHash -or (Get-FileHash -LiteralPath $a).Hash -ne $hashA) { throw 'Source or user data failed to survive the update' }
     Write-Host 'PASS updater: version 0.1.1 applied on relaunch and preserved local data'

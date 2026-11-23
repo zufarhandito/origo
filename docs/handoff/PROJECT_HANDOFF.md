@@ -1,5 +1,13 @@
 # Handoff terkini - 23 November 2026
 
+## Origo Preview 0.1.2
+
+Pemberitahuan di kanan bawah muncul setelah unduhan pembaruan selesai dan
+saat versi baru aktif setelah pembukaan ulang. Tes installer memverifikasi
+kedua pesan serta konfirmasi keluar saat PDF punya perubahan. Lihat
+[alur pembaruan](../installer.md#siklus-pembaruan) dan
+[hasil tes](../testing.md#notifikasi-pembaruan-preview).
+
 ## Origo Preview 0.1.1
 
 Tombol bintang di deretan tab dan aksi favorit di menu konteks tersedia pada
