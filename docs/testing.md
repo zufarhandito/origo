@@ -1,5 +1,13 @@
 # Pengujian Origo
 
+## Transformasi tanda tangan
+
+Tes unit release workspace lulus, 85 tes. Tes transformasi memeriksa urutan
+piksel setelah putar kiri dan kanan, flip pada sumbu visual halaman yang diputar,
+batas halaman, serta penyimpanan dan pembacaan ulang metadata. Smoke test
+`pdf-smoke --annotation-smoke` juga lulus untuk alur ekspor dan buka ulang anotasi
+dengan fixture sintetis. Menu Transformasi belum diuji melalui UI langsung.
+
 ## Notifikasi pembaruan Preview
 
 Smoke installer memeriksa pesan siap dipasang sesudah paket 0.1.1 selesai

@@ -9,6 +9,7 @@ use gpui::component::{
     button::{Button, ButtonVariants},
     checkbox::Checkbox,
     input::{Input, InputEvent, InputState},
+    menu::{DropdownMenu, PopupMenuItem},
     popover::Popover,
 };
 use pdf_domain::{
@@ -1039,6 +1040,72 @@ impl DocumentSession {
         .detach();
     }
 
+    pub(super) fn signature_transform_menu(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let owner = cx.weak_entity();
+        Button::new("signature-transform")
+            .ghost()
+            .icon(IconName::RotateCw)
+            .label("Transformasi")
+            .dropdown_caret(true)
+            .accessibility_label("Transformasi tanda tangan")
+            .disabled(self.edits_locked() || self.opening || self.annotation.signature.open)
+            .dropdown_menu(move |mut menu, _, _| {
+                use SignatureTransform::*;
+                for (label, operation) in [
+                    ("Putar kiri 90°", RotateLeft),
+                    ("Putar kanan 90°", RotateRight),
+                    ("Balik horizontal", FlipHorizontal),
+                    ("Balik vertikal", FlipVertical),
+                ] {
+                    let owner = owner.clone();
+                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                        let _ = owner.update(cx, |view, cx| {
+                            view.transform_selected_signature(operation, cx);
+                            view.focus.focus(window, cx);
+                        });
+                    }));
+                }
+                menu
+            })
+    }
+
+    fn transform_selected_signature(
+        &mut self,
+        operation: SignatureTransform,
+        cx: &mut Context<Self>,
+    ) {
+        if self.edits_locked()
+            || self.opening
+            || !self.annotation.open
+            || self.annotation.signature.open
+            || self.annotation.signature.placing
+            || self.annotation.signature.gesture.is_some()
+        {
+            return;
+        }
+        let Some((page, id)) = self.annotation.selected else {
+            return;
+        };
+        let Some(workspace) = self.workspace.as_ref() else {
+            return;
+        };
+        let Some(geometry) = workspace
+            .pages()
+            .iter()
+            .position(|p| p.id == page)
+            .and_then(|index| workspace.geometry(index).ok())
+        else {
+            return;
+        };
+        let mut annotations = workspace.annotations(page).to_vec();
+        drop(workspace);
+        if let Some(annotation) = annotations.iter_mut().find(|a| a.id == id)
+            && operation.apply(annotation, geometry)
+        {
+            self.set_annotations(page, annotations, cx);
+        }
+    }
+
     pub(super) fn change_selected_signature(
         &mut self,
         duplicate: bool,
@@ -1255,6 +1322,59 @@ impl DocumentSession {
         false
     }
 }
+#[derive(Clone, Copy)]
+enum SignatureTransform {
+    RotateLeft,
+    RotateRight,
+    FlipHorizontal,
+    FlipVertical,
+}
+
+impl SignatureTransform {
+    fn apply(self, annotation: &mut Annotation, geometry: PageGeometry) -> bool {
+        use SignatureTransform::*;
+        let Some(asset) = &annotation.signature else {
+            return false;
+        };
+        let Some(image) = image::RgbaImage::from_raw(asset.width, asset.height, asset.rgba.clone())
+        else {
+            return false;
+        };
+        let odd_turns = geometry.quarter_turns % 2 == 1;
+        // Flips follow the displayed axes, which are exchanged on sideways pages.
+        let image = match (self, odd_turns) {
+            (RotateLeft, _) => image::imageops::rotate270(&image),
+            (RotateRight, _) => image::imageops::rotate90(&image),
+            (FlipHorizontal, false) | (FlipVertical, true) => {
+                image::imageops::flip_horizontal(&image)
+            }
+            (FlipVertical, false) | (FlipHorizontal, true) => {
+                image::imageops::flip_vertical(&image)
+            }
+        };
+        if matches!(self, RotateLeft | RotateRight) {
+            let [page_width, page_height] = unrotated_page_size(geometry);
+            let [min, max] = [annotation.points[0], annotation.points[1]];
+            // Swap physical dimensions while keeping the center where the page allows it.
+            let width = (max[1] - min[1]) * page_height / page_width;
+            let height = (max[0] - min[0]) * page_width / page_height;
+            let scale = 1. / width.max(height).max(1.);
+            let size = [width * scale, height * scale];
+            for (axis, length) in size.into_iter().enumerate() {
+                let start = ((min[axis] + max[axis] - length) / 2.).clamp(0., 1. - length);
+                annotation.points[0][axis] = start;
+                annotation.points[1][axis] = (start + length).min(1.);
+            }
+        }
+        annotation.signature = Some(Arc::new(SignatureImage {
+            width: image.width(),
+            height: image.height(),
+            rgba: image.into_raw(),
+        }));
+        true
+    }
+}
+
 /// Hit ranges on the two unrotated page axes, shared by input and cursors.
 pub(super) fn signature_hit_bounds(a: &Annotation, resize: bool) -> [[f32; 2]; 2] {
     [0, 1].map(|axis| {
@@ -1281,12 +1401,7 @@ fn signature_placement_rect(
     geometry: PageGeometry,
     point: [f32; 2],
 ) -> [[f32; 2]; 2] {
-    // Annotation coordinates precede page rotation. Workspace sizes are displayed sizes.
-    let (width, height) = if geometry.quarter_turns % 2 == 1 {
-        (geometry.height_points, geometry.width_points)
-    } else {
-        (geometry.width_points, geometry.height_points)
-    };
+    let [width, height] = unrotated_page_size(geometry);
     let ratio = asset.height as f32 / asset.width as f32 * width / height;
     let width = 0.3_f32.min(0.25 / ratio);
     let height = width * ratio;
@@ -1296,6 +1411,15 @@ fn signature_placement_rect(
         [left, top],
         [(left + width).min(1.), (top + height).min(1.)],
     ]
+}
+
+fn unrotated_page_size(geometry: PageGeometry) -> [f32; 2] {
+    // Annotation coordinates precede page rotation. Workspace sizes are displayed sizes.
+    if geometry.quarter_turns % 2 == 1 {
+        [geometry.height_points, geometry.width_points]
+    } else {
+        [geometry.width_points, geometry.height_points]
+    }
 }
 
 fn ghost_images(asset: &SignatureImage) -> [Option<Arc<RenderImage>>; 4] {
@@ -1597,6 +1721,75 @@ mod tests {
             let p = pdf_domain::annotation::rotate([0.5 + d[0], 0.5 + d[1]], turns);
             assert!((p[0] - 0.51).abs() < 0.0001 && (p[1] - 0.5).abs() < 0.0001);
         }
+    }
+
+    #[test]
+    fn signature_transform_preserves_pixels_bounds_and_saved_metadata() {
+        let asset = Arc::new(SignatureImage {
+            width: 3,
+            height: 2,
+            rgba: (1..=6).flat_map(|value| [value, 0, 0, 255]).collect(),
+        });
+        let original = Annotation {
+            id: 1,
+            highlight: false,
+            color: [0; 3],
+            width: 1.,
+            points: vec![[0.4, 0.3], [0.7, 0.5]],
+            rectangles: false,
+            signature: Some(asset.clone()),
+        };
+        let page = PageGeometry {
+            width_points: 600.,
+            height_points: 800.,
+            quarter_turns: 0,
+        };
+        let red = |a: &Annotation| {
+            a.signature
+                .iter()
+                .flat_map(|image| image.rgba.iter().step_by(4).copied())
+                .collect::<Vec<_>>()
+        };
+        let mut rotated = original.clone();
+        assert!(SignatureTransform::RotateRight.apply(&mut rotated, page));
+        assert_eq!(red(&rotated), [4, 1, 5, 2, 6, 3]);
+        assert!(Arc::ptr_eq(
+            original.signature.as_ref().unwrap_or(&asset),
+            &asset
+        ));
+        let [min, max] = [rotated.points[0], rotated.points[1]];
+        assert!(((max[0] - min[0]) * 600. - 160.).abs() < 0.001);
+        assert!(((max[1] - min[1]) * 800. - 180.).abs() < 0.001);
+        assert_eq!(
+            Annotation::from_typed_name(&rotated.name(), true),
+            Some(rotated.clone())
+        );
+        assert!(SignatureTransform::RotateLeft.apply(&mut rotated, page));
+        assert_eq!(red(&rotated), red(&original));
+
+        let sideways = PageGeometry {
+            width_points: 800.,
+            height_points: 600.,
+            quarter_turns: 1,
+        };
+        let mut flipped = original.clone();
+        assert!(SignatureTransform::FlipHorizontal.apply(&mut flipped, sideways));
+        assert_eq!(red(&flipped), [4, 5, 6, 1, 2, 3]);
+        assert!(SignatureTransform::FlipVertical.apply(&mut flipped, sideways));
+        assert_eq!(red(&flipped), [6, 5, 4, 3, 2, 1]);
+        assert_eq!(flipped.points, original.points);
+
+        let mut wide = original;
+        wide.points = vec![[0., 0.7], [1., 1.]];
+        let short_page = PageGeometry {
+            width_points: 800.,
+            height_points: 200.,
+            quarter_turns: 0,
+        };
+        assert!(SignatureTransform::RotateLeft.apply(&mut wide, short_page));
+        assert!(wide.valid());
+        assert_eq!([wide.points[0][1], wide.points[1][1]], [0., 1.]);
+        assert!((wide.points[1][0] - wide.points[0][0] - 0.01875).abs() < 0.001);
     }
     #[test]
     fn stamp_aspect_budget_and_optional_white_removal() -> anyhow::Result<()> {

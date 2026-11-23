@@ -24,10 +24,16 @@ dan arahan pemilik untuk melanjutkan tanda tangan setelah anotator selesai.
    proporsional. Pegangan dan arah panah mengikuti rotasi halaman. Garis batas
    memperlihatkan posisi dan ukuran sementara. Perubahan diterapkan saat mouse
    dilepas dan dapat dibatalkan dengan satu langkah Undo.
-5. **Hapus anotasi** / Delete menghapus tanda tangan terpilih. Esc membatalkan
+5. Pilih tanda tangan, inisial, atau stempel yang sudah ditempatkan, lalu buka
+   **Transformasi** di toolbar Anotasi. **Putar kiri 90°** dan **Putar kanan 90°**
+   memutar gambar tanpa menurunkan resolusi. **Balik horizontal** menukar kiri
+   dan kanan, sedangkan **Balik vertikal** menukar atas dan bawah pada tampilan
+   halaman. Setiap aksi pada objek di halaman bisa di-Undo dan di-Redo.
+6. **Hapus anotasi** / Delete menghapus tanda tangan terpilih. Esc membatalkan
    penempatan/gesture; melepas mouse di luar halaman membatalkan gesture tersebut.
-6. **Simpan sebagai** ke file baru. File hasil simpan dapat dibuka ulang dan tanda
-   tangannya tetap dapat dipilih/digeser/di-resize/dihapus di PDF Studio.
+7. **Simpan sebagai** ke file baru untuk menyimpan hasil transformasi. Setelah
+   file hasil simpan dibuka ulang di Origo, tanda tangan tetap dapat dipilih,
+   digeser, diubah ukurannya, ditransformasi, atau dihapus.
 
 Sumber tetap read-only. Close guard, receipt revisi, snapshot, preflight, consent,
 validasi dan no-overwrite mengikuti ekspor yang sudah ada. Dua view satu PDF berbagi

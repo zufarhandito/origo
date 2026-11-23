@@ -236,7 +236,7 @@ impl DocumentSession {
                         .any(|a| a.id == id && a.signature.is_some())
                 })
             }) {
-                bar = bar.child(
+                bar = bar.child(self.signature_transform_menu(cx)).child(
                     Button::new("duplicate-signature")
                         .ghost()
                         .label("Duplikat tanda tangan")
