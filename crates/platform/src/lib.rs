@@ -214,14 +214,36 @@ fn capture(
 }
 /// QPDF budget measures process time, excluding user file/confirmation dialogs.
 pub fn run(
+    command: Command,
+    stdout_limit: usize,
+    control: &ExportControl,
+) -> Result<ProcessOutput, ExportError> {
+    run_process(command, None, stdout_limit, control)
+}
+
+pub fn run_with_input(
+    command: Command,
+    input: Vec<u8>,
+    stdout_limit: usize,
+    control: &ExportControl,
+) -> Result<ProcessOutput, ExportError> {
+    run_process(command, Some(input), stdout_limit, control)
+}
+
+fn run_process(
     mut command: Command,
+    input: Option<Vec<u8>>,
     stdout_limit: usize,
     control: &ExportControl,
 ) -> Result<ProcessOutput, ExportError> {
     let budget = control.remaining()?;
     let start = Instant::now();
     command
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     #[cfg(windows)]
@@ -232,6 +254,12 @@ pub fn run(
     let mut child = command.spawn().map_err(|_| ExportError::Dependency)?;
     let stdout = child.stdout.take().ok_or(ExportError::Engine)?;
     let stderr = child.stderr.take().ok_or(ExportError::Engine)?;
+    let writer = input.and_then(|input| {
+        child
+            .stdin
+            .take()
+            .map(|mut pipe| std::thread::spawn(move || pipe.write_all(&input)))
+    });
     let overflow = Arc::new(AtomicBool::new(false));
     let out_flag = overflow.clone();
     let err_flag = overflow.clone();
@@ -259,8 +287,14 @@ pub fn run(
     }
     let stdout = out.join().map_err(|_| ExportError::Engine)?;
     let stderr = err.join().map_err(|_| ExportError::Engine)?;
+    let written = writer.map(|thread| thread.join().map_err(|_| ExportError::Engine));
     control.charge(start.elapsed());
     let code = result?;
+    if let Some(written) = written
+        && code == Some(0)
+    {
+        written?.map_err(|_| ExportError::Io)?;
+    }
     let stdout = stdout?;
     let _ = stderr?;
     if overflow.load(Ordering::SeqCst) {

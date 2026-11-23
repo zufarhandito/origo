@@ -8,6 +8,7 @@ use std::path::PathBuf;
 mod annotations;
 mod books;
 mod exporting;
+mod ocr;
 mod optimizing;
 mod outline_print;
 mod png;
@@ -100,6 +101,12 @@ fn m1_smoke(root: &std::path::Path, renderer: &PdfiumRenderer) -> Result<()> {
 
 fn main() -> Result<()> {
     let root = dunce::canonicalize(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
+    if std::env::args().nth(1).as_deref() == Some("--ocr-engine-smoke") {
+        let fixtures = std::env::args_os()
+            .nth(2)
+            .context("OCR fixture directory required")?;
+        return ocr::engine_smoke(&root, &PathBuf::from(fixtures));
+    }
     if std::env::args().nth(1).as_deref() == Some("--write-search-fixtures") {
         let dir = root.join(".research/search-fixtures");
         std::fs::create_dir_all(&dir)?;

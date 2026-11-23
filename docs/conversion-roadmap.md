@@ -110,6 +110,9 @@ exist; do not present raster conversion as preservation of their interactive sem
 
 ## Word, OCR, Excel and PowerPoint
 
+For the standalone local OCR viewer, batch processing, and searchable PDF
+export, see the [Origo OCR implementation checklist](plans/OCR_IMPLEMENTATION_PLAN.md).
+
 PDF is a positioned page representation; an editable Office file requires paragraphs,
 reading order, fonts/styles, tables, images and structure that may not exist in the PDF.
 Extracting Unicode or copying a page image into DOCX is not equivalent to recovering an

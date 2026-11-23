@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = ["apps/desktop", "apps/smoke", "crates/domain", "crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "crates/platform"]
-default-members = ["crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "apps/smoke"]
+members = ["apps/desktop", "apps/smoke", "crates/domain", "crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "crates/platform", "crates/ocr"]
+default-members = ["crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "crates/ocr", "apps/smoke"]
 
 [workspace.package]
 version = "0.1.0"
@@ -22,6 +22,7 @@ gpui-kit = "=0.9.1"
 pdf-application = { path = "crates/application" }
 pdf-domain = { path = "crates/domain" }
 pdf-engine = { path = "crates/pdf-engine" }
+pdf-ocr = { path = "crates/ocr" }
 qpdf-adapter = { path = "crates/qpdf-adapter" }
 
 [workspace.lints.rust]

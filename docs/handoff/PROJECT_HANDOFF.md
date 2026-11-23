@@ -1,4 +1,12 @@
-# Handoff terkini - 22 November 2026
+# Handoff terkini - 23 November 2026
+
+## Mesin OCR lokal
+
+Crate `pdf-ocr` dan sidecar Tesseract 5.5.4 dengan model cepat Indonesia dan
+Inggris telah diuji pada fixture sintetis. Mesin menerima gambar lewat pipe
+lokal, mengembalikan kotak kata dan skor, serta mendukung timeout dan batal.
+[Modul OCR](../ocr.md) dan [checklist](../plans/OCR_IMPLEMENTATION_PLAN.md)
+mencatat tahap berikutnya dan batas hasil uji.
 
 ## Kursor untuk geser dan resize tanda tangan
 

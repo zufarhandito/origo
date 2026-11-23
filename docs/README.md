@@ -77,6 +77,7 @@ anotator inti dan tanda tangan visual sudah diotorisasi dan diimplementasikan.
 | Anotator aktif | [Highlight, pen/stabilo dan edit ulang](annotations.md) |
 | Viewer | [Buku dan benchmark](books.md), [seleksi teks](text-selection.md) |
 | Pencarian PDF aktif | [Cari kata/frasa](search.md), default tidak case-sensitive |
+| OCR lokal | [Mesin dan perilaku OCR](ocr.md), [checklist implementasi](plans/OCR_IMPLEMENTATION_PLAN.md) |
 | Pengaturan halaman | [Organizer](organizer.md), [perubahan belum disimpan](unsaved-changes.md) |
 | Output PDF | [Save As/Extract](m3-safe-export-plan.md), [Split](split.md), [Optimize](optimize.md) |
 | Dukungan/pengujian | [Kompatibilitas](compatibility.md), [hasil pengujian](testing.md) |

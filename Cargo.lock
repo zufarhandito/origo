@@ -4583,6 +4583,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdf-ocr"
+version = "0.1.0"
+dependencies = [
+ "pdf-application",
+ "pdf-platform",
+ "serde",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "pdf-platform"
 version = "0.1.0"
 dependencies = [
@@ -4604,6 +4614,7 @@ dependencies = [
  "pdf-application",
  "pdf-domain",
  "pdf-engine",
+ "pdf-ocr",
  "pdf-platform",
  "qpdf-adapter",
  "serde_json",

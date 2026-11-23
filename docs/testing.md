@@ -1,5 +1,23 @@
 # Pengujian Origo
 
+## Baseline mesin OCR lokal (23 November 2026)
+
+Format, Clippy, 2 tes modul OCR, 5 tes platform, dan smoke Tesseract pada Windows
+lulus. Gunakan `scripts/new-ocr-fixtures.ps1`, lalu
+`pdf-smoke --ocr-engine-smoke .research/ocr-fixtures`.
+
+Pada gambar sintetis A4 300 DPI, runner debug memberi hasil tepat untuk tiga
+fixture teks bersih dan nol kata untuk gambar kosong. Contoh buram dan miring
+terbaca. Urutan dua kolom sederhana terjalin per baris, sehingga akurasi layout
+dua kolom masih terbatas. Versi lokal diuji dengan proxy yang tidak dapat
+dihubungi. Build tidak menyertakan cURL. Koneksi Windows mesin uji tetap aktif.
+
+Waktu dari raster siap hingga hasil OCR berada di kisaran 1,16–1,56 detik per
+halaman pada mesin uji ini. Puncak working set runner debug 48,9 MiB dan puncak
+worker yang teramati 66,4 MiB, masing-masing diukur terpisah. Angka ini belum
+mencakup viewer. Mesin/model hilang, timeout, batal, dan path runtime Unicode
+ikut diverifikasi. Audit impor PE mencatat hanya `kernel32.dll`.
+
 ## Kursor untuk geser dan resize tanda tangan (22 November 2026)
 
 Format, Clippy desktop tanpa warning, 23 unit test, dan build release lulus.
