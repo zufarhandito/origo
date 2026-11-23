@@ -28,7 +28,11 @@ impl WindowShell {
         }).detach();
     }
     pub(super) fn toggle_favorite(&mut self, id: TabId, cx: &mut Context<Self>) {
-        if !self.favorites_ready || self.close.is_some() || self.modal(cx) {
+        if self.active != Some(id)
+            || !self.favorites_ready
+            || self.close.is_some()
+            || self.modal(cx)
+        {
             return;
         }
         let Some(tab) = self.tabs.iter().find(|t| t.id == id) else {
@@ -125,6 +129,9 @@ pub(super) fn tab_context_menu(
         ),
     ];
     for (label, action, disabled) in actions {
+        if action == 0 && shell.active != Some(id) {
+            continue;
+        }
         let weak = weak.clone();
         menu = menu.item(
             PopupMenuItem::new(label)

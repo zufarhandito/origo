@@ -1,5 +1,10 @@
-param([ValidateSet('debug','release')][string]$Profile='debug')
-. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -TestName 'tab-management-ui' -IsolatedState
+param([ValidateSet('debug','release')][string]$Profile='debug',[string]$ExecutablePath)
+. (Join-Path $PSScriptRoot 'tab-test-support.ps1') -Profile $Profile -ExecutablePath $ExecutablePath -TestName 'tab-management-ui' -IsolatedState
+function Assert-Hidden([string]$Name) {
+    $ui=[Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
+    $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$Name)
+    if($ui.FindFirst([Windows.Automation.TreeScope]::Descendants,$condition)){throw "Unexpected control: $Name"}
+}
 function Context-Tab([string]$Name) {
     $n=Find $Name
     $r=$n.Current.BoundingRectangle
@@ -48,12 +53,21 @@ try {
     Picker 'Buka PDF di tab baru';Fill-Picker $b
     $s=Wait-State {param($s) $s.tabCount -eq 2 -and $s.tabId -ne $idA}
     $idB=$s.tabId
+    $null=Find 'Bintangi: B.pdf'
+    Assert-Hidden 'Hapus bintang: A.pdf'
     Context-Tab 'A.pdf'
+    Assert-Hidden 'Hapus bintang'
+    Assert-Hidden 'Bintangi'
     Invoke 'Pindahkan ke akhir'
     $null=Wait-State {param($s) $s.tabOrder[0] -eq $idB -and $s.tabOrder[1] -eq $idA -and $s.tabId -eq $idB}
     Context-Tab 'A.pdf'
     Invoke 'Pindahkan ke awal'
     $null=Wait-State {param($s) $s.tabOrder[0] -eq $idA -and $s.tabId -eq $idB}
+    Switch-Tab $a
+    $null=Wait-State {param($s) $s.tabId -eq $idA -and $s.starredTabIds -contains $idA}
+    $null=Find 'Hapus bintang: A.pdf'
+    Assert-Hidden 'Bintangi: B.pdf'
+    Switch-Tab $b
     Drag-Tab 'B.pdf' 'A.pdf' -Cancel
     $null=Wait-State {param($s) $s.tabOrder[0] -eq $idA -and -not $s.dirty}
     Drag-Tab 'B.pdf' 'A.pdf'
@@ -77,17 +91,17 @@ try {
     $null=Wait-State {param($s) $s.tabCount -eq 0}
     Close-Window
     if(-not $app.WaitForExit(15000)){throw 'Fixture did not close'}
-    $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-Object Id)
-    $desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'" --state-dir "'+$stateDirectory+'"'),$root,'open',1)
+    $arguments='"'+$a+'" --metrics "'+$metrics+'" --state-dir "'+$stateDirectory+'"'
+    $app=Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Split-Path $exe) -WindowStyle Normal -PassThru
     $deadline=(Get-Date).AddSeconds(20)
-    do {Start-Sleep -Milliseconds 200;$app=Get-Process -Name pdf-studio -ErrorAction SilentlyContinue|Where-Object Id -NotIn $oldIds|Select-Object -First 1;if($app){$app.Refresh()}}while((Get-Date) -lt $deadline -and (-not $app -or $app.MainWindowHandle -eq 0))
+    do {Start-Sleep -Milliseconds 200;$app.Refresh()}while((Get-Date) -lt $deadline -and $app.MainWindowHandle -eq 0 -and !$app.HasExited)
     $null=Wait-State {param($s) $s.tabCount -eq 1 -and $s.favoritesReady -and $s.starredTabIds -contains $s.tabId}
     Invoke 'Hapus bintang: A.pdf'
     $null=Wait-State {param($s) $s.starredTabIds.Count -eq 0 -and $s.pendingPreferences -eq 0}
     Close-Window
     if(-not $app.WaitForExit(15000)){throw 'Restart fixture did not close'}
     if((Get-FileHash $a).Hash -ne $hashA -or (Get-FileHash $b).Hash -ne $hashB){throw 'Source changed'}
-    'PASS plus placement, persistent stars, stable reorder, inactive context target, dirty close batch cancel/discard and source hashes' | Set-Content (Join-Path $directory 'result.txt')
+    'PASS plus placement, active-tab-only stars, persistent favorites, stable reorder, inactive context target, dirty close batch cancel/discard and source hashes' | Set-Content (Join-Path $directory 'result.txt')
     Write-Host "PASS tab management: $directory"
 } catch {
     if($app -and -not $app.HasExited){Capture 'failure.png'}

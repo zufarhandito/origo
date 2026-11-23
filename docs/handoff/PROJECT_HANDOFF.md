@@ -1,5 +1,12 @@
 # Handoff terkini - 23 November 2026
 
+## Origo Preview 0.1.1
+
+Tombol bintang di deretan tab dan aksi favorit di menu konteks tersedia pada
+tab aktif. Daftar tab dan riwayat tetap menunjukkan favorit yang disimpan.
+Tes UI pengelolaan tab dan riwayat lulus. Paket preview memakai feed lokal
+`dist/origo-preview`. Lihat [pengelolaan tab](../multitab.md#pengelolaan-tab--tahap-1).
+
 ## Installer dan auto-update Origo Preview
 
 Preview 0.1.0 sudah dipasang per pengguna dengan shortcut **Origo Preview**

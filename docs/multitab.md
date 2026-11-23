@@ -157,9 +157,9 @@ toolbar baca tetap satu baris. Konversi placeholder tidak masuk navigasi utama.
   menerima drop ke akhir. Tepi strip menggulir saat pointer drag bergerak di sana.
   Escape/drop di luar sasaran tidak mengubah urutan. Ctrl+Tab, Daftar tab dan close
   jendela mengikuti urutan visual. Loading boleh dipindah; modal/close batch mengunci reorder.
-- Bintang outline/kuning menandai prioritas tanpa mengubah dirty state, isi atau
-  urutan PDF. Favorit permanen lokal berdasarkan canonical path Windows; file yang
-  dipindah/rename dianggap berbeda. Daftar tab juga menampilkan bintang.
+- Tombol bintang outline/kuning muncul pada tab aktif. Aktifkan tab untuk
+  menambah atau menghapus favorit. Favorit disimpan lokal berdasarkan canonical
+  path Windows. Daftar tab menampilkan indikator favorit.
 - Favorit berada di `%LOCALAPPDATA%/PDF Studio/favorites.json`, maksimum 4096 entri
   dan 1 MiB. I/O background, penggantian atomik dan close menunggu penulisan pending.
   Metadata rusak/versi asing tidak ditimpa; tombol bintang dinonaktifkan dengan pesan.
@@ -169,9 +169,9 @@ toolbar baca tetap satu baris. Konversi placeholder tidak masuk navigasi utama.
   Metadata lokal memuat lokasi file; tidak menjadi bagian diagnostics atau upload.
 - Tombol + langsung setelah deretan tab; tetap di luar area scroll saat overflow.
   Pada kapasitas penuh + dinonaktifkan; Open menu/shortcut tetap dapat memfokuskan duplikat.
-- Klik kanan tidak mengaktifkan tab. Menu menargetkan identitas tab yang diklik:
-  Bintangi/Hapus bintang, Pindahkan ke awal/akhir, Tutup tab, Tutup tab lainnya,
-  Tutup tab di kanan. Close banyak tab memakai guard transactional yang sama.
+- Klik kanan menampilkan menu untuk tab yang diklik. Bintangi dan Hapus bintang
+  tersedia lewat menu konteks tab aktif. Pindah dan tutup tetap menargetkan tab
+  yang diklik. Close banyak tab memakai guard transactional yang sama.
 
 History, dirty revision, seleksi, halaman, zoom, scroll/pan, dan mode alat milik
 masing-masing dokumen. Tema berlaku untuk jendela. Save As mempertahankan sumber,

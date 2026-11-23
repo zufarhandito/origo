@@ -1,5 +1,15 @@
 # Pengujian Origo
 
+## Tombol favorit pada tab aktif
+
+Pada build release Preview 0.1.1, tes UI memeriksa bahwa tombol bintang
+berpindah mengikuti tab aktif dan menu konteks tab latar tidak menawarkan
+aksi favorit. Bintang yang tersimpan terlihat kembali saat tabnya diaktifkan
+dan setelah restart. Tes Daftar terakhir dibuka juga lulus, termasuk sinkronisasi
+setelah bintang dihapus. Clippy dan 84 unit test lulus. Bukti lokal ada di
+`.research/tab-management-ui-3a6f367f44664951892bbe657d319750` dan
+`.research/recent-files-ui-2552ab4bdf4f47dfb5a516e90e2b2b3c`.
+
 ## Instalasi Windows dan pembaruan Preview
 
 `scripts/installer-ui-smoke.ps1` memakai ID `Origo.Preview.Fixture` dan feed

@@ -1228,6 +1228,7 @@ impl Render for WindowShell {
                 }
             );
             let weak = cx.weak_entity();
+            let active = self.active == Some(id);
             let starred = self.favorites.contains(&path_key(&tab.path));
             let blocked = self.close.is_some() || self.modal(cx);
             strip = strip.child(
@@ -1237,40 +1238,42 @@ impl Render for WindowShell {
                     .child(
                         DocumentTab::new()
                             .folder()
-                            .selected(self.active == Some(id))
+                            .selected(active)
                             .max_w(px(260.))
                             .flex_shrink_0()
                             .aria_label(label.clone())
                             .child(div().max_w(px(160.)).truncate().child(label))
-                            .prefix(
-                                Button::new(("star-tab", id.0))
-                                    .ghost()
-                                    .icon(if starred {
-                                        IconName::StarFill
-                                    } else {
-                                        IconName::Star
-                                    })
-                                    .when(starred, |button| {
-                                        button.custom(
-                                            ButtonCustomVariant::new(cx)
-                                                .foreground(gpui::rgb(0xeab308).into()),
-                                        )
-                                    })
-                                    .w(px(24.))
-                                    .h(px(24.))
-                                    .accessibility_label(format!(
-                                        "{}: {name}",
-                                        if starred { "Hapus bintang" } else { "Bintangi" }
-                                    ))
-                                    .disabled(blocked || !self.favorites_ready)
-                                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| {
-                                        cx.stop_propagation()
-                                    })
-                                    .on_click(cx.listener(move |this, _, _, cx| {
-                                        cx.stop_propagation();
-                                        this.toggle_favorite(id, cx);
-                                    })),
-                            )
+                            .when(active, |tab| {
+                                tab.prefix(
+                                    Button::new(("star-tab", id.0))
+                                        .ghost()
+                                        .icon(if starred {
+                                            IconName::StarFill
+                                        } else {
+                                            IconName::Star
+                                        })
+                                        .when(starred, |button| {
+                                            button.custom(
+                                                ButtonCustomVariant::new(cx)
+                                                    .foreground(gpui::rgb(0xeab308).into()),
+                                            )
+                                        })
+                                        .w(px(24.))
+                                        .h(px(24.))
+                                        .accessibility_label(format!(
+                                            "{}: {name}",
+                                            if starred { "Hapus bintang" } else { "Bintangi" }
+                                        ))
+                                        .disabled(blocked || !self.favorites_ready)
+                                        .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| {
+                                            cx.stop_propagation()
+                                        })
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            cx.stop_propagation();
+                                            this.toggle_favorite(id, cx);
+                                        })),
+                                )
+                            })
                             .when(!blocked, |tab| {
                                 tab.on_drag(TabDrag(id), move |_, _, _, cx| {
                                     cx.new(|_| TabDragLabel)
