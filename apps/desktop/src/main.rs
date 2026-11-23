@@ -236,7 +236,7 @@ fn main() -> anyhow::Result<()> {
         version
     };
     #[cfg(windows)]
-    let notifications = installed.as_ref().map(updates::Installed::notifications);
+    let updater = installed.as_ref().map(updates::Installed::updater);
     let page_budget = cache_budget("PDF_STUDIO_PAGE_CACHE_MIB", 128, 128, 512)?;
     let thumbnail_budget = cache_budget("PDF_STUDIO_THUMBNAIL_CACHE_MIB", 16, 16, 64)?;
     gpui_kit::application()
@@ -334,8 +334,9 @@ fn main() -> anyhow::Result<()> {
                 },
             );
             #[cfg(windows)]
-            if let (Ok((window, _)), Some(notifications)) = (&result, notifications) {
-                notifications(*window, cx);
+            if let (Ok((window, shell)), Some(updater)) = (&result, updater) {
+                let updater = updater(*window, cx);
+                shell.update(cx, |shell, cx| shell.attach_updater(updater, cx));
             }
             if let Err(error) = result {
                 eprintln!("Jendela tidak dapat dibuka: {error}");

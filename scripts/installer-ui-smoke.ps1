@@ -34,13 +34,26 @@ try {
     $null = Wait-State {param($s) $s.starredTabIds.Count -eq 1 -and $s.pendingPreferences -eq 0}
     $package = "$id-0.1.1-preview-full.nupkg"
     $download = Join-Path $installation "packages/$package"
+    $null = Find 'Unduh'
+    $null = Find 'Nanti'
+    if (Test-Path -LiteralPath $download) { throw 'Update downloaded before user confirmation' }
+    Capture 'update-prompt.png'
+    Invoke 'Nanti'
+    Start-Sleep -Milliseconds 500
+    if (Test-Path -LiteralPath $download) { throw 'Update downloaded after clicking Nanti' }
+    Write-Host 'PASS updater: version 0.1.1 prompts before download and Nanti defers cleanly'
+
+    Menu-Action 'Bantuan' 'Periksa pembaruan'
+    $null = Find 'Unduh'
+    Invoke 'Unduh'
     $limit = (Get-Date).AddSeconds(30)
     while (!(Test-Path -LiteralPath $download -PathType Leaf) -and (Get-Date) -lt $limit) { Start-Sleep -Milliseconds 150 }
+    if (!(Test-Path -LiteralPath $download -PathType Leaf)) { throw 'Approved update did not finish downloading' }
     if ((Get-FileHash -LiteralPath $download).Hash -ne (Get-FileHash -LiteralPath (Join-Path $feed $package)).Hash) { throw 'Staged update checksum mismatch' }
     $null = Find 'Origo 0.1.1 siap dipasang. Keluar dan buka lagi untuk memperbarui.'
     Capture 'update-ready.png'
     Assert-Version '0.1.0'
-    Write-Host 'PASS updater: version 0.1.1 downloaded by the installed viewer'
+    Write-Host 'PASS updater: version 0.1.1 downloaded after user confirmation'
 
     Invoke 'Panel alat'; Invoke 'Putar kanan'
     $null = Wait-State {param($s) $s.dirty}

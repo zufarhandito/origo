@@ -1,5 +1,17 @@
 # Pengujian Origo
 
+## Konfirmasi unduhan pembaruan Preview
+
+`scripts/installer-ui-smoke.ps1` memeriksa bahwa versi baru (`0.1.1`) tidak
+diunduh otomatis saat jendela dibuka. Notifikasi di kanan bawah menampilkan
+versi, perkiraan ukuran unduhan, serta tombol **Unduh** dan **Nanti**. Memilih
+**Nanti** menutup prompt tanpa mengunduh paket. Membuka **Bantuan > Periksa
+pembaruan** memunculkan kembali prompt, dan memilih **Unduh** mengunduh paket
+dengan checksum cocok hingga tampil pesan siap dipasang serta aktif setelah
+buka ulang. Format, Clippy workspace, 88 unit test, build release, dan smoke
+installer lulus. Bukti lokal ada di
+`.research/installer-ui-2d7d9d096ed44da7a15256d2692dc989`.
+
 ## Transformasi tanda tangan
 
 Tes unit release workspace lulus, 85 tes. Tes transformasi memeriksa urutan

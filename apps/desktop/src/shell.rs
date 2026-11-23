@@ -61,6 +61,8 @@ pub(super) struct WindowShell {
     ocr: Entity<ocr::OcrJobs>,
     #[cfg(windows)]
     ocr_tray: Option<ocr_tray::OcrTray>,
+    #[cfg(windows)]
+    updater: Option<Entity<updates::Updater>>,
     resources: Arc<WindowResources>,
     page_budget: usize,
     thumbnail_budget: usize,
@@ -153,6 +155,8 @@ impl WindowShell {
                 ocr,
                 #[cfg(windows)]
                 ocr_tray: None,
+                #[cfg(windows)]
+                updater: None,
                 sidecars,
                 resources: Arc::new(WindowResources {
                     templates_dir: state_dir.clone(),
@@ -934,9 +938,21 @@ enum MenuAction {
     Png,
     Optimize,
     Help,
+    #[cfg(windows)]
+    CheckUpdates,
     About,
 }
 impl WindowShell {
+    #[cfg(windows)]
+    pub(super) fn attach_updater(
+        &mut self,
+        updater: Entity<updates::Updater>,
+        cx: &mut Context<Self>,
+    ) {
+        self.updater = Some(updater);
+        cx.notify();
+    }
+
     fn action(&mut self, action: MenuAction, window: &mut Window, cx: &mut Context<Self>) {
         if !self.enabled(action, cx) {
             return;
@@ -947,6 +963,12 @@ impl WindowShell {
             ClearSession => self.clear_session_history(cx),
             #[cfg(windows)]
             HideOcrTray => self.hide_to_ocr_tray(window, cx),
+            #[cfg(windows)]
+            CheckUpdates => {
+                if let Some(updater) = &self.updater {
+                    updater.update(cx, |updater, cx| updater.check_manually(cx));
+                }
+            }
             ClearOcr => {
                 let reply = window.prompt(
                     gpui::PromptLevel::Warning,
@@ -1080,6 +1102,10 @@ impl WindowShell {
         #[cfg(windows)]
         if matches!(action, HideOcrTray) {
             return self.ocr.read(cx).has_batch() && self.ocr_tray.is_none();
+        }
+        #[cfg(windows)]
+        if matches!(action, CheckUpdates) {
+            return self.updater.is_some();
         }
         if matches!(action, ExitCompare) {
             return self.split_view.is_some();
@@ -1403,7 +1429,12 @@ impl Render for WindowShell {
             ),
             (
                 "Bantuan",
-                vec![("Daftar shortcut", Help), ("Tentang Origo", About)],
+                vec![
+                    ("Daftar shortcut", Help),
+                    #[cfg(windows)]
+                    ("Periksa pembaruan", CheckUpdates),
+                    ("Tentang Origo", About),
+                ],
             ),
         ];
         let groups = groups
