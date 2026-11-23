@@ -77,6 +77,49 @@ function Invoke-FixtureTray([string]$Label) {
     [OutputDialog]::PostMessage($tray,0x111,[IntPtr]$command,[IntPtr]::Zero)|Out-Null # WM_COMMAND
 }
 
+function Complete-OcrBatch([int]$Pages, [int]$AlreadyReady) {
+    $watch=[Diagnostics.Stopwatch]::StartNew()
+    $next=($AlreadyReady - ($AlreadyReady % 100))+100
+    $hostPeak=0; $workerPeak=0; $combinedPeak=0; $done=$false
+    while($watch.Elapsed.TotalMinutes -lt 30) {
+        $app.Refresh()
+        if($app.HasExited){throw 'Viewer exited during long OCR batch'}
+        $progress=(Read-Metrics).ocrBatch
+        # Diagnostics can be briefly empty while the app writes its next frame.
+        if(!$progress -or $progress.total -ne $Pages){Start-Sleep -Milliseconds 100;continue}
+        $hostRam=$app.WorkingSet64
+        $worker=Get-CimInstance Win32_Process -Filter "Name='tesseract.exe' AND ParentProcessId=$($app.Id)" | Select-Object -First 1
+        $workerRam=if($worker){[long]$worker.WorkingSetSize}else{0}
+        $hostPeak=[Math]::Max($hostPeak,$hostRam)
+        $workerPeak=[Math]::Max($workerPeak,$workerRam)
+        $combinedPeak=[Math]::Max($combinedPeak,$hostRam+$workerRam)
+        if($progress.ready -ge $next) {
+            Write-Host ('OCR desktop {0}/{1}, elapsed while monitoring {2:F1} s' -f $progress.ready,$Pages,$watch.Elapsed.TotalSeconds)
+            $next+=100
+        }
+        if($progress.paused -or $progress.failed -gt 0){throw 'Long OCR batch reached an unexpected error'}
+        if($progress.ready -eq $Pages){$done=$true;break}
+        Start-Sleep -Milliseconds 350
+    }
+    if(!$done){throw 'Long OCR batch did not complete'}
+    $cache=(Get-Item -LiteralPath (Join-Path $stateDirectory 'ocr-v1.sqlite3')).Length
+    Write-Host ('PASS long OCR desktop: {0} pages, {1:F1} s from viewer start, {2} bytes SQLite' -f $Pages,((Get-Date)-$app.StartTime).TotalSeconds,$cache)
+    Write-Host ('Desktop working set samples: viewer {0:F1}, worker {1:F1}, combined {2:F1} MiB' -f ($hostPeak/1MB),($workerPeak/1MB),($combinedPeak/1MB))
+
+    Invoke-FixtureTray 'Buka Origo'
+    $null=Wait-State {param($s) -not $s.ocrInTray -and $s.ocrBatch.ready -eq $Pages}
+    $saved=Join-Path $directory 'Searchable.pdf'
+    Invoke 'Menu aplikasi'
+    Invoke 'Berkas'
+    Picker ('Simpan PDF yang bisa dicari'+[char]0x2026)
+    Fill-Picker $saved
+    $export=Wait-State {param($s) $s.exportsCompleted -gt 0}
+    if(!$export.exportSuccess -or $export.exportPages -ne $Pages -or !(Test-Path -LiteralPath $saved)){
+        throw 'Searchable export of the completed batch failed'
+    }
+    Write-Host "PASS OCR desktop: searchable copy for all $Pages pages"
+}
+
 try {
     $null=Wait-State {param($s) $s.pageCount -ge 100}
     $hwnd=$app.MainWindowHandle
@@ -141,30 +184,8 @@ try {
         Menu-Action 'Tampilan' 'Halaman terakhir'
         $null=Wait-State {param($s) $s.activePage -eq $s.pageCount -and $s.ocrBatch.remaining -gt 0}
         Menu-Action 'Berkas' 'Sembunyikan ke tray'
-        $null=Wait-State {param($s) $s.ocrInTray}
-        $watch=[Diagnostics.Stopwatch]::StartNew(); $next=100; $hostPeak=0; $workerPeak=0; $combinedPeak=0
-        do {
-            $progress=Read-Metrics
-            $app.Refresh()
-            $hostRam=$app.WorkingSet64
-            $worker=Get-CimInstance Win32_Process -Filter "Name='tesseract.exe' AND ParentProcessId=$($app.Id)" | Select-Object -First 1
-            $workerRam=if($worker){[long]$worker.WorkingSetSize}else{0}
-            $hostPeak=[Math]::Max($hostPeak,$hostRam)
-            $workerPeak=[Math]::Max($workerPeak,$workerRam)
-            $combinedPeak=[Math]::Max($combinedPeak,$hostRam+$workerRam)
-            if($progress.ocrBatch.ready -ge $next) {
-                Write-Host ('OCR desktop {0}/{1}, elapsed after restart {2:F1} s' -f $progress.ocrBatch.ready,$progress.ocrBatch.total,$watch.Elapsed.TotalSeconds)
-                $next+=100
-            }
-            if($progress.ocrBatch.paused -or $progress.ocrBatch.failed -gt 0){throw 'Long OCR batch reached an unexpected error'}
-            Start-Sleep -Milliseconds 350
-        } while($progress.ocrBatch.remaining -gt 0 -and $watch.Elapsed.TotalMinutes -lt 30)
-        if($progress.ocrBatch.ready -ne $progress.ocrBatch.total){throw 'Long OCR batch did not complete'}
-        $cache=(Get-Item -LiteralPath (Join-Path $stateDirectory 'ocr-v1.sqlite3')).Length
-        Write-Host ('PASS long OCR desktop: {0} pages, {1:F1} s after resuming with {2} pages ready, {3} bytes SQLite' -f $progress.ocrBatch.total,$watch.Elapsed.TotalSeconds,$resumed.ocrBatch.ready,$cache)
-        Write-Host ('Desktop working set samples: viewer {0:F1}, worker {1:F1}, combined {2:F1} MiB' -f ($hostPeak/1MB),($workerPeak/1MB),($combinedPeak/1MB))
-        Invoke-FixtureTray 'Buka Origo'
-        $null=Wait-State {param($s) -not $s.ocrInTray -and $s.ocrBatch.remaining -eq 0}
+        $hidden=Wait-State {param($s) $s.ocrInTray}
+        Complete-OcrBatch $resumed.ocrBatch.total $hidden.ocrBatch.ready
     } else {
         Invoke 'Panel alat'
         Invoke 'Putar kanan'

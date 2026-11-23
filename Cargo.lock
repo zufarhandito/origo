@@ -5064,6 +5064,7 @@ dependencies = [
  "dunce",
  "pdf-application",
  "pdf-domain",
+ "pdf-ocr",
  "pdf-platform",
  "serde_json",
 ]

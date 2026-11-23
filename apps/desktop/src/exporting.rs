@@ -1,9 +1,11 @@
 //! Native dialogs and async composition of the safe export use case.
 use crate::*;
 use pdf_application::export::{
-    ExportControl, ExportError, ExportPlan, ExportReceipt, ExportScope, OptimizationSizes,
-    finish_export, prepare_export,
+    ExportControl, ExportError, ExportPhase, ExportPlan, ExportReceipt, ExportScope,
+    OptimizationSizes, finish_export, prepare_export, resolve_source,
 };
+use pdf_application::text::TextRequest;
+use pdf_ocr::{FrozenResults, Language, PageKey, Store};
 use pdf_platform::LocalOutput;
 #[derive(Clone, Default)]
 pub(super) struct ExportState {
@@ -25,7 +27,6 @@ pub(super) struct ExportState {
 }
 impl ExportState {
     pub(super) fn phase_label(&self) -> &'static str {
-        use pdf_application::export::ExportPhase;
         let phase = self
             .control
             .as_ref()
@@ -133,6 +134,8 @@ impl DocumentSession {
                         optimization_notice(&name, sizes)
                     } else if receipt.scope == ExportScope::Selected {
                         format!("Halaman terpilih tersimpan: {name}")
+                    } else if receipt.scope == ExportScope::Searchable {
+                        format!("Salinan PDF OCR tersimpan: {name}")
                     } else if current {
                         format!("PDF baru tersimpan: {name}")
                     } else {
@@ -214,6 +217,7 @@ impl DocumentSession {
             match scope {
                 ExportScope::All => "edited",
                 ExportScope::Selected => "pages",
+                ExportScope::Searchable => "ocr",
                 ExportScope::Optimized => "optimized",
             }
         );
@@ -233,6 +237,7 @@ impl DocumentSession {
         cx.notify();
         let exporter = self.exporter.clone();
         let renderer = self.renderer.clone();
+        let store = self.ocr.read(cx).store.clone();
         let handle = self.window_handle;
         cx.spawn(async move |this, cx| {
             let path = match dialog.await {
@@ -255,27 +260,54 @@ impl DocumentSession {
             };
             let preflight = exporter.clone();
             let c = control.clone();
-            let task = cx
-                .background_executor()
-                .spawn(async move { prepare_export(plan, &path, &LocalOutput, &preflight, &c) });
-            let prepared = match task.await {
+            let task = cx.background_executor().spawn(async move {
+                let results = if scope == ExportScope::Searchable {
+                    c.set_phase(ExportPhase::Snapshot);
+                    Some(ocr_snapshot(&plan, &store, &c)?)
+                } else {
+                    None
+                };
+                let prepared = prepare_export(plan, &path, &LocalOutput, &preflight, &c)?;
+                Ok((prepared, results))
+            });
+            let (prepared, results) = match task.await {
                 Ok(p) => p,
                 Err(e) => {
                     let _ = this.update(cx, |this, cx| this.export_finished(Err(e), cx));
                     return;
                 }
             };
-            let acknowledged = if prepared.report.requires_acknowledgement() {
-                control.set_phase(pdf_application::export::ExportPhase::Confirmation);
+            let preflight_warning = prepared.report.requires_acknowledgement();
+            let coverage_warning = results.as_ref().filter(|r| r.recognized() < r.pages());
+            let needs_confirmation = preflight_warning || coverage_warning.is_some();
+            let acknowledged = if needs_confirmation {
+                control.set_phase(ExportPhase::Confirmation);
+                let mut detail = document_name;
+                if preflight_warning {
+                    detail.push('\n');
+                    detail.push_str(prepared.report.confirmation_detail());
+                }
+                if let Some(results) = coverage_warning {
+                    detail.push_str(&format!(
+                        "\nLapisan teks OCR akan ditambahkan ke {} dari {} halaman. Teks bawaan PDF tetap dapat dicari.",
+                        results.recognized(),
+                        results.pages()
+                    ));
+                }
+                let (title, action) = if preflight_warning {
+                    (
+                        prepared.report.confirmation_title(),
+                        prepared.report.confirmation_action(),
+                    )
+                } else {
+                    ("Simpan PDF dengan cakupan OCR ini?", "Lanjutkan")
+                };
                 let prompt = handle.update(cx, |_, window, cx| {
                     window.prompt(
                         gpui::PromptLevel::Warning,
-                        prepared.report.confirmation_title(),
-                        Some(&format!(
-                            "{document_name}\n{}",
-                            prepared.report.confirmation_detail()
-                        )),
-                        &["Batal", prepared.report.confirmation_action()],
+                        title,
+                        Some(&detail),
+                        &["Batal", action],
                         cx,
                     )
                 });
@@ -286,7 +318,7 @@ impl DocumentSession {
             } else {
                 false
             };
-            if prepared.report.requires_acknowledgement() && !acknowledged {
+            if needs_confirmation && !acknowledged {
                 drop(prepared);
                 let _ = this.update(cx, |this, cx| {
                     this.export_finished(Err(ExportError::Cancelled), cx)
@@ -294,7 +326,12 @@ impl DocumentSession {
                 return;
             }
             let task = cx.background_executor().spawn(async move {
-                finish_export(prepared, acknowledged, &exporter, &renderer, &control)
+                if let Some(results) = results {
+                    let searchable = qpdf_adapter::SearchableExporter::new(exporter, results, renderer.clone());
+                    finish_export(prepared, acknowledged, &searchable, &renderer, &control)
+                } else {
+                    finish_export(prepared, acknowledged, &exporter, &renderer, &control)
+                }
             });
             let result = task.await;
             let _ = this.update(cx, |this, cx| this.export_finished(result, cx));
@@ -302,6 +339,36 @@ impl DocumentSession {
         .detach();
     }
 }
+
+fn ocr_snapshot(
+    plan: &ExportPlan,
+    store: &Store,
+    control: &ExportControl,
+) -> Result<FrozenResults, ExportError> {
+    let keys = plan
+        .pages()
+        .iter()
+        .map(|page| {
+            let source = resolve_source(plan.sources(), page.entry.source_id)?;
+            Ok(PageKey::new(
+                &TextRequest {
+                    path: source.path.clone(),
+                    page_index: page.entry.source_page_index,
+                    fingerprint: source.fingerprint,
+                },
+                Language::default(),
+            ))
+        })
+        .collect::<Result<Vec<_>, ExportError>>()?;
+    let results = store.freeze(&keys, control)?;
+    if results.recognized() == 0 {
+        return Err(ExportError::Unsupported(
+            "Jalankan OCR pada halaman yang dipindai sebelum menyimpan salinan ini.",
+        ));
+    }
+    Ok(results)
+}
+
 fn format_size(bytes: u64) -> String {
     if bytes < 1024 {
         format!("{bytes} B")

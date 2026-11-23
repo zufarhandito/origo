@@ -15,6 +15,9 @@ use std::{
     process::Command,
 };
 const JSON_LIMIT: usize = 16 * 1024 * 1024;
+#[path = "searchable.rs"]
+mod searchable;
+pub use searchable::SearchableExporter;
 
 fn annotation_json_limit<'a>(mut annotations: impl Iterator<Item = &'a Annotation>) -> usize {
     // Eight 2 MiB images can occupy almost 22 MiB in base64 before other PDF objects.
@@ -31,11 +34,13 @@ fn annotation_json_limit<'a>(mut annotations: impl Iterator<Item = &'a Annotatio
 #[derive(Clone)]
 pub struct QpdfExporter {
     executable: PathBuf,
+    ocr_font: PathBuf,
 }
 impl QpdfExporter {
     pub fn new(sidecars: &Path) -> Self {
         Self {
             executable: sidecars.join("qpdf/bin/qpdf.exe"),
+            ocr_font: sidecars.join("ocr/pdf.ttf"),
         }
     }
     fn invoke(
@@ -438,6 +443,7 @@ mod tests {
     {
         let exporter = QpdfExporter {
             executable: std::env::current_exe()?,
+            ocr_font: PathBuf::new(),
         };
         assert!(matches!(
             exporter.version(&ExportControl::default()),
@@ -445,6 +451,7 @@ mod tests {
         ));
         let exporter = QpdfExporter {
             executable: PathBuf::from("missing-sidecar-that-does-not-exist.exe"),
+            ocr_font: PathBuf::new(),
         };
         assert!(matches!(
             exporter.version(&ExportControl::default()),

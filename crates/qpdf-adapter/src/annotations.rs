@@ -110,7 +110,7 @@ pub(crate) fn validate(
     }
     Ok(())
 }
-fn inherited<'a>(
+pub(crate) fn inherited<'a>(
     objects: &'a Map<String, Value>,
     mut page: &'a Value,
     key: &str,

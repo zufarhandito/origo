@@ -8,6 +8,9 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+#[path = "snapshot.rs"]
+mod snapshot;
+pub use snapshot::FrozenResults;
 
 const MAX_RECORD: usize = 2 * 1024 * 1024;
 const MAX_ENTRIES: i64 = 8192;
@@ -287,6 +290,32 @@ mod tests {
         assert!(matches!(store.get(&key)?, Some(Cached::Native)));
         store.clear()?;
         assert!(store.get(&key)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn full_database_keeps_committed_results_and_checkpoint()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let key = PageKey("existing".into());
+        let oversized = PageKey("x".repeat(32 * 1024));
+        let store = Store::new(Some(directory.path()));
+        store.put(&key, &Cached::Native)?;
+        store.set_checkpoint(&key, true)?;
+        store.with_connection(|db| {
+            let pages = db.pragma_query_value(None, "page_count", |row| row.get::<_, u32>(0))?;
+            db.pragma_update(None, "max_page_count", pages)
+        })?;
+
+        assert!(matches!(
+            store.put(&oversized, &Cached::Native),
+            Err(CacheError::Storage)
+        ));
+        drop(store);
+        let resumed = Store::new(Some(directory.path()));
+        assert!(matches!(resumed.get(&key)?, Some(Cached::Native)));
+        assert!(resumed.has_checkpoint(&key)?);
+        assert!(resumed.get(&oversized)?.is_none());
         Ok(())
     }
 }

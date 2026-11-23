@@ -9,6 +9,7 @@ mod annotations;
 mod books;
 mod exporting;
 mod ocr;
+mod ocr_export;
 mod optimizing;
 mod outline_print;
 mod png;
@@ -128,6 +129,12 @@ fn main() -> Result<()> {
             .nth(2)
             .context("OCR fixture directory required")?;
         return ocr::write_batch_fixture(&PathBuf::from(fixtures));
+    }
+    if std::env::args().nth(1).as_deref() == Some("--ocr-export-smoke") {
+        let fixtures = std::env::args_os()
+            .nth(2)
+            .context("OCR fixture directory required")?;
+        return ocr_export::run(&root, &PathBuf::from(fixtures));
     }
     if std::env::args().nth(1).as_deref() == Some("--write-search-fixtures") {
         let dir = root.join(".research/search-fixtures");

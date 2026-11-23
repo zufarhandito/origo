@@ -9,6 +9,7 @@ anyhow.workspace = true
 dunce.workspace = true
 pdf-application.workspace = true
 pdf-platform.workspace = true
+pdf-ocr.workspace = true
 serde_json.workspace = true
 [lints]
 workspace = true

@@ -1,5 +1,16 @@
 # Pengujian Origo
 
+## Ekspor PDF dengan lapisan OCR (23 November 2026)
+
+`pdf-smoke --ocr-export-smoke .research/ocr-fixtures` memeriksa snapshot hasil
+OCR, posisi teks pada halaman yang diputar, PDF campuran, kesamaan piksel
+dengan ekspor biasa, tujuan yang sudah ada, pembatalan, dan hash sumber.
+`pypdf` juga mengekstrak kalimat OCR dan teks bawaan dari salinan yang sama.
+
+`scripts/ocr-export-ui-smoke.ps1` memverifikasi konfirmasi cakupan, batal,
+Simpan PDF yang bisa dicari, dan Find dari tab salinan melalui lapisan PDF.
+Bukti lokal `.research/ocr-export-ui-04559bb9494248889c58f77ca0aa0e7f`.
+
 ## Batch OCR dan tray Windows (23 November 2026)
 
 `scripts/ocr-batch-ui-smoke.ps1` memulai batch pada PDF sintetis campuran.

@@ -47,8 +47,9 @@ konfirmasi. File PDF sumber tetap read-only.
 ## Batch dan tray Windows
 
 Pilih **Menu > Berkas > OCR seluruh dokumen** untuk antrean hingga 1.024
-halaman. Origo melewati teks bawaan dan hasil valid, lalu memproses halaman
-scan satu per satu. Permintaan OCR halaman aktif didahulukan setelah giliran
+halaman. Batas dokumen sumber adalah 128 MiB. Origo melewati teks bawaan dan
+hasil valid, lalu memproses halaman scan satu per satu. Permintaan OCR halaman
+aktif didahulukan setelah giliran
 yang sedang berjalan. Pencarian ikut diperbarui selama batch berjalan.
 
 Progres menunjukkan halaman siap dicari, tanpa teks, gagal, dan tersisa.
@@ -64,6 +65,20 @@ eksplisit ke area notifikasi. Arahkan pointer ke ikon Origo untuk melihat
 progres. Menu ikon menyediakan **Buka Origo**, **Jeda OCR** atau **Lanjutkan
 OCR**, dan **Keluar**. Keluar mengikuti konfirmasi perubahan dokumen bila ada.
 Minimize biasa juga membiarkan pekerjaan berjalan.
+
+## Simpan salinan PDF yang bisa dicari
+
+Setelah ada hasil OCR, pilih **Menu > Berkas > Simpan PDF yang bisa dicari…**.
+Origo menambahkan lapisan teks tak terlihat ke halaman dengan hasil OCR,
+sehingga pencarian dan salin juga tersedia di pembaca PDF lain. Teks bawaan
+PDF ikut tersalin. Jika hanya sebagian halaman mendapat lapisan OCR, dialog
+menunjukkan jumlahnya sebelum pembuatan salinan dilanjutkan.
+
+Ekspor memakai snapshot susunan halaman, rotasi, anotasi, dan hasil OCR.
+QPDF dan PDFium memeriksa salinan sebelum file diterbitkan ke nama baru.
+Perubahan pada workspace yang masih terbuka disimpan melalui **Simpan
+sebagai**. Lapisan OCR memakai font tanpa glif dari paket lokal Tesseract
+(`sidecars/ocr/pdf.ttf`).
 
 Lihat [checklist implementasi OCR](plans/OCR_IMPLEMENTATION_PLAN.md) dan
 [hasil pengujian](testing.md).

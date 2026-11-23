@@ -39,13 +39,15 @@ the result may stay the same size or grow. See [Optimize](docs/optimize.md).
 - Background rendering, bounded CPU caches and viewport-scoped GPU textures.
 - Metadata-only document opening, stable page identities and source-change detection.
 - Drag-select text, copy with Ctrl+C or Salin, and clear with Esc. Selection follows
-  zoom/scroll and intrinsic page rotation. Image-only scans need OCR (not included).
+  zoom/scroll and intrinsic page rotation.
   Single-click clears without selecting; double-click selects a sentence.
 - Ctrl+F searches the active PDF with phrase matching, default case-insensitive,
   occurrence highlights/counts and previous/next navigation. The Find bar lives
   below the reading toolbar; see [text search](docs/search.md).
 - Book viewer follow-up: up to 1024 pages, reused native document sessions and lightweight
   previews before larger rasters. The input-file limit remains 128 MiB.
+- Local Indonesian/English OCR supports active pages, resumable document batches,
+  the Windows notification area and searchable copies. See [OCR](docs/ocr.md).
 
 Page selection, reorder, virtual rotate/delete, import and bounded Undo/Redo are implemented.
 Use **Simpan sebagai** or **Ctrl+Shift+S** to save the current page plan to a new PDF.
@@ -121,6 +123,9 @@ The download script checks genuine archive hashes and keeps DLLs and upstream no
 No network access is required at application runtime. `test-sidecars.ps1` independently
 checks both native binaries using a PowerShell/C# test harness, even before MSVC is
 available. It does not validate the Rust integration or GPUI.
+
+For OCR, build the local Tesseract runtime with `./scripts/build-ocr-sidecar.ps1`.
+See [OCR setup and limits](docs/ocr.md).
 
 ## Verify and run
 

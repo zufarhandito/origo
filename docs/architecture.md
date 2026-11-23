@@ -246,6 +246,15 @@ structural-PDF, raster, text, reflow/Office and OCR adapter boundaries, sharing 
 and output transactions when implemented. Only complete PDF Save As can advance a clean
 revision; a derived conversion output will not mark the virtual PDF plan saved.
 
+## OCR lokal
+
+`pdf-ocr` menangani pengenalan Tesseract, kotak kata, cache SQLite, dan antrean
+per halaman. Desktop mengatur satu giliran OCR per jendela dan memperbarui
+Find melalui identitas halaman sumber. Progres dan tindakan tray memakai
+antrean yang sama. Modul ekspor `qpdf-adapter` membaca snapshot hasil OCR dan
+menambahkan lapisan teks PDF sebelum transaksi output yang sudah ada melakukan
+validasi dan publikasi. Lihat [perilaku OCR](ocr.md).
+
 ## Annotation authoring (17 November 2026)
 
 Workspace owns bounded per-PageId annotation lists, baseline source lists and a shared

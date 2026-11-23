@@ -897,6 +897,7 @@ enum MenuAction {
     ClearSession,
     ClearOcr,
     OcrBatch,
+    OcrExport,
     #[cfg(windows)]
     HideOcrTray,
     Compare,
@@ -1004,6 +1005,9 @@ impl WindowShell {
                         Copy => s.copy_text(cx),
                         Find => s.show_search(window, cx),
                         OcrBatch => s.start_ocr_batch(cx),
+                        OcrExport => {
+                            s.start_export(pdf_application::export::ExportScope::Searchable, cx)
+                        }
                         Select | Clear => {
                             if s.mode == ViewerMode::Organize {
                                 s.select_all_pages(matches!(action, Select), cx);
@@ -1106,7 +1110,7 @@ impl WindowShell {
             Copy => s.text.selection.is_some(),
             OcrBatch => content && s.navigation.count > 0 && !self.ocr.read(cx).has_batch(),
             Select | Clear => content && s.mode == ViewerMode::Organize,
-            Save | Optimize | Split | Png => {
+            Save | OcrExport | Optimize | Split | Png => {
                 content
                     && s.navigation.count > 0
                     && self.resources.export_owner.load(Ordering::SeqCst) == 0
@@ -1338,6 +1342,7 @@ impl Render for WindowShell {
                     ("Hapus riwayat sesi", ClearSession),
                     ("Hapus hasil OCR lokal", ClearOcr),
                     ("OCR seluruh dokumen", OcrBatch),
+                    ("Simpan PDF yang bisa dicari…", OcrExport),
                     #[cfg(windows)]
                     ("Sembunyikan ke tray", HideOcrTray),
                     ("Simpan sebagai…  Ctrl+Shift+S", Save),

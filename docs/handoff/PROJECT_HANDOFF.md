@@ -15,6 +15,12 @@ dengan progres, jeda, batal, retry, dan checkpoint. **Sembunyikan ke tray**
 di Windows mempertahankan pekerjaan dan menyediakan aksi untuk membuka
 jendela, menjeda pekerjaan, atau keluar.
 
+**Berkas > Simpan PDF yang bisa dicari…** menambahkan lapisan teks PDF
+berdasarkan hasil OCR yang ada saat snapshot. Ekspor parsial meminta
+konfirmasi cakupan. Build Windows yang diuji sudah dipasang untuk `run.cmd`,
+dengan SHA-256
+`5A2DAE88AD5BF613357EA64DBD9501AF991570BDD1262136315E61D1CF049ABF`.
+
 ## Kursor untuk geser dan resize tanda tangan
 
 Tool Pilih menampilkan kursor tangan pada badan tanda tangan dan panah diagonal

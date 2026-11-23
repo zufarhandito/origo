@@ -6,7 +6,7 @@ mod store;
 
 pub use batch::{BatchPlan, MAX_BATCH_PAGES, PageStatus, Progress};
 pub use document::{DocumentError, DocumentPage, has_text, read_text};
-pub use store::{CacheError, Cached, PageKey, Recognition, Store};
+pub use store::{CacheError, Cached, FrozenResults, PageKey, Recognition, Store};
 
 use pdf_application::export::{ExportControl, ExportError};
 use serde::{Deserialize, Serialize};

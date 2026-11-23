@@ -10,9 +10,10 @@ use std::{
 
 mod annotations;
 mod export;
+mod ocr_layer;
 mod preflight;
 mod structure;
-pub use export::QpdfExporter;
+pub use export::{QpdfExporter, SearchableExporter};
 
 pub struct QpdfProbe {
     executable: PathBuf,

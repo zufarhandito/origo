@@ -57,6 +57,8 @@ pub enum ExportError {
 pub enum ExportScope {
     All,
     Selected,
+    /// A derived copy with OCR text. Does not advance the clean revision.
+    Searchable,
     /// All pages as a derived optimized PDF; never advances the clean baseline.
     Optimized,
 }

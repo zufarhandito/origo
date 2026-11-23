@@ -75,7 +75,7 @@ Mode changes do not mark content dirty. Structural edits explicitly clear text s
 
 The old Konversi catalog is informational. PNG export is now operational separately
 under Alat; JPEG, TXT, Word/Excel/PowerPoint and conversion into PDF remain deferred.
-The pinned renderer supplies PNG rasters; no OCR model or network upload was added.
+The pinned renderer supplies PNG rasters.
 Save As/Extract continue to produce PDFs only.
 See m3-safe-export-plan.md and conversion-roadmap.md for scope and prerequisites.
 
@@ -84,9 +84,11 @@ clears without selecting, drag over text to select, double-click selects a sente
 Ctrl+C or Salin to copy, Esc or a blank page click to clear. Selection survives zoom
 and scroll. Drag may cross simultaneously visible pages; automatic edge scrolling,
 separate word/paragraph selection modes, whole-document Select All and text search are not included.
-Copy follows PDFium's extracted order, which can differ from intended reading order
-for columns, rotated layouts, ligatures and unusual fonts. Image-only scans need OCR;
-OCR is not implemented. See text-selection.md for bounds and current evidence.
+Copy follows the extracted order, which can differ from intended reading order for
+columns, rotated layouts, ligatures and unusual fonts. Local Tesseract OCR supplies
+text for image-only scans in Indonesian and English. Searchable OCR export follows
+the standard structural preflight and output validation. See [OCR](ocr.md) and
+[text selection](text-selection.md) for bounds and test evidence.
 
 Default adapter limits are 128 MiB input, 1024 pages, 8192 pixels per bitmap dimension
 and 16 million bitmap pixels (64 MiB RGBA). ResourceLimits can be configured in Rust.

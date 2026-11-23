@@ -1,5 +1,13 @@
 # Progres PDF Studio
 
+## OCR lokal Origo
+
+OCR halaman aktif, cache, batch yang bisa dilanjutkan, tray Windows, dan
+ekspor searchable tersedia di build lokal. Lihat [perilaku OCR](ocr.md),
+[checklist](plans/OCR_IMPLEMENTATION_PLAN.md) dan [pengujian](testing.md).
+
+## Checkpoint 19 November 2026
+
 Commit fitur cetak/outline: **4736dfb**. Build lokal teruji sudah dipasang untuk
 `run.cmd`. Push ke origin/main belum berhasil: Git tidak memiliki kredensial,
 sehingga pengiriman remote/CI belum terverifikasi. Detail respons ada di
@@ -73,7 +81,7 @@ consent, validasi dan no-overwrite. Hanya full Save As yang cocok menandai clean
 | Pemulihan edit/crash-orphan | Belum tersedia; session restore hanya metadata baca |
 | DPI fisik/mixed-monitor, trackpad, keyboard/Narrator | Gate acceptance manusia/perangkat; hasil otomatis tidak menutupnya |
 | Clean Windows, lisensi/notice/redistribusi, native security/advisory review | Gate rilis, bukan fitur yang selesai karena build lokal lulus |
-| JPEG/TXT, OCR/Office, converter lain | Ditunda/belum diimplementasikan; lihat conversion roadmap |
+| JPEG/TXT, rekonstruksi Office, converter lain | Lihat conversion roadmap untuk cakupan yang ditunda |
 | AI online berbayar | Diskusi bisnis ditunda; belum ada backend/model/akun/pembayaran/upload |
 | Publikasi binary/portable | Belum diotorisasi pada handover ini; kandidat internal historis bukan rilis terbaru |
 

@@ -81,10 +81,10 @@ jendela punya perubahan PDF yang belum disimpan.
 
 ## 6. Simpan salinan PDF yang bisa dicari
 
-- [ ] Tambahkan ekspor lapisan teks tak terlihat dengan koordinat yang tepat.
+- [x] Tambahkan ekspor lapisan teks tak terlihat dengan koordinat yang tepat.
   Jelaskan cakupan jika hasil OCR masih parsial. Lewati halaman yang telah
   memiliki teks yang dapat dipakai.
-- [ ] Pakai alur Simpan Sebagai dengan validasi dan no-overwrite. Pertahankan
+- [x] Pakai alur Simpan Sebagai dengan validasi dan no-overwrite. Pertahankan
   urutan, ukuran, rotasi, dan tampilan halaman.
 
 **Tes.** Cari dan salin hasil di Origo serta viewer PDF lain. Bandingkan render

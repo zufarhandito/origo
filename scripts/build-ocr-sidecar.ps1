@@ -66,6 +66,7 @@ $tessdata = Join-Path $stage 'tessdata'
 $licenses = Join-Path $stage 'licenses'
 New-Item -ItemType Directory -Force (Join-Path $tessdata 'configs'),$licenses | Out-Null
 Copy-Item -LiteralPath (Join-Path $tessBuild 'bin/tesseract.exe') -Destination $stage
+Copy-Item -LiteralPath (Join-Path $tesseract 'tessdata/pdf.ttf') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $tesseract 'tessdata/configs/tsv') -Destination (Join-Path $tessdata 'configs')
 foreach ($language in @('eng','ind')) {
     Copy-Item -LiteralPath (Join-Path $sources "$language.traineddata") -Destination $tessdata
