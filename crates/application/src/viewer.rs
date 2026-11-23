@@ -109,6 +109,11 @@ impl<K: Eq + Hash + Clone, V: Clone> ByteCache<K, V> {
     pub fn contains(&self, key: &K) -> bool {
         self.entries.contains_key(key)
     }
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        let (value, bytes, _) = self.entries.remove(key)?;
+        self.used -= bytes;
+        Some(value)
+    }
     pub fn insert(&mut self, key: K, value: V, bytes: usize) -> CacheInsert<V> {
         if bytes > self.budget {
             return CacheInsert {

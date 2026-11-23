@@ -9,7 +9,7 @@ use gpui::component::{
 };
 use pdf_application::{
     search::{MATCH_LIMIT, QUERY_LIMIT, SearchOptions, SearchQuery, next_match},
-    text::{TextExtractor, TextRequest},
+    text::{TextPage, TextRequest},
 };
 
 pub(super) struct Match {
@@ -35,12 +35,14 @@ pub(super) struct SearchState {
     delayed: bool,
     query: Option<SearchQuery>,
     debounce: Option<gpui::Task<()>>,
+    ocr_match_pending: Option<(usize, Vec<Range<usize>>)>,
 }
 impl SearchState {
     pub(super) fn pause(&mut self) {
         self.token = self.token.wrapping_add(1);
         self.debounce = None;
         self.delayed = false;
+        self.ocr_match_pending = None;
     }
 }
 
@@ -141,12 +143,11 @@ impl DocumentSession {
         let token = self.search.token;
         let source_sequence = self.source_sequence;
         let renderer = self.renderer.clone();
+        let store = self.ocr.read(cx).store.clone();
         self.search.busy = true;
         let task = cx.background_executor().spawn(async move {
-            renderer.extract_text(&request).map(|page| {
-                let has_text = page.chars.iter().any(|ch| !ch.unicode.is_whitespace());
-                (query.find(&page, limit), has_text)
-            })
+            pdf_ocr::read_text(&renderer, &store, &request, pdf_ocr::Language::default())
+                .map(|(page, _)| (query.find(&page, limit), pdf_ocr::has_text(&page)))
         });
         cx.spawn(async move |this, cx| {
             let result = task.await;
@@ -160,6 +161,12 @@ impl DocumentSession {
                     this.search.scanned += 1;
                     match result {
                         Ok((ranges, has_text)) => {
+                            let pending = this.search.ocr_match_pending.take();
+                            let (mut ranges, has_text) = match pending {
+                                Some((page, updated)) if page == index => (updated, true),
+                                _ => (ranges, has_text),
+                            };
+                            ranges.truncate(MATCH_LIMIT.saturating_sub(this.search.matches.len()));
                             this.search.has_text |= has_text;
                             this.search.matches.extend(
                                 ranges.into_iter().map(|range| Match { page: index, range }),
@@ -199,6 +206,60 @@ impl DocumentSession {
             });
         })
         .detach();
+    }
+    pub(super) fn update_ocr_matches(
+        &mut self,
+        index: usize,
+        text: &TextPage,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(query) = self.search.query.as_ref().filter(|_| self.search.open) else {
+            return;
+        };
+        if !pdf_ocr::has_text(text) {
+            return;
+        }
+        if index == self.search.scanned && self.search.busy {
+            self.search.ocr_match_pending = Some((index, query.find(text, MATCH_LIMIT)));
+            return;
+        }
+        if index >= self.search.scanned {
+            // The normal Find scan will read that page from the committed OCR store.
+            return;
+        }
+        self.search.has_text = true;
+        let selected = self
+            .search
+            .current
+            .and_then(|i| self.search.matches.get(i))
+            .map(|m| (m.page, m.range.clone()));
+        let left = self.search.matches.partition_point(|m| m.page < index);
+        let right = self.search.matches.partition_point(|m| m.page <= index);
+        let limit = MATCH_LIMIT.saturating_sub(self.search.matches.len() - (right - left));
+        self.search.matches.splice(
+            left..right,
+            query
+                .find(text, limit)
+                .into_iter()
+                .map(|range| Match { page: index, range }),
+        );
+        self.search.current = if self.search.matches.is_empty() {
+            None
+        } else {
+            selected
+                .and_then(|(page, range)| {
+                    self.search
+                        .matches
+                        .iter()
+                        .position(|m| m.page == page && m.range == range)
+                })
+                .or(Some(0))
+        };
+        if self.search.matches.len() >= MATCH_LIMIT {
+            self.search.capped = true;
+            self.search.running = false;
+        }
+        cx.notify();
     }
     pub(super) fn move_search(&mut self, previous: bool, cx: &mut Context<Self>) {
         if self.edits_locked() || !self.search.open {

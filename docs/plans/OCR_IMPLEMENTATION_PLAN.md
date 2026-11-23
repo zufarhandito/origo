@@ -26,11 +26,11 @@ baris. Detail waktu, RAM, dan batas uji ada di [testing](../testing.md).
 
 ## 2. OCR halaman aktif di viewer
 
-- [ ] Aktifkan chip **Butuh OCR** untuk halaman scan. Tampilkan status
+- [x] Aktifkan chip **Butuh OCR** untuk halaman scan. Tampilkan status
   memproses, selesai, tidak ada teks, gagal, serta tindakan batal atau coba ulang.
-- [ ] Render di latar belakang, batasi ukuran raster, dan beri viewer prioritas.
+- [x] Render di latar belakang, batasi ukuran raster, dan beri viewer prioritas.
   Mulai dari satu worker dan satu halaman aktif. Lepas raster setelah dipakai.
-- [ ] Gabungkan teks OCR dengan jalur pencarian, seleksi, dan salin. Petakan
+- [x] Gabungkan teks OCR dengan jalur pencarian, seleksi, dan salin. Petakan
   koordinat OCR ke koordinat halaman dan utamakan teks bawaan PDF.
 
 **Tes.** Cari, pilih, dan salin kata dari scan. Uji zoom, rotasi empat arah,
@@ -40,9 +40,9 @@ lain. Uji halaman sangat besar dan pastikan viewer tetap bisa dinavigasi.
 
 ## 3. Cache dan identitas halaman
 
-- [ ] Simpan hasil OCR per halaman secara atomik. Ikat entri pada fingerprint
+- [x] Simpan hasil OCR per halaman secara atomik. Ikat entri pada fingerprint
   sumber, identitas halaman stabil, bahasa, dan versi OCR.
-- [ ] Tetapkan batas disk, aturan pembersihan, dan cara menghapus hasil OCR
+- [x] Tetapkan batas disk, aturan pembersihan, dan cara menghapus hasil OCR
   lokal. Baca hasil sesuai kebutuhan dengan cache RAM terbatas.
 
 **Tes.** Buka ulang tanpa OCR ulang. Pindah urutan halaman dan pastikan hasil

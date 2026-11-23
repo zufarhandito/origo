@@ -1,5 +1,11 @@
 //! Local, bounded recognition. GPUI and document state live outside this crate.
 
+mod document;
+mod store;
+
+pub use document::{DocumentError, DocumentPage, has_text, read_text};
+pub use store::{CacheError, Cached, PageKey, Recognition, Store};
+
 use pdf_application::export::{ExportControl, ExportError};
 use serde::{Deserialize, Serialize};
 use std::{

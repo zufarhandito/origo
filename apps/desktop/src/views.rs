@@ -1,7 +1,7 @@
 use crate::*;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, Sizable,
+    ActiveTheme, Icon, Sizable,
     button::{Button, ButtonVariants},
     empty::{Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle},
     scroll::Scrollbar,
@@ -703,6 +703,7 @@ impl Render for DocumentSession {
                 .then(|| self.annotation_bar(cx));
         let search_bar = (has_document && self.search.open && self.mode != ViewerMode::Convert)
             .then(|| self.search_bar(cx));
+        let ocr_chip = self.ocr_chip(cx);
 
         let body = if self.mode == ViewerMode::Convert {
             self.conversion_hub(window, cx)
@@ -1081,9 +1082,7 @@ impl Render for DocumentSession {
                             } else {
                                 self.status.clone()
                             })
-                            .when(self.navigation.count > 0 && self.text.pages.get(&usize::from(self.navigation.current)).is_some_and(|p|p.chars.is_empty()), |el| {
-                                el.child(Button::new("ocr-coming-soon").outline().xsmall().rounded_full().label("Butuh OCR").tooltip("OCR segera hadir").disabled(true))
-                            })
+                            .children(ocr_chip)
                             .when(self.workspace.is_some(), |el| {
                                 el.child(format!(
                                     " - {} sumber",

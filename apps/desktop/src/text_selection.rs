@@ -1,8 +1,9 @@
 use crate::*;
-use pdf_application::text::{TextExtractor, TextPage, TextPosition, TextRequest, TextSelection};
+use pdf_application::text::{TextPage, TextPosition, TextRequest, TextSelection};
 
 pub(super) struct TextState {
     pub pages: ByteCache<usize, Arc<TextPage>>,
+    pub ocr_pages: std::collections::HashSet<usize>,
     pub selection: Option<TextSelection>,
     pub dragging: bool,
     pub pending: Option<(TextPosition, gpui::Point<gpui::Pixels>)>,
@@ -62,6 +63,7 @@ impl Default for TextState {
     fn default() -> Self {
         Self {
             pages: ByteCache::new(16 * 1024 * 1024),
+            ocr_pages: Default::default(),
             selection: None,
             dragging: false,
             pending: None,
@@ -90,6 +92,7 @@ impl DocumentSession {
             return;
         };
         let id = self.source_sequence;
+        let ocr_revision = self.ocr_revision;
         let rotation = page.rotation_delta;
         let Some(source) = workspace.resolve(page.source_id) else {
             return;
@@ -102,9 +105,10 @@ impl DocumentSession {
         self.text.busy = true;
         self.text.loads += 1;
         let renderer = self.renderer.clone();
-        let task = cx
-            .background_executor()
-            .spawn(async move { renderer.extract_text(&request) });
+        let store = self.ocr.read(cx).store.clone();
+        let task = cx.background_executor().spawn(async move {
+            pdf_ocr::read_text(&renderer, &store, &request, pdf_ocr::Language::default())
+        });
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
@@ -115,11 +119,20 @@ impl DocumentSession {
                 if !this.visible_for_render {
                     return;
                 }
+                if this.ocr_revision != ocr_revision {
+                    this.request_text(index, cx);
+                    return;
+                }
                 match result {
-                    Ok(mut page) => {
+                    Ok((mut page, recognized)) => {
                         page.rotate(rotation);
                         let bytes = page.bytes();
                         this.text.pages.insert(index, Arc::new(page), bytes);
+                        if recognized {
+                            this.text.ocr_pages.insert(index);
+                        } else {
+                            this.text.ocr_pages.remove(&index);
+                        }
                         this.align_search_match(cx);
                     }
                     Err(error) => {

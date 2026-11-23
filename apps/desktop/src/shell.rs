@@ -58,6 +58,7 @@ pub(super) struct WindowShell {
     next_id: u64,
     sidecars: PathBuf,
     renderer: PdfiumRenderer,
+    ocr: Entity<ocr::OcrJobs>,
     resources: Arc<WindowResources>,
     page_budget: usize,
     thumbnail_budget: usize,
@@ -120,11 +121,28 @@ impl WindowShell {
                 weak.update(cx, |this: &mut Self, cx| this.begin_close(true, cx))
                     .unwrap_or(true)
             });
+            let renderer = PdfiumRenderer::new(&sidecars);
+            let ocr =
+                cx.new(|_| ocr::OcrJobs::new(&sidecars, state_dir.as_deref(), renderer.clone()));
+            cx.observe(&ocr, |this: &mut Self, _, cx| {
+                if this.close.is_some() {
+                    this.advance_close(cx);
+                }
+            })
+            .detach();
+            cx.subscribe(&ocr, |this: &mut Self, _, change, cx| {
+                if let ocr::Change::Notice(message) = change {
+                    this.notice = Some(message.clone());
+                    cx.notify();
+                }
+            })
+            .detach();
             let mut shell = Self {
                 tabs: vec![],
                 active: None,
                 next_id: 1,
-                renderer: PdfiumRenderer::new(&sidecars),
+                renderer,
+                ocr,
                 sidecars,
                 resources: Arc::new(WindowResources {
                     templates_dir: state_dir.clone(),
@@ -500,6 +518,7 @@ impl WindowShell {
                                     this.metrics.clone(),
                                     owner,
                                     this.resources.clone(),
+                                    this.ocr.clone(),
                                     id,
                                     ViewId(id.0 * 2),
                                 );
@@ -694,6 +713,11 @@ impl WindowShell {
                 if self.pending_preferences != 0 {
                     return;
                 }
+                if let Some(batch) = &self.close
+                    && self.ocr.update(cx, |ocr, _| ocr.stop_tabs(&batch.ids))
+                {
+                    return;
+                }
                 let Some(batch) = self.close.take() else {
                     return;
                 };
@@ -858,6 +882,7 @@ enum MenuAction {
     Open,
     Reopen,
     ClearSession,
+    ClearOcr,
     Compare,
     ExitCompare,
     DuplicateView,
@@ -899,6 +924,22 @@ impl WindowShell {
         match action {
             Reopen => self.reopen_tab(cx),
             ClearSession => self.clear_session_history(cx),
+            ClearOcr => {
+                let reply = window.prompt(
+                    gpui::PromptLevel::Warning,
+                    "Hapus hasil OCR lokal?",
+                    Some("Teks OCR yang tersimpan akan dihapus dari komputer ini."),
+                    &["Hapus", "Batal"],
+                    cx,
+                );
+                let ocr = self.ocr.downgrade();
+                cx.spawn(async move |_, cx| {
+                    if reply.await == Ok(0) {
+                        let _ = ocr.update(cx, |ocr, cx| ocr.clear(cx));
+                    }
+                })
+                .detach();
+            }
             Compare => self.choose_comparison(window, cx),
             ExitCompare => self.exit_comparison(cx),
             DuplicateView => self.duplicate_view(window, cx),
@@ -1002,6 +1043,9 @@ impl WindowShell {
         }
         if matches!(action, Reopen) {
             return !self.opening && !self.closed_tabs.is_empty() && self.tabs.len() < MAX_TABS;
+        }
+        if matches!(action, ClearOcr) {
+            return self.ocr.read(cx).can_clear();
         }
         if matches!(action, ExitCompare) {
             return self.split_view.is_some();
@@ -1265,6 +1309,7 @@ impl Render for WindowShell {
                     ("Buka PDF…  Ctrl+O", Open),
                     ("Buka ulang tab tertutup  Ctrl+Shift+T", Reopen),
                     ("Hapus riwayat sesi", ClearSession),
+                    ("Hapus hasil OCR lokal", ClearOcr),
                     ("Simpan sebagai…  Ctrl+Shift+S", Save),
                     ("Cetak PDF  Ctrl+P", Print),
                     ("Tutup tab  Ctrl+W", Close),

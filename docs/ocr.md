@@ -19,7 +19,30 @@ Sumber upstream tersedia di [rilis Tesseract](https://github.com/tesseract-ocr/t
 [rilis Leptonica](https://github.com/DanBloomberg/leptonica/releases/tag/1.87.0),
 dan [model cepat](https://github.com/tesseract-ocr/tessdata_fast/tree/4.1.0).
 
-## Status integrasi
+## OCR di viewer
 
-Mesin lokal sudah tersedia. Urutan integrasi viewer, batch, tray, dan ekspor ada
-di [checklist implementasi OCR](plans/OCR_IMPLEMENTATION_PLAN.md).
+Klik **Butuh OCR** pada halaman scan. Origo memakai Indonesia dan Inggris
+bersamaan. Saat mengantre atau berjalan, klik chip lagi untuk membatalkan.
+Kegagalan menampilkan alasan dan opsi coba lagi. OCR berjalan satu halaman
+per giliran di latar belakang.
+
+Hasil masuk ke Find, seleksi teks, dan salin. Teks asli PDF diutamakan.
+Kotak kata berasal dari mesin OCR dan posisi huruf di dalam kata diperkirakan.
+Hasil teks mengikuti identitas halaman sumber saat halaman dipindah atau
+diputar di workspace.
+
+## Penyimpanan lokal
+
+Origo menyimpan hasil terkompresi dalam `ocr-v1.sqlite3` di direktori state
+lokal. Kunci mencakup path, ukuran dan waktu modifikasi sumber, indeks halaman
+sumber, bahasa, serta versi mesin. Transaksi per halaman menjaga hasil yang
+sudah selesai saat proses terputus. Origo membaca hasil sesuai kebutuhan
+melalui anggaran cache teks viewer.
+
+Cache menyimpan hingga 8.192 entri dan 192 MiB data terkompresi. Batas utama
+file SQLite 256 MiB. Entri yang paling lama ditulis dibersihkan lebih dulu.
+**Menu > Berkas > Hapus hasil OCR lokal** menghapus hasil lokal setelah
+konfirmasi. File PDF sumber tetap read-only.
+
+Urutan batch, tray, dan ekspor ada di
+[checklist implementasi OCR](plans/OCR_IMPLEMENTATION_PLAN.md).

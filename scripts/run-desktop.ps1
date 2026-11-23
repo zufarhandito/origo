@@ -7,7 +7,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Desktop build failed' }
     $destination = Join-Path $root 'target/debug/sidecars'
     New-Item -ItemType Directory -Force $destination | Out-Null
-    foreach ($name in @('qpdf', 'pdfium')) {
+    foreach ($name in @('qpdf', 'pdfium', 'ocr')) {
+        if ($name -eq 'ocr' -and -not (Test-Path -LiteralPath (Join-Path $root 'sidecars/ocr/tesseract.exe'))) {
+            continue
+        }
         $component = Join-Path $destination $name
         New-Item -ItemType Directory -Force $component | Out-Null
         Get-ChildItem -LiteralPath (Join-Path $root "sidecars/$name") | Copy-Item -Destination $component -Recurse -Force

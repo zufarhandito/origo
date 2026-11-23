@@ -1,5 +1,18 @@
 # Pengujian Origo
 
+## OCR halaman aktif dan cache lokal (23 November 2026)
+
+Smoke `pdf-smoke --ocr-viewer-smoke .research/ocr-fixtures` mengenali PDF scan
+sintetis dari path Unicode. Pengujian memeriksa Find, seleksi dan salin, kotak
+teks pada empat orientasi, teks native di PDF campuran, cache setelah restart
+koneksi, serta kesamaan byte PDF sumber. Tes cache memeriksa perbedaan
+fingerprint dan bahasa, entri korup, serta penghapusan lokal.
+
+Fmt, Clippy modul OCR/desktop/smoke, 3 tes OCR, 5 tes platform, dan build
+release lulus. Smoke UI Windows memverifikasi chip, pembaruan Find yang sudah
+terbuka, teks native di PDF campuran, buka ulang dari cache, dan hash sumber.
+Bukti lokal `.research/ocr-ui-243b1ab9fc9348918288d093e608833e`.
+
 ## Baseline mesin OCR lokal (23 November 2026)
 
 Format, Clippy, 2 tes modul OCR, 5 tes platform, dan smoke Tesseract pada Windows

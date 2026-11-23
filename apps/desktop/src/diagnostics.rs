@@ -49,6 +49,7 @@ impl DocumentSession {
             "documentOpens": native.document_opens, "nativeRenders": native.renders,
             "textCacheBytes": self.text.pages.bytes(), "textLoads": self.text.loads,
             "textLoading": self.text.busy, "copyingText": self.text.copying(),
+            "ocrPageCached": self.text.ocr_pages.contains(&usize::from(self.navigation.current)),
             "searchOpen": self.search.open, "searchRunning": self.search.running,
             "searchMatches": self.search.matches.len(), "searchCurrent": self.search.current.map_or(0, |i| i + 1),
             "searchScannedPages": self.search.scanned, "searchFailedPages": self.search.errors,

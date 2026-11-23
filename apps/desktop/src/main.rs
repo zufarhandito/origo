@@ -23,6 +23,7 @@ mod document_model;
 mod exporting;
 mod feedback;
 mod local_state;
+mod ocr;
 mod outline;
 mod png_export;
 mod printing;
@@ -133,6 +134,8 @@ struct DocumentSession {
     mode: ViewerMode,
     page_dragging: bool,
     text: text_selection::TextState,
+    ocr: Entity<ocr::OcrJobs>,
+    ocr_revision: u64,
     search: search::SearchState,
     search_input: Entity<InputState>,
     page_anchor: Option<pdf_domain::PageId>,
@@ -327,11 +330,23 @@ impl DocumentSession {
         metrics: Option<PathBuf>,
         owner: gpui::WeakEntity<shell::WindowShell>,
         resources: Arc<shell::WindowResources>,
+        ocr: Entity<ocr::OcrJobs>,
         tab_id: shell::TabId,
         view_id: shell::ViewId,
     ) -> Entity<Self> {
         cx.new(|cx| {
             let focus = cx.focus_handle();
+            cx.observe(&ocr, |this: &mut DocumentSession, _, cx| {
+                if this.visible_for_render {
+                    this.report(cx);
+                    cx.notify();
+                }
+            })
+            .detach();
+            cx.subscribe(&ocr, |this: &mut DocumentSession, _, change, cx| {
+                this.ocr_changed(change, cx);
+            })
+            .detach();
             let focus_owner = owner.clone();
             cx.on_focus_in(
                 &focus,
@@ -439,6 +454,8 @@ impl DocumentSession {
                 page_dragging: false,
                 annotation: annotations::AnnotationState::default(),
                 text: text_selection::TextState::default(),
+                ocr,
+                ocr_revision: 0,
                 search: search::SearchState::default(),
                 search_input,
                 page_anchor: None,

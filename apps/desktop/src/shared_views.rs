@@ -83,6 +83,7 @@ impl WindowShell {
             self.metrics.clone(),
             owner,
             self.resources.clone(),
+            self.ocr.clone(),
             id,
             ViewId(id.0 * 2 + 1),
         );

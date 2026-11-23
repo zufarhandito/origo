@@ -20,6 +20,7 @@ tiny-skia = { version = "=0.11.4", default-features = false, features = ["std"] 
 pdf-application.workspace = true
 pdf-domain.workspace = true
 pdf-engine.workspace = true
+pdf-ocr.workspace = true
 pdf-platform.workspace = true
 qpdf-adapter.workspace = true
 [build-dependencies]

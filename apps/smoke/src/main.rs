@@ -107,6 +107,12 @@ fn main() -> Result<()> {
             .context("OCR fixture directory required")?;
         return ocr::engine_smoke(&root, &PathBuf::from(fixtures));
     }
+    if std::env::args().nth(1).as_deref() == Some("--ocr-viewer-smoke") {
+        let fixtures = std::env::args_os()
+            .nth(2)
+            .context("OCR fixture directory required")?;
+        return ocr::viewer_smoke(&root, &PathBuf::from(fixtures));
+    }
     if std::env::args().nth(1).as_deref() == Some("--write-search-fixtures") {
         let dir = root.join(".research/search-fixtures");
         std::fs::create_dir_all(&dir)?;
