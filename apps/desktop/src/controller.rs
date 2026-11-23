@@ -45,6 +45,57 @@ impl DocumentSession {
             .collect();
         self.release_images(images, cx);
     }
+    fn thumbnails_visible(&self) -> bool {
+        self.sidebar
+            && (self.mode == ViewerMode::Organize
+                || (self.mode == ViewerMode::Read && !self.outline.open))
+    }
+    pub(super) fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
+        self.sidebar = !self.sidebar;
+        self.release_hidden_thumbnails(cx);
+        cx.notify();
+    }
+    pub(super) fn release_hidden_thumbnails(&mut self, cx: &mut Context<Self>) {
+        if self.thumbnails_visible() {
+            return;
+        }
+        self.queue.discard_kind(RenderKind::Thumbnail);
+        self.thumbnail_visible = 0..0;
+        let gpu = self
+            .gpu_images
+            .extract_if(|key, _| key.kind == RenderKind::Thumbnail)
+            .map(|(_, (image, _))| image);
+        let images = self.thumbnails.clear().into_iter().chain(gpu).collect();
+        self.release_images(images, cx);
+        self.report(cx);
+    }
+    fn trim_layout_bitmaps(&mut self, cx: &mut Context<Self>) {
+        let Some(workspace) = self.workspace.as_ref() else {
+            return;
+        };
+        let images = self.pages.retain(|key| {
+            if key.device_scale_milli != (self.dpr * 1000.) as u32 {
+                return false;
+            }
+            let Some(mut geometry) = workspace
+                .resolve(key.source)
+                .and_then(|source| source.geometries.get(usize::from(key.index)))
+                .copied()
+            else {
+                return false;
+            };
+            if geometry.quarter_turns % 2 != key.rotation % 2 {
+                std::mem::swap(&mut geometry.width_points, &mut geometry.height_points);
+            }
+            let mut full = key.clone();
+            full.width =
+                RenderKey::pixel_width(self.zoom.size(geometry, self.viewport).0, self.dpr);
+            full.width == key.width || full.preview().width == key.width
+        });
+        drop(workspace);
+        self.release_images(images, cx);
+        self.trim_gpu(cx);
+    }
     pub(super) fn trim_gpu(&mut self, cx: &mut Context<Self>) {
         let keys: Vec<_> = self
             .gpu_images
@@ -198,7 +249,7 @@ impl DocumentSession {
             return;
         }
         self.zoom = zoom;
-        self.trim_gpu(cx);
+        self.trim_layout_bitmaps(cx);
         self.invalidate_work();
         self.reset_layout();
         self.schedule_current(cx);
@@ -323,7 +374,7 @@ impl DocumentSession {
         if self.opening {
             return;
         }
-        self.trim_gpu(cx);
+        self.trim_layout_bitmaps(cx);
         self.invalidate_work();
         self.reset_layout();
         if let Some(fraction) = fraction {
@@ -414,7 +465,8 @@ impl DocumentSession {
         priority: u8,
         cx: &mut Context<Self>,
     ) {
-        if !self.visible_for_render {
+        if !self.visible_for_render || (kind == RenderKind::Thumbnail && !self.thumbnails_visible())
+        {
             return;
         }
         let Some(key) = self.key(index, kind) else {
@@ -514,7 +566,10 @@ impl DocumentSession {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
                 this.inflight = None;
-                if !this.visible_for_render || job.generation != this.generation {
+                if !this.visible_for_render
+                    || job.generation != this.generation
+                    || (job.key.kind == RenderKind::Thumbnail && !this.thumbnails_visible())
+                {
                     this.stats.stale += 1;
                 } else {
                     match result {

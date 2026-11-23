@@ -157,6 +157,15 @@ impl<K: Eq + Hash + Clone, V: Clone> ByteCache<K, V> {
         self.used = 0;
         evicted
     }
+    pub fn retain(&mut self, mut keep: impl FnMut(&K) -> bool) -> Vec<V> {
+        self.entries
+            .extract_if(|key, _| !keep(key))
+            .map(|(_, (value, bytes, _))| {
+                self.used -= bytes;
+                value
+            })
+            .collect()
+    }
     pub fn bytes(&self) -> usize {
         self.used
     }
@@ -190,6 +199,9 @@ impl RenderQueue {
     pub fn reset(&mut self, generation: u64) {
         self.generation = generation;
         self.pending.clear();
+    }
+    pub fn discard_kind(&mut self, kind: RenderKind) {
+        self.pending.retain(|ticket| ticket.key.kind != kind);
     }
     pub fn push(&mut self, ticket: RenderTicket) {
         if ticket.generation != self.generation || self.capacity == 0 {

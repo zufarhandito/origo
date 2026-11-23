@@ -1,5 +1,33 @@
 # Pengujian Origo
 
+## Cache bitmap saat membaca dan mengubah zoom
+
+`scripts/viewer-cache-ui-smoke.ps1` membandingkan build release sebelum dan
+sesudah perubahan dengan PDF vektor sintetis 1.000 halaman. Uji dimulai dari
+jendela kosong dengan state terisolasi, membuka PDF, mengganti panel Thumbnail
+ke Daftar isi, menutup panel, mengubah zoom 150% → 200% → 400% → 100%, lalu
+membuka panel kembali dan menutup tab.
+
+| Sampel | Sebelum | Sesudah |
+| --- | ---: | ---: |
+| Working set awal di jendela kosong | 72,4 MiB | 72,5 MiB |
+| Cache thumbnail saat panel tertutup | 312 KiB | 0 KiB |
+| Cache halaman setelah kembali ke 100% | 61,0 MiB | 2,0 MiB |
+| Working set setelah kembali ke 100% | 252,4 MiB | 201,5 MiB |
+| Cache halaman dan thumbnail setelah tab ditutup | 0 MiB | 0 MiB |
+
+Thumbnail muncul kembali saat panel dibuka. Dokumen native kembali ke nol
+setelah idle dan hash PDF sumber cocok. Working set merupakan sampel proses
+Windows pada satu skenario dan dapat bervariasi, sedangkan cache bitmap
+dihitung dari ukuran raster yang masih disimpan. Bukti lokal sebelum perubahan
+ada di `.research/viewer-cache-a89af8e9820a46afabf7840f2770e7a2` dan sesudah
+perubahan di `.research/viewer-cache-816349c3abe14abe9b448aba2fd2d692`.
+
+Format, Clippy workspace, 84 unit test, serta build release lulus. Smoke UI
+dua tampilan satu dokumen dan OCR halaman aktif juga lulus. Bukti lokal
+`.research/same-document-ui-57903c1851a74007a9946c29c063f0ea` dan
+`.research/ocr-ui-4158e029b5184e95804ccebff55c8919`.
+
 ## Penerimaan OCR dokumen panjang (23 November 2026)
 
 Windows 11 x64, Intel Core i7-13620H, RAM terlihat 15,73 GiB. Runner release memproses

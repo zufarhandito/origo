@@ -130,6 +130,11 @@ width, DPR and page/thumbnail kind. Separate byte-counted LRU CPU caches default
 128 MiB and 16 MiB. PDF_STUDIO_PAGE_CACHE_MIB accepts 128-512 and
 PDF_STUDIO_THUMBNAIL_CACHE_MIB accepts 16-64. Oversized bitmaps are not retained.
 GPU residency is limited independently to visible pages/thumbnails plus neighbors.
+Changing zoom or viewport drops cached page rasters whose resolution no longer
+matches the layout. Compatible full rasters and 512-pixel previews can be reused.
+Closing the navigation panel or switching to the outline clears thumbnail CPU
+and GPU residency and discards queued thumbnail renders. A thumbnail render
+already in flight is discarded if its panel is hidden when it finishes.
 Releases defer a window update and call drop_image with the actual Window: dropping
 CPU Arc values or passing no current window alone does not free window atlas entries.
 

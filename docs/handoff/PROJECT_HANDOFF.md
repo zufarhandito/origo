@@ -1,5 +1,15 @@
 # Handoff terkini - 23 November 2026
 
+## Pelepasan cache bitmap viewer
+
+Viewer melepas raster halaman yang resolusinya tidak lagi cocok setelah zoom
+atau perubahan viewport. Thumbnail dilepas saat panel navigasi ditutup atau
+beralih ke Daftar isi. Pada fixture sintetis 1.000 halaman, cache halaman
+setelah zoom 400% kembali ke 100% turun dari 61,0 ke 2,0 MiB. Lihat
+[pengujian cache bitmap](../testing.md#cache-bitmap-saat-membaca-dan-mengubah-zoom).
+Build release teruji sudah terpasang untuk `run.cmd` dengan SHA-256
+`A6E967410536842B99D8D4112D683053CA83AEDCEEF03B86D87D668EF8630B5F`.
+
 ## Mesin OCR lokal
 
 Crate `pdf-ocr` dan sidecar Tesseract 5.5.4 dengan model cepat Indonesia dan

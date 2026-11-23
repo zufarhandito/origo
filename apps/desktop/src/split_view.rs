@@ -364,6 +364,7 @@ impl WindowShell {
                 if open {
                     s.sidebar = true;
                 }
+                s.release_hidden_thumbnails(cx);
                 cx.notify();
             });
         }

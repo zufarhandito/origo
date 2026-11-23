@@ -1,4 +1,4 @@
-﻿param([ValidateSet('debug','release')][string]$Profile='release',[string]$TestName='tab-hardening',[string]$Fixture='tests/fixtures/text-selection.pdf',[string]$ExecutablePath,[switch]$IsolatedState=$true)
+﻿param([ValidateSet('debug','release')][string]$Profile='release',[string]$TestName='tab-hardening',[string]$Fixture='tests/fixtures/text-selection.pdf',[string]$ExecutablePath,[switch]$IsolatedState=$true,[switch]$StartEmpty)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Add-Type -AssemblyName UIAutomationClient
@@ -18,12 +18,14 @@ $oldIds=@(Get-Process -Name pdf-studio -ErrorAction SilentlyContinue | ForEach-O
 $desktop=New-Object -ComObject Shell.Application
 $stateDirectory=Join-Path $directory 'state'
 $stateArguments=if($IsolatedState){' --state-dir "'+$stateDirectory+'"'}else{''}
+$pdfArgument=if($StartEmpty){''}else{'"'+$a+'" '}
+$launchArguments=$pdfArgument+'--metrics "'+$metrics+'"'+$stateArguments
 if($ExecutablePath){
     $savedPath=$env:PATH
     # This is the interactive UI acceptance window; UIA/PrintWindow need it visible.
-    try{$env:PATH="$env:SystemRoot\System32;$env:SystemRoot";Start-Process -FilePath $exe -ArgumentList ('"'+$a+'" --metrics "'+$metrics+'"'+$stateArguments) -WorkingDirectory (Split-Path $exe) -WindowStyle Normal|Out-Null}
+    try{$env:PATH="$env:SystemRoot\System32;$env:SystemRoot";Start-Process -FilePath $exe -ArgumentList $launchArguments -WorkingDirectory (Split-Path $exe) -WindowStyle Normal|Out-Null}
     finally{$env:PATH=$savedPath}
-}else{$desktop.ShellExecute($exe,('"'+$a+'" --metrics "'+$metrics+'"'+$stateArguments),$root,'open',1)}
+}else{$desktop.ShellExecute($exe,$launchArguments,$root,'open',1)}
 $deadline=(Get-Date).AddSeconds(20)
 do {
     Start-Sleep -Milliseconds 200

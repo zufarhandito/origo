@@ -65,6 +65,7 @@ impl DocumentSession {
                             s.set_mode(ViewerMode::Read, window, cx);
                         }
                         s.outline.open = true;
+                        s.release_hidden_thumbnails(cx);
                         s.load_outlines(cx);
                         cx.notify();
                     })),

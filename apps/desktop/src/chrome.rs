@@ -57,6 +57,7 @@ impl DocumentSession {
         self.cancel_signature_placement(cx);
         self.page_dragging = false;
         self.mode = mode;
+        self.release_hidden_thumbnails(cx);
         if mode == ViewerMode::Organize {
             self.sidebar = true;
             if self.selected_ids().is_empty() {
@@ -225,8 +226,7 @@ impl DocumentSession {
                             .selected(self.sidebar)
                             .disabled(self.workspace.is_none())
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.sidebar = !this.sidebar;
-                                cx.notify();
+                                this.toggle_sidebar(cx);
                             })),
                     )
                     .child(

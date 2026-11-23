@@ -115,8 +115,7 @@ impl DocumentSession {
             .on_action(cx.listener(|this, _: &FitWidth, _, cx| this.set_zoom(Zoom::FitWidth, cx)))
             .on_action(cx.listener(|this, _: &FitPage, _, cx| this.set_zoom(Zoom::FitPage, cx)))
             .on_action(cx.listener(|this, _: &ToggleSidebar, _, cx| {
-                this.sidebar = !this.sidebar;
-                cx.notify();
+                this.toggle_sidebar(cx);
             }))
             .on_action(cx.listener(|this, _: &FocusPage, window, cx| {
                 if this.mode == ViewerMode::Convert {

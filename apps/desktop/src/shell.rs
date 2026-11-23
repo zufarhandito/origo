@@ -1016,8 +1016,7 @@ impl WindowShell {
                             }
                         }
                         Sidebar => {
-                            s.sidebar = !s.sidebar;
-                            cx.notify();
+                            s.toggle_sidebar(cx);
                         }
                         Panel => s.set_mode(
                             if s.mode == ViewerMode::Organize {
