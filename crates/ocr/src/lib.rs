@@ -1,8 +1,10 @@
 //! Local, bounded recognition. GPUI and document state live outside this crate.
 
+mod batch;
 mod document;
 mod store;
 
+pub use batch::{BatchPlan, MAX_BATCH_PAGES, PageStatus, Progress};
 pub use document::{DocumentError, DocumentPage, has_text, read_text};
 pub use store::{CacheError, Cached, PageKey, Recognition, Store};
 

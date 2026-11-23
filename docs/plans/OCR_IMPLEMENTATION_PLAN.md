@@ -52,12 +52,12 @@ tetap bisa dibaca. Hash PDF sumber identik.
 
 ## 4. Batch OCR yang bisa dilanjutkan
 
-- [ ] Tambah **OCR seluruh dokumen**. Lewati halaman dengan teks yang dapat
+- [x] Tambah **OCR seluruh dokumen**. Lewati halaman dengan teks yang dapat
   dipakai atau hasil OCR valid. Antrekan halaman lain satu per satu dan
   dahulukan permintaan OCR halaman aktif setelah pekerjaan saat ini selesai.
-- [ ] Simpan progres per halaman. Sediakan jeda, lanjut, batal, dan coba ulang
+- [x] Simpan progres per halaman. Sediakan jeda, lanjut, batal, dan coba ulang
   halaman gagal. Tampilkan jumlah halaman siap dicari, gagal, dan tersisa.
-- [ ] Tampilkan hasil pencarian bertahap dan estimasi waktu setelah cukup
+- [x] Tampilkan hasil pencarian bertahap dan estimasi waktu setelah cukup
   sampel. Laporkan cakupan parsial selama batch aktif.
 
 **Tes.** Batch 1.000 halaman scan dan dokumen campuran. Tetap baca, scroll,
@@ -68,10 +68,10 @@ prioritas halaman aktif, sumber berubah, dan disk penuh.
 
 ## 5. Tray Windows untuk batch
 
-- [ ] Sediakan **Sembunyikan ke tray** saat batch aktif. Minimize biasa tetap
+- [x] Sediakan **Sembunyikan ke tray** saat batch aktif. Minimize biasa tetap
   membiarkan batch berjalan. Tray menampilkan status dan aksi **Buka Origo**,
   **Jeda/Lanjutkan**, serta **Keluar**.
-- [ ] Gunakan alur konfirmasi perubahan dokumen saat benar-benar keluar.
+- [x] Gunakan alur konfirmasi perubahan dokumen saat benar-benar keluar.
   Hentikan worker, simpan checkpoint, lalu bersihkan ikon tray.
 
 **Tes.** Sembunyikan jendela, periksa progres bertambah, jeda dan lanjut dari

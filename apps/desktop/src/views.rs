@@ -704,6 +704,7 @@ impl Render for DocumentSession {
         let search_bar = (has_document && self.search.open && self.mode != ViewerMode::Convert)
             .then(|| self.search_bar(cx));
         let ocr_chip = self.ocr_chip(cx);
+        let ocr_batch = self.ocr_batch_controls(cx);
 
         let body = if self.mode == ViewerMode::Convert {
             self.conversion_hub(window, cx)
@@ -1058,6 +1059,7 @@ impl Render for DocumentSession {
             })
             .children(reading_toolbar)
             .children(search_bar)
+            .children(ocr_batch)
             .children(annotation_bar)
 
             .child(body)

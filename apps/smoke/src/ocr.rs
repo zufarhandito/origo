@@ -2,14 +2,23 @@ use anyhow::{Context, Result, ensure};
 use pdf_application::export::ExportControl;
 use pdf_application::{PdfInspector, SourceId, Workspace, open_document, text::TextRequest};
 use pdf_engine::PdfiumRenderer;
-use pdf_ocr::{Cached, DocumentPage, Language, OcrError, Raster, Recognizer, Store, Tesseract};
+use pdf_ocr::{
+    BatchPlan, Cached, DocumentPage, Language, OcrError, PageStatus, Raster, Recognizer, Store,
+    Tesseract,
+};
 use std::{
     path::Path,
     time::{Duration, Instant},
 };
 
 pub fn make_book(fixtures: &Path, pages: usize, mixed: bool) -> Result<Vec<u8>> {
-    let source = image::open(fixtures.join("indonesia.png"))?;
+    let mut source = image::open(fixtures.join("indonesia.png"))?;
+    let size = if pages >= 100 {
+        source = source.thumbnail(1240, 1754);
+        [297.6, 420.96]
+    } else {
+        [595.2, 841.92]
+    };
     let width = source.width();
     let height = source.height();
     let mut jpeg = Vec::new();
@@ -18,6 +27,7 @@ pub fn make_book(fixtures: &Path, pages: usize, mixed: bool) -> Result<Vec<u8>> 
         &(jpeg, width, height),
         pages,
         mixed,
+        size,
     ))
 }
 
@@ -108,6 +118,86 @@ pub fn viewer_smoke(root: &Path, fixtures: &Path) -> Result<()> {
         "PASS OCR PDF: search, selection, copy, four rotations, native text, persistent cache, source bytes ({} ms)",
         start.elapsed().as_millis()
     );
+    Ok(())
+}
+
+pub fn batch_smoke(root: &Path, fixtures: &Path, count: usize) -> Result<()> {
+    ensure!(matches!(count, 1 | 100 | 1000 | 1024 | 1025));
+    let sidecars = root.join("sidecars");
+    let renderer = PdfiumRenderer::new(&sidecars);
+    let tesseract = Tesseract::new(&sidecars);
+    let dir = tempfile::Builder::new()
+        .prefix("ocr-batch-")
+        .tempdir_in(fixtures)?;
+    let path = dir.path().join("book.pdf");
+    let fixture = make_book(fixtures, count, false)?;
+    std::fs::write(&path, &fixture)?;
+    if count > 1024 {
+        ensure!(matches!(
+            renderer.inspect(&path),
+            Err(pdf_application::RenderError::ResourceLimit)
+        ));
+        println!("PASS OCR book limit: {count} pages rejected by native inspection");
+        return Ok(());
+    }
+    let workspace = open_document(&renderer, &path, SourceId(1))?;
+    let requests = (0..count)
+        .map(|index| request_for(&workspace, index))
+        .collect::<Result<Vec<_>>>()?;
+    let marker = requests[0].key();
+    let mut store = Store::new(Some(dir.path()));
+    let mut batch = BatchPlan::load(requests.clone(), &store)?;
+    store.set_checkpoint(&marker, true)?;
+    let start = Instant::now();
+    let mut done = 0;
+    let mut total_raster_time = Duration::ZERO;
+    while let Some((mut id, mut page)) = batch.claim_next() {
+        if done == 37 {
+            // The request was claimed with no result committed. Restart the
+            // store and prove the same page is pending and earlier ones are ready.
+            let interrupted = page.request.page_index;
+            drop(batch);
+            drop(store);
+            store = Store::new(Some(dir.path()));
+            ensure!(store.has_checkpoint(&marker)?);
+            batch = BatchPlan::load(requests.clone(), &store)?;
+            ensure!(batch.progress().ready == done);
+            (id, page) = batch.claim_next().context("interrupted page missing")?;
+            ensure!(page.request.page_index == interrupted);
+        }
+        let item_time = Instant::now();
+        let entry = page.recognize(
+            &renderer,
+            &tesseract,
+            &store,
+            &ExportControl::default(),
+            false,
+        )?;
+        total_raster_time += item_time.elapsed();
+        batch.finish(id, PageStatus::from(&entry));
+        done += 1;
+        if done.is_multiple_of(100) {
+            println!(
+                "OCR batch {done}/{count}, elapsed {:.1} s",
+                start.elapsed().as_secs_f64()
+            );
+        }
+    }
+    ensure!(batch.progress().ready == count && batch.progress().remaining() == 0);
+    store.set_checkpoint(&marker, false)?;
+    ensure!(!store.has_checkpoint(&marker)?);
+    ensure!(std::fs::read(&path)? == fixture);
+    println!(
+        "PASS OCR batch {count}: {:.2} s, {:.1} ms/page, {} bytes SQLite; source identical",
+        start.elapsed().as_secs_f64(),
+        total_raster_time.as_secs_f64() * 1000. / count as f64,
+        std::fs::metadata(dir.path().join("ocr-v1.sqlite3"))?.len(),
+    );
+    Ok(())
+}
+
+pub fn write_batch_fixture(fixtures: &Path) -> Result<()> {
+    std::fs::write(fixtures.join("batch.pdf"), make_book(fixtures, 300, true)?)?;
     Ok(())
 }
 

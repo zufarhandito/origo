@@ -8,10 +8,12 @@ lokal, mengembalikan kotak kata dan skor, serta mendukung timeout dan batal.
 [Modul OCR](../ocr.md) dan [checklist](../plans/OCR_IMPLEMENTATION_PLAN.md)
 mencatat tahap berikutnya dan batas hasil uji.
 
-Chip **Butuh OCR** sekarang menjalankan OCR halaman aktif dan memperbarui
-Find, seleksi, dan salin. SQLite lokal menyimpan hasil per halaman dengan
-identitas sumber, bahasa, dan versi mesin. Batch panjang, tray, dan ekspor
-searchable mengikuti checklist OCR.
+Chip **Butuh OCR** menjalankan OCR halaman aktif dan memperbarui Find, seleksi,
+dan salin. SQLite lokal menyimpan hasil per halaman dengan identitas sumber,
+bahasa, dan versi mesin. **Berkas > OCR seluruh dokumen** menjalankan batch
+dengan progres, jeda, batal, retry, dan checkpoint. **Sembunyikan ke tray**
+di Windows mempertahankan pekerjaan dan menyediakan aksi untuk membuka
+jendela, menjeda pekerjaan, atau keluar.
 
 ## Kursor untuk geser dan resize tanda tangan
 

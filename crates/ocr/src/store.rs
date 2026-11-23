@@ -98,6 +98,10 @@ impl Store {
                          page_key TEXT NOT NULL UNIQUE,
                          kind INTEGER NOT NULL,
                          data BLOB NOT NULL
+                     );
+                     CREATE TABLE IF NOT EXISTS ocr_checkpoint (
+                         id INTEGER PRIMARY KEY,
+                         source_key TEXT NOT NULL UNIQUE
                      );",
                 )
                 .map_err(|_| CacheError::Storage)?;
@@ -162,8 +166,48 @@ impl Store {
 
     pub fn clear(&self) -> Result<(), CacheError> {
         self.with_connection(|db| {
-            db.execute("DELETE FROM ocr_result", [])?;
+            let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            tx.execute("DELETE FROM ocr_result", [])?;
+            tx.execute("DELETE FROM ocr_checkpoint", [])?;
+            tx.commit()?;
             db.execute_batch("PRAGMA incremental_vacuum")
+        })
+    }
+
+    pub fn has_checkpoint(&self, document: &PageKey) -> Result<bool, CacheError> {
+        if self.path.as_ref().is_some_and(|path| !path.exists()) {
+            return Ok(false);
+        }
+        self.with_connection(|db| {
+            db.query_row(
+                "SELECT EXISTS(SELECT 1 FROM ocr_checkpoint WHERE source_key=?1)",
+                [&document.0],
+                |row| row.get(0),
+            )
+        })
+    }
+
+    pub fn set_checkpoint(&self, document: &PageKey, pending: bool) -> Result<(), CacheError> {
+        self.with_connection(|db| {
+            if pending {
+                let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                tx.execute(
+                    "INSERT OR REPLACE INTO ocr_checkpoint(source_key) VALUES (?1)",
+                    [&document.0],
+                )?;
+                tx.execute(
+                    "DELETE FROM ocr_checkpoint WHERE id IN
+                     (SELECT id FROM ocr_checkpoint ORDER BY id DESC LIMIT -1 OFFSET 256)",
+                    [],
+                )?;
+                tx.commit()
+            } else {
+                db.execute(
+                    "DELETE FROM ocr_checkpoint WHERE source_key=?1",
+                    [&document.0],
+                )?;
+                Ok(())
+            }
         })
     }
 }

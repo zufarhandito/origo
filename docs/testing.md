@@ -1,5 +1,19 @@
 # Pengujian Origo
 
+## Batch OCR dan tray Windows (23 November 2026)
+
+`scripts/ocr-batch-ui-smoke.ps1` memulai batch pada PDF sintetis campuran.
+Uji Windows memeriksa minimize, prioritas halaman aktif, progres saat jendela
+tersembunyi, jeda dan lanjut dari menu tray, serta pemulihan HWND yang sama.
+Uji juga memastikan ikon dilepas, worker berhenti saat keluar, checkpoint
+tersedia saat dibuka ulang, keluar dari tray meminta konfirmasi jika PDF
+punya perubahan, dan hash sumber cocok. Bukti lokal
+`.research/ocr-batch-ui-830f0e02ccbe48be9175cdb0fbe1fb0c`.
+
+Tes modul mencakup halaman gagal, retry, serta pemulihan antrean 1.000
+halaman termasuk giliran yang terputus. Runner `pdf-smoke --ocr-batch-smoke
+.research/ocr-fixtures <jumlah>` memproses scan sintetis dengan Tesseract asli.
+
 ## OCR halaman aktif dan cache lokal (23 November 2026)
 
 Smoke `pdf-smoke --ocr-viewer-smoke .research/ocr-fixtures` mengenali PDF scan

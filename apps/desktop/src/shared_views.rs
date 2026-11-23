@@ -98,6 +98,7 @@ impl WindowShell {
             s.document_owner = Some(actor.downgrade());
             s.workspace = model;
             s.workspace_instance = instance;
+            s.check_ocr_resume(cx);
             s.navigation.count = s.workspace.as_ref().map_or(0, |w| w.pages().len() as u16);
             s.navigation.current = index;
             s.zoom = zoom;

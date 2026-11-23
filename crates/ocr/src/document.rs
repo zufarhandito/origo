@@ -85,7 +85,7 @@ impl DocumentPage {
     }
 }
 
-fn verify(request: &TextRequest) -> Result<(), RenderError> {
+pub(crate) fn verify(request: &TextRequest) -> Result<(), RenderError> {
     if pdf_platform::fingerprint(&request.path).ok() != Some(request.fingerprint) {
         return Err(RenderError::SourceChanged);
     }

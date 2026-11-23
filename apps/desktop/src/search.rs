@@ -400,6 +400,18 @@ impl DocumentSession {
                     .child(label),
             )
             .child(
+                Button::new("find-ocr-document")
+                    .outline()
+                    .xsmall()
+                    .label(if self.ocr_resume_pending() {
+                        "Lanjutkan OCR dokumen"
+                    } else {
+                        "OCR seluruh dokumen"
+                    })
+                    .disabled(self.edits_locked() || self.ocr.read(cx).has_batch())
+                    .on_click(cx.listener(|this, _, _, cx| this.start_ocr_batch(cx))),
+            )
+            .child(
                 Button::new("search-previous")
                     .ghost()
                     .icon(IconName::ChevronUp)

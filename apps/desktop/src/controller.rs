@@ -89,6 +89,7 @@ impl DocumentSession {
         self.page_anchor = None;
         self.opening = false;
         self.workspace.install(workspace);
+        self.check_ocr_resume(cx);
         self.observed_model = self.workspace.signature();
         self.restart_search(cx);
         self.navigation = Navigation::default();

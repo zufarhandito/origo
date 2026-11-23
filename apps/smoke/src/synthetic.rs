@@ -1,5 +1,10 @@
 //! Generated fixtures only. No customer documents or external assets.
-pub fn ocr_scan_pdf(images: &(Vec<u8>, u32, u32), count: usize, mixed: bool) -> Vec<u8> {
+pub fn ocr_scan_pdf(
+    images: &(Vec<u8>, u32, u32),
+    count: usize,
+    mixed: bool,
+    [page_width, page_height]: [f32; 2],
+) -> Vec<u8> {
     let (jpeg, width, height) = images;
     let kids = (5..5 + count)
         .map(|id| format!("{id} 0 R"))
@@ -8,9 +13,9 @@ pub fn ocr_scan_pdf(images: &(Vec<u8>, u32, u32), count: usize, mixed: bool) -> 
     let font = 5 + count;
     let mut objects = vec![
         b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
-        format!("<< /Type /Pages /Kids [{kids}] /Count {count} /MediaBox [0 0 595.2 841.92] >>")
+        format!("<< /Type /Pages /Kids [{kids}] /Count {count} /MediaBox [0 0 {page_width} {page_height}] >>")
             .into_bytes(),
-        stream("", b"q 595.2 0 0 841.92 0 0 cm /Scan Do Q\n"),
+        stream("", format!("q {page_width} 0 0 {page_height} 0 0 cm /Scan Do Q\n").as_bytes()),
         stream(
             &format!(
                 "/Type /XObject /Subtype /Image /Width {width} /Height {height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode"
@@ -30,7 +35,11 @@ pub fn ocr_scan_pdf(images: &(Vec<u8>, u32, u32), count: usize, mixed: bool) -> 
         objects.push(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec());
         objects.push(stream(
             "",
-            b"BT /F1 20 Tf 36 720 Td (Native text remains searchable.) Tj ET\n",
+            format!(
+                "BT /F1 14 Tf 20 {} Td (Native text remains searchable.) Tj ET\n",
+                page_height * 0.85
+            )
+            .as_bytes(),
         ));
     }
     assemble(&objects)

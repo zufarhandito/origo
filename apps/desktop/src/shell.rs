@@ -59,6 +59,8 @@ pub(super) struct WindowShell {
     sidecars: PathBuf,
     renderer: PdfiumRenderer,
     ocr: Entity<ocr::OcrJobs>,
+    #[cfg(windows)]
+    ocr_tray: Option<ocr_tray::OcrTray>,
     resources: Arc<WindowResources>,
     page_budget: usize,
     thumbnail_budget: usize,
@@ -125,9 +127,13 @@ impl WindowShell {
             let ocr =
                 cx.new(|_| ocr::OcrJobs::new(&sidecars, state_dir.as_deref(), renderer.clone()));
             cx.observe(&ocr, |this: &mut Self, _, cx| {
+                #[cfg(windows)]
+                this.sync_ocr_tray(cx);
                 if this.close.is_some() {
                     this.advance_close(cx);
                 }
+                this.report(cx);
+                cx.notify();
             })
             .detach();
             cx.subscribe(&ocr, |this: &mut Self, _, change, cx| {
@@ -143,6 +149,8 @@ impl WindowShell {
                 next_id: 1,
                 renderer,
                 ocr,
+                #[cfg(windows)]
+                ocr_tray: None,
                 sidecars,
                 resources: Arc::new(WindowResources {
                     templates_dir: state_dir.clone(),
@@ -290,6 +298,11 @@ impl WindowShell {
         json["totalPageCacheBytes"] = serde_json::json!(sum("pageCacheBytes"));
         json["totalThumbnailCacheBytes"] = serde_json::json!(sum("thumbnailCacheBytes"));
         json["totalTextCacheBytes"] = serde_json::json!(sum("textCacheBytes"));
+        json["ocrBatch"] = self.ocr.read(cx).batch_diagnostics();
+        #[cfg(windows)]
+        {
+            json["ocrInTray"] = serde_json::json!(self.ocr_tray.is_some());
+        }
         json["totalCopyBufferBytes"] = serde_json::json!(sum("copyBufferBytes"));
         json["totalGpuImages"] = serde_json::json!(sum("gpuImages"));
         json["windowGpuReleases"] =
@@ -714,7 +727,7 @@ impl WindowShell {
                     return;
                 }
                 if let Some(batch) = &self.close
-                    && self.ocr.update(cx, |ocr, _| ocr.stop_tabs(&batch.ids))
+                    && self.ocr.update(cx, |ocr, cx| ocr.stop_tabs(&batch.ids, cx))
                 {
                     return;
                 }
@@ -883,6 +896,9 @@ enum MenuAction {
     Reopen,
     ClearSession,
     ClearOcr,
+    OcrBatch,
+    #[cfg(windows)]
+    HideOcrTray,
     Compare,
     ExitCompare,
     DuplicateView,
@@ -924,6 +940,8 @@ impl WindowShell {
         match action {
             Reopen => self.reopen_tab(cx),
             ClearSession => self.clear_session_history(cx),
+            #[cfg(windows)]
+            HideOcrTray => self.hide_to_ocr_tray(window, cx),
             ClearOcr => {
                 let reply = window.prompt(
                     gpui::PromptLevel::Warning,
@@ -985,6 +1003,7 @@ impl WindowShell {
                         Undo | Redo => s.history(matches!(action, Redo), cx),
                         Copy => s.copy_text(cx),
                         Find => s.show_search(window, cx),
+                        OcrBatch => s.start_ocr_batch(cx),
                         Select | Clear => {
                             if s.mode == ViewerMode::Organize {
                                 s.select_all_pages(matches!(action, Select), cx);
@@ -1047,6 +1066,10 @@ impl WindowShell {
         if matches!(action, ClearOcr) {
             return self.ocr.read(cx).can_clear();
         }
+        #[cfg(windows)]
+        if matches!(action, HideOcrTray) {
+            return self.ocr.read(cx).has_batch() && self.ocr_tray.is_none();
+        }
         if matches!(action, ExitCompare) {
             return self.split_view.is_some();
         }
@@ -1081,6 +1104,7 @@ impl WindowShell {
             Undo => content && s.workspace.as_ref().is_some_and(|w| w.can_undo()),
             Redo => content && s.workspace.as_ref().is_some_and(|w| w.can_redo()),
             Copy => s.text.selection.is_some(),
+            OcrBatch => content && s.navigation.count > 0 && !self.ocr.read(cx).has_batch(),
             Select | Clear => content && s.mode == ViewerMode::Organize,
             Save | Optimize | Split | Png => {
                 content
@@ -1104,6 +1128,9 @@ use tab_management::{TabDrag, TabDragLabel, tab_context_menu};
 #[path = "tab_recovery.rs"]
 mod tab_recovery;
 use tab_recovery::ClosedTab;
+#[cfg(windows)]
+#[path = "ocr_tray.rs"]
+mod ocr_tray;
 #[path = "session_restore.rs"]
 mod session_restore;
 #[path = "shared_views.rs"]
@@ -1310,6 +1337,9 @@ impl Render for WindowShell {
                     ("Buka ulang tab tertutup  Ctrl+Shift+T", Reopen),
                     ("Hapus riwayat sesi", ClearSession),
                     ("Hapus hasil OCR lokal", ClearOcr),
+                    ("OCR seluruh dokumen", OcrBatch),
+                    #[cfg(windows)]
+                    ("Sembunyikan ke tray", HideOcrTray),
                     ("Simpan sebagai…  Ctrl+Shift+S", Save),
                     ("Cetak PDF  Ctrl+P", Print),
                     ("Tutup tab  Ctrl+W", Close),

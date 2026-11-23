@@ -44,5 +44,26 @@ file SQLite 256 MiB. Entri yang paling lama ditulis dibersihkan lebih dulu.
 **Menu > Berkas > Hapus hasil OCR lokal** menghapus hasil lokal setelah
 konfirmasi. File PDF sumber tetap read-only.
 
-Urutan batch, tray, dan ekspor ada di
-[checklist implementasi OCR](plans/OCR_IMPLEMENTATION_PLAN.md).
+## Batch dan tray Windows
+
+Pilih **Menu > Berkas > OCR seluruh dokumen** untuk antrean hingga 1.024
+halaman. Origo melewati teks bawaan dan hasil valid, lalu memproses halaman
+scan satu per satu. Permintaan OCR halaman aktif didahulukan setelah giliran
+yang sedang berjalan. Pencarian ikut diperbarui selama batch berjalan.
+
+Progres menunjukkan halaman siap dicari, tanpa teks, gagal, dan tersisa.
+Estimasi muncul setelah lima halaman diproses. Jeda selesai setelah giliran
+yang sedang berjalan. Pembatalan menghentikan batch dan menyimpan hasil yang
+sudah selesai. Untuk halaman yang gagal, gunakan **Coba ulang halaman gagal**.
+Jika jendela ditutup saat batch berjalan, buka dokumen yang sama dan pilih
+**Lanjutkan OCR dokumen** dari panel pencarian, atau mulai batch melalui menu
+**Berkas**. PDF dengan sumber yang berubah perlu dibuka ulang.
+
+Di Windows, **Berkas > Sembunyikan ke tray** memindahkan jendela secara
+eksplisit ke area notifikasi. Arahkan pointer ke ikon Origo untuk melihat
+progres. Menu ikon menyediakan **Buka Origo**, **Jeda OCR** atau **Lanjutkan
+OCR**, dan **Keluar**. Keluar mengikuti konfirmasi perubahan dokumen bila ada.
+Minimize biasa juga membiarkan pekerjaan berjalan.
+
+Lihat [checklist implementasi OCR](plans/OCR_IMPLEMENTATION_PLAN.md) dan
+[hasil pengujian](testing.md).
