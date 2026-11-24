@@ -3,7 +3,10 @@ use pdf_application::{
     ExactPageRenderer, ExactRenderRequest, InspectedDocument, PageGeometry, PageRenderer,
     PdfInspector, RenderError, RenderRequest, RenderedPage, SourceFingerprint,
 };
-use pdf_domain::annotation::{Annotation, MAX_PAGE_ANNOTATIONS, MAX_SIGNATURES, PREFIX};
+use pdf_domain::annotation::{
+    Annotation, AnnotationKind, MAX_PAGE_ANNOTATIONS, MAX_SIGNATURE_PLACEMENTS, MAX_SIGNATURES,
+    PREFIX, ParsedName, SignatureImage,
+};
 use pdfium_render::prelude::*;
 use std::{
     path::{Path, PathBuf},
@@ -578,39 +581,56 @@ fn render(
     })
 }
 
-fn read_annotation(
+fn annotation_kind(annotation_type: PdfPageAnnotationType) -> Option<AnnotationKind> {
+    match annotation_type {
+        PdfPageAnnotationType::Ink => Some(AnnotationKind::Ink),
+        PdfPageAnnotationType::Highlight => Some(AnnotationKind::Highlight),
+        PdfPageAnnotationType::Stamp => Some(AnnotationKind::Stamp),
+        PdfPageAnnotationType::FreeText => Some(AnnotationKind::FreeText),
+        _ => None,
+    }
+}
+
+fn read_parsed_annotation(
     annotation_type: PdfPageAnnotationType,
     name: Option<String>,
-    signatures_left: &mut usize,
-) -> Result<Option<Annotation>, RenderError> {
+    full_signatures_left: &mut usize,
+    total_stamps_left: &mut usize,
+) -> Result<Option<ParsedName>, RenderError> {
+    let Some(kind) = annotation_kind(annotation_type) else {
+        return Ok(None);
+    };
     let Some(name) = name.filter(|name| name.starts_with(PREFIX)) else {
         return Ok(None);
     };
-    let stamp = annotation_type == PdfPageAnnotationType::Stamp;
-    if stamp {
-        *signatures_left = signatures_left
+    if kind == AnnotationKind::Stamp {
+        *total_stamps_left = total_stamps_left
             .checked_sub(1)
             .ok_or(RenderError::ResourceLimit)?;
     }
-    Ok(Annotation::from_typed_name(&name, stamp))
+    let parsed = Annotation::parse_with_kind(&name, Some(kind));
+    if matches!(&parsed, Some(ParsedName::Complete(a)) if a.signature.is_some()) {
+        *full_signatures_left = full_signatures_left
+            .checked_sub(1)
+            .ok_or(RenderError::ResourceLimit)?;
+    }
+    Ok(parsed)
 }
 
-fn read_annotations(
+fn read_page_parsed(
     page: &PdfPage<'_>,
-    signatures_left: &mut usize,
-) -> Result<Vec<Annotation>, RenderError> {
+    full_signatures_left: &mut usize,
+    total_stamps_left: &mut usize,
+) -> Result<Vec<ParsedName>, RenderError> {
     let mut result = Vec::new();
     for a in page.annotations().iter() {
-        if !matches!(
+        if let Some(parsed) = read_parsed_annotation(
             a.annotation_type(),
-            PdfPageAnnotationType::Ink
-                | PdfPageAnnotationType::Highlight
-                | PdfPageAnnotationType::Stamp
-        ) {
-            continue;
-        }
-        if let Some(a) = read_annotation(a.annotation_type(), a.name(), signatures_left)? {
-            result.push(a);
+            a.name(),
+            full_signatures_left,
+            total_stamps_left,
+        )? {
+            result.push(parsed);
         }
         if result.len() > MAX_PAGE_ANNOTATIONS {
             return Err(RenderError::ResourceLimit);
@@ -618,6 +638,7 @@ fn read_annotations(
     }
     Ok(result)
 }
+
 fn with_annotations(
     document: &PdfDocument<'_>,
     index: u16,
@@ -634,15 +655,16 @@ fn with_annotations(
         .map_err(|_| RenderError::InvalidPage)?;
     let mut hidden = Vec::new();
     let mut hide_error = None;
-    let mut signatures_left = MAX_SIGNATURES;
+    let mut full_signatures_left = MAX_SIGNATURES;
+    let mut total_stamps_left = MAX_SIGNATURE_PLACEMENTS;
     for mut a in page.annotations().iter() {
-        if matches!(
-            a.annotation_type(),
-            PdfPageAnnotationType::Ink
-                | PdfPageAnnotationType::Highlight
-                | PdfPageAnnotationType::Stamp
-        ) {
-            match read_annotation(a.annotation_type(), a.name(), &mut signatures_left) {
+        if annotation_kind(a.annotation_type()).is_some() {
+            match read_parsed_annotation(
+                a.annotation_type(),
+                a.name(),
+                &mut full_signatures_left,
+                &mut total_stamps_left,
+            ) {
                 Ok(Some(_)) => {
                     let previous = a.is_hidden();
                     let failed = a.set_is_hidden(true).is_err();
@@ -693,14 +715,41 @@ fn with_annotations(
 fn read_document_annotations(
     document: &PdfDocument<'_>,
 ) -> Result<Vec<Vec<Annotation>>, RenderError> {
-    let mut result = Vec::new();
-    let mut points = 0;
-    let mut signatures_left = MAX_SIGNATURES;
+    let mut parsed_pages = Vec::new();
+    let mut full_signatures: std::collections::HashMap<u64, Arc<SignatureImage>> =
+        std::collections::HashMap::new();
+    let mut full_signatures_left = MAX_SIGNATURES;
+    let mut total_stamps_left = MAX_SIGNATURE_PLACEMENTS;
     for page in document.pages().iter() {
-        let annotations = read_annotations(&page, &mut signatures_left)?;
-        points += annotations.iter().map(|a| a.points.len()).sum::<usize>();
-        if points > 65536 {
-            return Err(RenderError::ResourceLimit);
+        let parsed = read_page_parsed(&page, &mut full_signatures_left, &mut total_stamps_left)?;
+        for entry in &parsed {
+            if let ParsedName::Complete(a) = entry
+                && let Some(image) = &a.signature
+            {
+                full_signatures.insert(a.id, Arc::clone(image));
+            }
+        }
+        parsed_pages.push(parsed);
+    }
+    let mut result = Vec::with_capacity(parsed_pages.len());
+    let mut points = 0usize;
+    for page in parsed_pages {
+        let mut annotations = Vec::with_capacity(page.len());
+        for entry in page {
+            let resolved = match entry {
+                ParsedName::Complete(a) => Some(a),
+                ParsedName::SignatureRef { ref_id, .. } => full_signatures
+                    .get(&ref_id)
+                    .cloned()
+                    .and_then(|image| entry.resolve_signature(image)),
+            };
+            if let Some(a) = resolved {
+                points += a.points.len();
+                if points > 65536 {
+                    return Err(RenderError::ResourceLimit);
+                }
+                annotations.push(a);
+            }
         }
         result.push(annotations);
     }

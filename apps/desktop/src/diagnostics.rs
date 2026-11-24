@@ -31,6 +31,9 @@ impl DocumentSession {
             "signatureStrokes": self.annotation.signature.strokes.len(),
             "signatureAsset": self.annotation.signature.asset.is_some(),
             "signatureError": self.annotation.signature.error.is_some(),
+            "textAnnotationPanel": self.annotation.text.open,
+            "textAnnotationPlacing": self.annotation.text.placing.is_some(),
+            "applyPagesPanel": self.annotation.apply_pages.open,
             "annotationPanel": self.annotation.open,
             "annotationPopup": self.annotation.popup_open,
             "annotationTextOnly": self.annotation.text_only,
@@ -86,6 +89,13 @@ impl DocumentSession {
                     .iter()
                     .flat_map(|p| w.annotations(p.id))
                     .filter(|a| a.signature.is_some())
+                    .count()
+            );
+            result["textAnnotationCount"] = json!(
+                w.pages()
+                    .iter()
+                    .flat_map(|p| w.annotations(p.id))
+                    .filter(|a| a.text.is_some())
                     .count()
             );
             result["annotationCount"] = json!(

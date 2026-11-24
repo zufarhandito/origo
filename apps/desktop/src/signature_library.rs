@@ -81,6 +81,7 @@ pub(super) fn save(dir: &Path, entries: &[Entry]) -> anyhow::Result<()> {
             points: vec![[0., 0.], [1., 1.]],
             rectangles: false,
             signature: Some(e.asset.clone()),
+            text: None,
         };
         values.push(serde_json::json!({"label":e.label,"kind":e.kind,"asset":annotation.name()}));
     }

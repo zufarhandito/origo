@@ -51,8 +51,10 @@ tanda tangan untuk memperoleh resolusi baru pada aset yang pernah disimpan.
 Input maksimal 8 MiB, dimensi maksimal 8192 per sisi, budget decode 64 MiB. Hanya
 PNG/JPEG diterima; file rusak dan gambar sepenuhnya transparan ditolak. Pad maksimal
 128 stroke x 1024 titik; aset raster dibagi dengan Arc pada snapshot/history.
-Maksimal delapan tanda tangan dalam model Workspace (termasuk halaman dihapus yang
-masih dipertahankan untuk Undo) dan delapan saat inspeksi satu sumber.
+Maksimal delapan aset gambar unik dalam model Workspace (termasuk halaman dihapus yang
+masih dipertahankan untuk Undo) dan delapan aset unik saat inspeksi satu sumber, dengan
+total hingga 1.024 penempatan tanda tangan, inisial, atau stempel per dokumen. Salinan
+aset yang sama berbagi memori (`Arc`) di aplikasi dan berbagi XObject gambar di PDF.
 
 Tidak ada upload ke layanan eksternal. Pustaka template lokal tersedia secara opt-in. Draft hanya bertahan selama view
 masih terbuka; tanda tangan yang ditempatkan tersimpan di PDF hasil ekspor. Metadata
@@ -74,16 +76,21 @@ ke batas aset. Pratinjau penempatan dan PDF memakai raster yang dihasilkan.
 Tanda tangan disimpan sebagai anotasi PDF **Stamp** pasif, dengan appearance Form,
 image RGB dan soft mask alpha. Kedua image stream meminta interpolasi dari
 viewer PDF. Viewer Origo dan ekspor PNG memperhitungkan cakupan piksel dan
-transparansi saat menskalakan aset. Metadata model Origo ikut tersimpan di NM.
-Konten halaman asli tetap utuh. Save As/Extract/Split/Optimize menangkap objek
-bersama page plan. Origo tetap membaca anotasi dan template lama. Untuk mengedit
-tanda tangan dengan metadata baru, gunakan Origo versi ini atau lebih baru.
-Policy ekspor v6 menerima subset Stamp milik aplikasi dengan validasi terbatas
-dan menolak key aktif atau subtype palsu.
+transparansi saat menskalakan aset. Metadata model Origo ikut tersimpan di NM;
+salinan aset yang sama pada banyak halaman memakai referensi `ref:<id>` dan berbagi
+XObject `/Image` + `/SMask` yang sama. Anotasi teks/tanggal/nama disimpan sebagai
+anotasi PDF **FreeText** pasif dengan `/Contents`, `/DA`, dan appearance stream `/AP /N`,
+tanpa membuat field `/AcroForm` atau aksi interaktif. Konten halaman asli tetap utuh.
+Save As/Extract/Split/Optimize menangkap objek bersama page plan dan menjaga setiap
+file hasil Split/Extract tetap mandiri. Origo tetap membaca anotasi dan template lama.
+Untuk mengedit tanda tangan atau anotasi teks dengan metadata baru, gunakan Origo
+versi ini atau lebih baru. Policy ekspor v6 menerima subset Stamp dan FreeText milik
+aplikasi dengan validasi terbatas dan menolak key aktif atau subtype palsu.
 
 Ini tanda tangan visual, tanpa sertifikat kriptografis, validasi identitas atau audit
 trail. Dukungan PDF yang sudah ditandatangani secara digital mengikuti pembatasan
-lama. Edit Stamp pihak ketiga, SVG, rotasi objek sendiri, pressure sensitivity belum tersedia. Rotasi halaman ikut memutar tanda tangan bersama isi halaman.
+lama. Edit Stamp/FreeText pihak ketiga, SVG, pressure sensitivity belum tersedia.
+Rotasi halaman ikut memutar tanda tangan dan anotasi teks bersama isi halaman.
 
 Lihat [testing](testing.md) untuk hasil aktual dan batas interoperabilitas.
 
@@ -144,11 +151,12 @@ template mempertahankan objek yang sudah ditempatkan pada PDF. Pustaka memakai
 penulisan atomik di background, dengan batas 22 MiB. Jika file rusak, Origo
 menampilkan pesan kesalahan dan mempertahankan file lama.
 
-Pilih objek tanda tangan/stempel: Duplikat tanda tangan atau Ctrl+D membuat salinan
-bergeser sedikit sebagai satu langkah Undo. Alt+panah menggeser objek terpilih
+Pilih objek tanda tangan, stempel, atau teks: Duplikat objek atau Ctrl+D membuat
+salinan bergeser sedikit sebagai satu langkah Undo. Alt+panah menggeser objek terpilih
 sedikit per langkah, dibatasi ke halaman. Shortcut berlaku saat canvas fokus,
-sehingga mengetik pada input tidak menggeser objek. Batas delapan objek tetap.
-Rotasi objek dan terapkan ke banyak halaman belum termasuk checkpoint ini.
+sehingga mengetik pada input tidak menggeser objek. Batas delapan aset gambar unik
+dan hingga 1.024 penempatan, rotasi/transformasi objek, anotasi teks pasif, serta
+terapkan ke banyak halaman kini telah tersedia (lihat bagian di bawah).
 
 ## Gambar dari HP lewat QR LAN (tahap 5)
 
@@ -170,3 +178,37 @@ Windows mungkin perlu mengizinkan Origo pada jaringan privat. Guest Wi-Fi dengan
 client isolation, VPN/rute NIC lain atau jaringan tanpa rute IPv4 dapat menghalangi
 koneksi; pemilihan interface manual/HTTPS belum tersedia. Tidak ada kolaborasi,
 request email, validasi identitas atau sertifikat digital dalam fitur ini.
+
+## Anotasi teks, tanggal, dan nama (pasif)
+
+Di toolbar Anotasi, tombol **Teks** membuka panel popover dengan tiga preset satu baris:
+**Teks** (teks bebas), **Tanggal** (otomatis mengisi tanggal hari ini dalam format Indonesia,
+misalnya `24 November 2026`), dan **Nama**. Ukuran huruf dapat diatur `10`–`24 pt` dengan
+pilihan warna **Hitam**, **Biru**, atau **Merah**, dilengkapi pratinjau langsung memakai font
+IBM Plex Sans yang dibundel bersama lisensi OFL di `crates/application/assets/fonts/`.
+
+Klik **Tempatkan Teks** untuk masuk ke mode penempatan dengan pratinjau tembus pandang dan
+kursor silang, lalu klik (atau geser) pada halaman tujuan. Setelah ditempatkan, objek teks
+dapat dipilih, digeser, diubah ukurannya secara proporsional lewat pegangan sudut,
+diduplikasi (`Ctrl+D`), digeser halus (`Alt+Panah`), dihapus (`Delete`), atau diedit kembali
+melalui tombol **Edit teks** di toolbar (mengubah isi, ukuran, dan warna dalam satu langkah
+Undo). Semua objek teks disimpan sebagai PDF `/FreeText` pasif (tanpa `/AcroForm`) dan tetap
+dapat diedit ulang setelah **Simpan sebagai** dan dibuka kembali di Origo.
+
+## Terapkan ke banyak halaman dan deduplikasi
+
+Saat sebuah tanda tangan, inisial, stempel, atau anotasi teks terpilih, tombol **Terapkan ke halaman**
+di toolbar Anotasi membuka panel untuk menyalin objek tersebut ke posisi relatif yang sama pada
+banyak halaman sekaligus:
+
+- **Semua halaman**: seluruh halaman lain selain halaman asal.
+- **Halaman terpilih**: halaman yang sedang dipilih di panel Thumbnail.
+- **Rentang halaman**: ekspresi rentang 1-berbasis koma, misalnya `1-3, 5` (divalidasi terhadap
+  jumlah halaman aktif).
+
+Seluruh penempatan diterapkan dalam **1 langkah Undo/Redo atomik** (`Command::AnnotateMany`).
+Untuk tanda tangan/inisial/stempel, salinan pada halaman lain berbagi aset raster yang sama
+(`Arc<SignatureImage>`) di RAM serta berbagi XObject `/Image` dan `/SMask` yang sama di PDF
+melalui referensi `ref:<id>` pada `/NM`, sehingga ukuran file tidak membengkak meski diterapkan
+ke puluhan halaman. Saat diekspor melalui **Pisahkan (Split)** atau **Ekstrak**, aset referensi
+di-re-root otomatis agar setiap file keluaran berdiri sendiri.

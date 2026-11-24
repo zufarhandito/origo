@@ -25,6 +25,8 @@ impl DocumentSession {
                 .load(std::sync::atomic::Ordering::SeqCst)
                 == 0
             && !self.annotation.signature.open
+            && !self.annotation.text.open
+            && !self.annotation.apply_pages.open
             && !self.annotation.popup_open
             && !self
                 .resources
@@ -346,7 +348,7 @@ impl DocumentSession {
                     workspace
                         .annotations(page_id)
                         .iter()
-                        .filter(|a| a.signature.is_some())
+                        .filter(|a| a.is_box_object())
                         .flat_map(|a| {
                             [(false, move_cursor), (true, resize_cursor)].map(|(resize, cursor)| {
                                 let [[left, right], [top, bottom]] =

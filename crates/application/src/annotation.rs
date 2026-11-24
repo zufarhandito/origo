@@ -1,5 +1,219 @@
-//! Raster projection shared by the viewer and PNG export.
-use pdf_domain::annotation::{Annotation, SignatureImage, rotate};
+//! Raster projection shared by the viewer, PNG export, and PDF appearance streams.
+use fontdue::{
+    Font, FontSettings,
+    layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle},
+};
+use pdf_domain::annotation::{
+    Annotation, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, SignatureImage, rotate,
+};
+use std::sync::OnceLock;
+
+static TEXT_FONT: OnceLock<Result<Font, String>> = OnceLock::new();
+const TEXT_FONT_BYTES: &[u8] = include_bytes!("../assets/fonts/IBMPlexSans-Regular.ttf");
+
+fn text_font() -> Result<&'static Font, String> {
+    TEXT_FONT
+        .get_or_init(|| {
+            Font::from_bytes(TEXT_FONT_BYTES, FontSettings::default()).map_err(str::to_owned)
+        })
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
+/// Validates single-line passive text content and verifies bundled font glyph coverage.
+pub fn validate_text(content: &str) -> Result<(), String> {
+    let trimmed = content.trim();
+    if trimmed.is_empty()
+        || content.chars().count() > MAX_TEXT_CHARS
+        || content.chars().any(char::is_control)
+    {
+        return Err(format!(
+            "Isi teks 1-{MAX_TEXT_CHARS} karakter dalam satu baris."
+        ));
+    }
+    let font = text_font()?;
+    if content
+        .chars()
+        .any(|c| !c.is_whitespace() && font.lookup_glyph_index(c) == 0)
+    {
+        return Err(
+            "Sebagian karakter belum didukung font teks lokal. Gunakan huruf Latin, angka, atau tanda baca umum.".into(),
+        );
+    }
+    Ok(())
+}
+
+fn layout_text(font: &Font, content: &str, px_size: f32) -> (Layout, f32, f32, f32, f32) {
+    let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
+    layout.reset(&LayoutSettings::default());
+    layout.append(&[font], &TextStyle::new(content, px_size, 0));
+    let line_height = font
+        .horizontal_line_metrics(px_size)
+        .map(|m| m.new_line_size)
+        .unwrap_or(px_size * 1.25)
+        .max(px_size);
+    let glyphs = layout.glyphs();
+    let left = glyphs.iter().map(|g| g.x).fold(0.0_f32, f32::min);
+    let top = glyphs.iter().map(|g| g.y).fold(0.0_f32, f32::min);
+    let mut right = glyphs
+        .iter()
+        .map(|g| g.x + g.width as f32)
+        .fold(0.0_f32, f32::max);
+    if let Some(last) = glyphs.last() {
+        let advance = font
+            .metrics_indexed(last.key.glyph_index, px_size)
+            .advance_width;
+        right = right.max(last.x + advance);
+    }
+    let bottom = glyphs
+        .iter()
+        .map(|g| g.y + g.height as f32)
+        .fold(line_height, f32::max);
+    (layout, left, top, right, bottom)
+}
+
+/// Measures single-line text bounds in PDF points `[width, height]`.
+pub fn measure_text_points(content: &str, font_size: f32) -> Option<[f32; 2]> {
+    if content.trim().is_empty()
+        || content.chars().count() > MAX_TEXT_CHARS
+        || content.chars().any(char::is_control)
+        || !font_size.is_finite()
+        || !(MIN_TEXT_SIZE..=MAX_TEXT_SIZE).contains(&font_size)
+    {
+        return None;
+    }
+    let font = text_font().ok()?;
+    let (_, left, top, right, bottom) = layout_text(font, content, font_size);
+    let pad = (font_size * 0.15).max(1.5);
+    let width = (right - left + pad * 2.).max(font_size * 0.6);
+    let height = (bottom - top + pad * 2.).max(font_size * 1.2);
+    Some([width, height])
+}
+
+/// Deterministically rasterizes a passive text annotation to a bounded RGBA image.
+pub fn rasterize_text(content: &str, font_size: f32, color: [u8; 3]) -> Option<SignatureImage> {
+    let [pts_w, pts_h] = measure_text_points(content, font_size)?;
+    let font = text_font().ok()?;
+    let max_side = SignatureImage::MAX_SIDE as f32;
+    let max_pixels = SignatureImage::MAX_PIXELS as f32;
+    let scale = 3.0_f32
+        .min((max_side - 2.) / pts_w)
+        .min((max_side - 2.) / pts_h)
+        .min(((max_pixels * 0.95) / (pts_w * pts_h)).sqrt())
+        .max(0.5);
+    let px_size = font_size * scale;
+    let pad = (font_size * 0.15).max(1.5) * scale;
+    let (layout, left, top, right, bottom) = layout_text(font, content, px_size);
+    let width = ((right - left + pad * 2.).ceil() as u32).clamp(1, SignatureImage::MAX_SIDE);
+    let height = ((bottom - top + pad * 2.).ceil() as u32).clamp(1, SignatureImage::MAX_SIDE);
+    if u64::from(width) * u64::from(height) > u64::from(SignatureImage::MAX_PIXELS) {
+        return None;
+    }
+    let [r, g, b] = color;
+    let mut rgba = vec![0u8; width as usize * height as usize * 4];
+    for pixel in rgba.as_chunks_mut::<4>().0.iter_mut() {
+        pixel[0] = r;
+        pixel[1] = g;
+        pixel[2] = b;
+    }
+    let offset_x = pad - left;
+    let offset_y = pad - top;
+    for glyph in layout.glyphs() {
+        if glyph.width == 0 || glyph.height == 0 {
+            continue;
+        }
+        let (_, mask) = font.rasterize_config(glyph.key);
+        let gx = (glyph.x + offset_x).round() as i32;
+        let gy = (glyph.y + offset_y).round() as i32;
+        for y in 0..glyph.height {
+            let py = gy + y as i32;
+            if py < 0 || py >= height as i32 {
+                continue;
+            }
+            for x in 0..glyph.width {
+                let px = gx + x as i32;
+                if px < 0 || px >= width as i32 {
+                    continue;
+                }
+                let alpha = mask[y * glyph.width + x];
+                if alpha == 0 {
+                    continue;
+                }
+                let index = (py as usize * width as usize + px as usize) * 4 + 3;
+                let prev = u16::from(rgba[index]);
+                let combined = u16::from(alpha) + prev * (255 - u16::from(alpha)) / 255;
+                rgba[index] = combined.min(255) as u8;
+            }
+        }
+    }
+    let image = SignatureImage {
+        width,
+        height,
+        rgba,
+    };
+    image.valid().then_some(image)
+}
+
+/// Parses 1-based page target expressions like `"1-3, 5, 8-10"` into sorted unique 0-based indices.
+pub fn parse_page_targets(
+    spec: &str,
+    page_count: usize,
+    exclude_index: Option<usize>,
+) -> Result<Vec<usize>, String> {
+    if page_count == 0 {
+        return Err("Dokumen tidak memiliki halaman.".into());
+    }
+    let trimmed = spec.trim();
+    if trimmed.is_empty() || trimmed.len() > 2048 {
+        return Err(format!(
+            "Masukkan rentang halaman antara 1 dan {page_count}, misalnya 1-3, 5."
+        ));
+    }
+    let mut selected = vec![false; page_count];
+    for part in trimmed.split(',') {
+        let token = part.trim();
+        if token.is_empty() {
+            return Err("Format rentang tidak valid. Contoh: 1-3, 5, 8.".into());
+        }
+        let mut bounds = token.split('-');
+        let parse_page = |s: &str| -> Result<usize, String> {
+            let s = s.trim();
+            if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
+                return Err("Gunakan angka dan tanda hubung saja, misalnya 2-5, 8.".into());
+            }
+            let number = s
+                .parse::<usize>()
+                .map_err(|_| "Nomor halaman di luar batas dokumen.".to_owned())?;
+            if number == 0 || number > page_count {
+                return Err(format!("Nomor halaman harus antara 1 dan {page_count}."));
+            }
+            Ok(number)
+        };
+        let start = parse_page(bounds.next().unwrap_or_default())?;
+        let end = match bounds.next() {
+            Some(value) => parse_page(value)?,
+            None => start,
+        };
+        if bounds.next().is_some() || end < start {
+            return Err(format!(
+                "Rentang '{token}' tidak valid. Gunakan urutan naik seperti 2-5."
+            ));
+        }
+        for page in start..=end {
+            selected[page - 1] = true;
+        }
+    }
+    if let Some(exclude) = exclude_index
+        && exclude < page_count
+    {
+        selected[exclude] = false;
+    }
+    Ok(selected
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, on)| on.then_some(index))
+        .collect())
+}
 
 pub fn composite(
     rgba: &mut [u8],
@@ -18,7 +232,11 @@ pub fn composite(
     }
     let mut mask = vec![false; w * h];
     for a in annotations.iter().filter(|a| a.valid()) {
-        if let Some(image) = &a.signature {
+        let text_bitmap = a
+            .text
+            .as_ref()
+            .and_then(|t| rasterize_text(&t.content, t.font_size, a.color));
+        if let Some(image) = a.signature.as_deref().or(text_bitmap.as_ref()) {
             let corners = [rotate(a.points[0], turns), rotate(a.points[1], turns)];
             let x0 = (corners[0][0].min(corners[1][0]) * width as f32).floor() as usize;
             let x1 = (corners[0][0].max(corners[1][0]) * width as f32).ceil() as usize;
@@ -193,6 +411,7 @@ mod tests {
                 height: 1,
                 rgba: [0, 0, 255, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 255, 0].to_vec(),
             })),
+            text: None,
         };
         let mut narrow = [255; 8];
         composite(&mut narrow, 1, 2, 1., 1, std::slice::from_ref(&signature));
@@ -213,6 +432,7 @@ mod tests {
             points: vec![[0.1, 0.5], [0.9, 0.5], [0.1, 0.5]],
             rectangles: false,
             signature: None,
+            text: None,
         };
         let mut raster = vec![255; 40 * 40 * 4];
         let offset = (20 * 40 + 20) * 4;
@@ -223,5 +443,82 @@ mod tests {
             &raster[(20 * 40 + 10) * 4..(20 * 40 + 10) * 4 + 4],
             &[255, 232, 127, 255]
         );
+    }
+
+    #[test]
+    fn text_rasterization_and_composite_are_deterministic_and_bounded() {
+        assert!(validate_text("24 November 2026").is_ok());
+        assert!(validate_text("   ").is_err());
+        assert!(validate_text("baris 1\nbaris 2").is_err());
+        assert!(validate_text("\u{7b7e}\u{540d}").is_err());
+
+        let Some([w, h]) = measure_text_points("Zufar Handito", 14.) else {
+            panic!("text should measure");
+        };
+        assert!(w > 40. && h >= 14.);
+
+        let Some(image) = rasterize_text("Zufar Handito", 14., [30, 80, 180]) else {
+            panic!("text should rasterize");
+        };
+        assert!(image.valid());
+        assert!(image.rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 200));
+        assert!(
+            image
+                .rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|p| p[..3] == [30, 80, 180])
+        );
+
+        let long_text = "A".repeat(MAX_TEXT_CHARS);
+        let Some(long_image) = rasterize_text(&long_text, MAX_TEXT_SIZE, [25, 25, 25]) else {
+            panic!("max length text must clamp within bounds");
+        };
+        assert!(long_image.valid());
+
+        let text_annotation = Annotation {
+            id: 5,
+            highlight: false,
+            color: [30, 80, 180],
+            width: 1.,
+            points: vec![[0.1, 0.2], [0.7, 0.4]],
+            rectangles: false,
+            signature: None,
+            text: Some(pdf_domain::annotation::TextAnnotation {
+                content: "24 November 2026".into(),
+                font_size: 14.,
+            }),
+        };
+        for turns in 0..4 {
+            let mut canvas = vec![255; 120 * 120 * 4];
+            composite(
+                &mut canvas,
+                120,
+                120,
+                600.,
+                turns,
+                std::slice::from_ref(&text_annotation),
+            );
+            assert!(
+                canvas.as_chunks::<4>().0.iter().any(|p| p[0] < 240),
+                "text must paint visible pixels at rotation {turns}"
+            );
+        }
+    }
+
+    #[test]
+    fn page_target_parser_handles_ranges_dedup_exclusion_and_errors() {
+        assert_eq!(
+            parse_page_targets("1-3, 5, 2-4", 6, Some(0)),
+            Ok(vec![1, 2, 3, 4])
+        );
+        assert_eq!(parse_page_targets("4, 2", 5, None), Ok(vec![1, 3]));
+        assert!(parse_page_targets("", 5, None).is_err());
+        assert!(parse_page_targets("0-2", 5, None).is_err());
+        assert!(parse_page_targets("1-6", 5, None).is_err());
+        assert!(parse_page_targets("4-2", 5, None).is_err());
+        assert!(parse_page_targets("1, abc", 5, None).is_err());
+        assert!(parse_page_targets("1,,2", 5, None).is_err());
     }
 }

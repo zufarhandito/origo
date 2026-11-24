@@ -21,6 +21,8 @@ pub(super) enum Tool {
 pub(super) struct AnnotationState {
     pub open: bool,
     pub signature: crate::signatures::SignatureState,
+    pub text: crate::text_annotations::TextAnnotationState,
+    pub apply_pages: crate::text_annotations::ApplyPagesState,
     pub tool: Tool,
     pub color: usize,
     pub pen_color: usize,
@@ -79,6 +81,10 @@ impl DocumentSession {
         self.annotation.signature.gallery.reset_selection();
         self.annotation.signature.open = false;
         self.annotation.signature.drawing = false;
+        self.annotation.text.open = false;
+        self.annotation.text.editing = None;
+        self.annotation.text.error = None;
+        self.annotation.apply_pages.open = false;
         self.cancel_signature_placement(cx);
     }
 
@@ -228,24 +234,62 @@ impl DocumentSession {
             );
         }
         if self.annotation.open {
-            bar = bar.child(self.signature_button(cx));
-            if self.annotation.selected.is_some_and(|(page, id)| {
-                self.workspace.as_ref().is_some_and(|w| {
+            use gpui_kit::assets::IconName;
+            bar = bar
+                .child(self.signature_button(cx))
+                .child(self.text_annotation_button(cx));
+            let selected_kind = self.annotation.selected.and_then(|(page, id)| {
+                self.workspace.as_ref().and_then(|w| {
                     w.annotations(page)
                         .iter()
-                        .any(|a| a.id == id && a.signature.is_some())
+                        .find(|a| a.id == id)
+                        .map(|a| (a.signature.is_some(), a.text.is_some()))
                 })
-            }) {
-                bar = bar.child(self.signature_transform_menu(cx)).child(
-                    Button::new("duplicate-signature")
-                        .ghost()
-                        .label("Duplikat tanda tangan")
-                        .tooltip("Duplikat: Ctrl+D. Geser: Alt+panah.")
-                        .on_click(cx.listener(|s, _, window, cx| {
-                            s.change_selected_signature(true, [0.02, 0.02], cx);
-                            s.focus.focus(window, cx);
-                        })),
-                )
+            });
+            match selected_kind {
+                Some((true, _)) => {
+                    bar = bar
+                        .child(self.signature_transform_menu(cx))
+                        .child(
+                            Button::new("duplicate-signature")
+                                .ghost()
+                                .label("Duplikat tanda tangan")
+                                .tooltip("Duplikat: Ctrl+D. Geser: Alt+panah.")
+                                .on_click(cx.listener(|s, _, window, cx| {
+                                    s.change_selected_signature(true, [0.02, 0.02], cx);
+                                    s.focus.focus(window, cx);
+                                })),
+                        )
+                        .child(self.apply_pages_button(cx));
+                }
+                Some((_, true)) => {
+                    bar = bar
+                        .child(
+                            Button::new("edit-text-annotation")
+                                .ghost()
+                                .icon(IconName::Pencil)
+                                .label("Edit teks")
+                                .tooltip("Ubah isi, ukuran, atau warna teks")
+                                .disabled(self.edits_locked() || self.opening)
+                                .on_click(cx.listener(|s, _, window, cx| {
+                                    if let Some(selected) = s.annotation.selected {
+                                        s.open_text_annotation_panel(Some(selected), window, cx);
+                                    }
+                                })),
+                        )
+                        .child(
+                            Button::new("duplicate-text-annotation")
+                                .ghost()
+                                .label("Duplikat teks")
+                                .tooltip("Duplikat: Ctrl+D. Geser: Alt+panah.")
+                                .on_click(cx.listener(|s, _, window, cx| {
+                                    s.change_selected_signature(true, [0.02, 0.02], cx);
+                                    s.focus.focus(window, cx);
+                                })),
+                        )
+                        .child(self.apply_pages_button(cx));
+                }
+                _ => {}
             }
         }
         bar.into_any_element()
@@ -519,6 +563,7 @@ impl DocumentSession {
                     points: vec![point],
                     rectangles: false,
                     signature: None,
+                    text: None,
                 },
             ));
             self.annotation.selected = None;
@@ -539,7 +584,9 @@ impl DocumentSession {
             self.annotation.signature.drawing = false;
         }
         let gesture = self.annotation.signature.gesture.take();
-        if !self.annotation.signature.placing && self.annotation.signature.placement_ghost.is_some()
+        if !self.annotation.signature.placing
+            && self.annotation.text.placing.is_none()
+            && self.annotation.signature.placement_ghost.is_some()
         {
             self.cancel_signature_placement(cx);
             cx.notify();
@@ -604,6 +651,7 @@ impl DocumentSession {
                         points,
                         rectangles: true,
                         signature: None,
+                        text: None,
                     },
                 ));
             }
@@ -634,7 +682,7 @@ impl DocumentSession {
     }
 }
 fn hit(a: &Annotation, p: [f32; 2], tolerance: f32) -> bool {
-    if a.rectangles || a.signature.is_some() {
+    if a.rectangles || a.is_box_object() {
         return a.points.as_chunks::<2>().0.iter().any(|r| {
             p[0] >= r[0][0].min(r[1][0])
                 && p[0] <= r[0][0].max(r[1][0])
@@ -700,7 +748,7 @@ pub(super) fn paint_selection(
     let origin = bounds.origin + gpui::point(bounds.size.width * left, bounds.size.height * top);
     let width = bounds.size.width * (right - left);
     let height = bounds.size.height * (bottom - top);
-    if a.signature.is_some() {
+    if a.is_box_object() {
         let [x, y] = points[1];
         let corner = bounds.origin + gpui::point(bounds.size.width * x, bounds.size.height * y);
         window.paint_quad(gpui::fill(

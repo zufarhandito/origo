@@ -1,6 +1,5 @@
 //! Conservative structural preflight over QPDF inspection JSON v2.
 use pdf_application::export::{ExportError, PreflightReport};
-use pdf_domain::annotation::MAX_SIGNATURES;
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 mod bookmarks;
@@ -18,15 +17,15 @@ fn object<'a>(
 fn forbidden(
     v: &Value,
     source_copy: bool,
-    remaining_signatures: &mut usize,
+    budget: &mut crate::annotations::SignatureBudget,
 ) -> Result<(), ExportError> {
     match v {
         Value::Object(dict) => {
             if crate::annotations::owned_name(dict).is_some() {
-                crate::annotations::validate(dict, remaining_signatures)?;
+                crate::annotations::validate(dict, budget)?;
                 for (key, value) in dict {
                     if key != "/Type" {
-                        forbidden(value, source_copy, remaining_signatures)?;
+                        forbidden(value, source_copy, budget)?;
                     }
                 }
                 return Ok(());
@@ -89,12 +88,12 @@ fn forbidden(
                         "dokumen memiliki aksi atau tautan interaktif.",
                     ));
                 }
-                forbidden(value, source_copy, remaining_signatures)?;
+                forbidden(value, source_copy, budget)?;
             }
         }
         Value::Array(array) => {
             for value in array {
-                forbidden(value, source_copy, remaining_signatures)?;
+                forbidden(value, source_copy, budget)?;
             }
         }
         _ => {}
@@ -397,7 +396,7 @@ fn inspect(
     let (bookmarks_loss, checked_bookmarks) =
         bookmarks::inspect(catalog, objects, &tree_pages, outlines)?;
     let mut owned_pages = HashSet::new();
-    let mut remaining_signatures = MAX_SIGNATURES;
+    let mut signature_budget = crate::annotations::SignatureBudget::new();
     for page in &tree_pages {
         let dict = object(objects, &Value::String(page.clone()))?
             .as_object()
@@ -424,7 +423,7 @@ fn inspect(
                 // Inline dictionaries must be checked before removing /Annots.
                 if inline_list {
                     for v in list.iter().filter(|v| v.is_object()) {
-                        forbidden(v, allow_structure, &mut remaining_signatures)?;
+                        forbidden(v, allow_structure, &mut signature_budget)?;
                     }
                 }
                 owned_pages.insert(page.clone());
@@ -455,15 +454,12 @@ fn inspect(
                 .ok_or(ExportError::Inspection)?
                 .clone();
             page.remove("/Annots");
-            forbidden(
-                &Value::Object(page),
-                allow_structure,
-                &mut remaining_signatures,
-            )?;
+            forbidden(&Value::Object(page), allow_structure, &mut signature_budget)?;
         } else {
-            forbidden(value, allow_structure, &mut remaining_signatures)?;
+            forbidden(value, allow_structure, &mut signature_budget)?;
         }
     }
+    signature_budget.verify_refs()?;
     if let Some(info) = trailer.get("/Info")
         && !object(objects, info)?.is_object()
     {
@@ -496,12 +492,13 @@ fn inspect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pdf_domain::annotation::{Annotation, MAX_SIGNATURES, SignatureImage, TextAnnotation};
     fn json() -> Value {
         serde_json::json!({"version":2,"encrypt":{"encrypted":false},"acroform":{"hasacroform":false,"fields":[]},"outlines":[],"pages":[{"object":"3 0 R"}],"qpdf":[{"jsonversion":2},{"trailer":{"value":{"/Root":"1 0 R"}},"obj:1 0 R":{"value":{"/Type":"/Catalog","/Pages":"2 0 R"}},"obj:2 0 R":{"value":{"/Type":"/Pages","/Count":1,"/Kids":["3 0 R"]}},"obj:3 0 R":{"value":{"/Type":"/Page","/Parent":"2 0 R"}}}]})
     }
     #[test]
     fn annotation_marker_never_bypasses_inline_or_indirect_active_content() {
-        let a = pdf_domain::annotation::Annotation {
+        let a = Annotation {
             id: 1,
             highlight: false,
             color: [0, 0, 0],
@@ -509,6 +506,7 @@ mod tests {
             points: vec![[0.1, 0.2], [0.3, 0.4]],
             rectangles: false,
             signature: None,
+            text: None,
         };
         let annotation = serde_json::json!({"/Type":"/Annot","/Subtype":"/Ink","/NM":format!("u:{}",a.name()),"/Rect":[0,0,100,100],"/C":[0,0,0],"/CA":1,"/F":4,"/InkList":[[10,20,30,40]]});
         for indirect in [false, true] {
@@ -533,20 +531,19 @@ mod tests {
     }
     #[test]
     fn signature_stamp_rejects_active_keys_and_forged_subtype() {
-        let a = pdf_domain::annotation::Annotation {
+        let a = Annotation {
             id: 1,
             highlight: false,
             color: [0, 0, 0],
             width: 1.,
             points: vec![[0.1, 0.2], [0.3, 0.4]],
             rectangles: false,
-            signature: Some(std::sync::Arc::new(
-                pdf_domain::annotation::SignatureImage {
-                    width: 1,
-                    height: 1,
-                    rgba: vec![0, 0, 0, 255],
-                },
-            )),
+            signature: Some(std::sync::Arc::new(SignatureImage {
+                width: 1,
+                height: 1,
+                rgba: vec![0, 0, 0, 255],
+            })),
+            text: None,
         };
         let annotation = serde_json::json!({"/Type":"/Annot","/Subtype":"/Stamp","/NM":format!("u:{}",a.name()),"/Rect":[0,0,100,100],"/C":[0,0,0],"/CA":1,"/F":4});
         let mut v = json();
@@ -569,6 +566,164 @@ mod tests {
         assert!(inspect_source_copy(&active, 1).is_err());
         v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/Subtype"] = serde_json::json!("/Widget");
         assert!(inspect_json(&v, 1).is_err());
+    }
+    #[test]
+    fn free_text_annotation_accepts_passive_and_rejects_tampered_or_active() {
+        let a = Annotation {
+            id: 7,
+            highlight: false,
+            color: [0, 0, 0],
+            width: 1.,
+            points: vec![[0.1, 0.2], [0.4, 0.25]],
+            rectangles: false,
+            signature: None,
+            text: Some(TextAnnotation {
+                content: "24 November 2026".into(),
+                font_size: 12.,
+            }),
+        };
+        let annotation = serde_json::json!({
+            "/Type": "/Annot",
+            "/Subtype": "/FreeText",
+            "/NM": format!("u:{}", a.name()),
+            "/Rect": [0, 0, 120, 20],
+            "/C": [0, 0, 0],
+            "/CA": 1,
+            "/F": 4,
+            "/Contents": "u:24 November 2026",
+            "/DA": "u:/Helv 12.00 Tf 0.000 0.000 0.000 rg",
+        });
+        let mut v = json();
+        v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!([annotation]);
+        assert!(inspect_json(&v, 1).is_ok());
+        assert!(inspect_extract(&v, 1).is_ok());
+        assert!(inspect_source_copy(&v, 1).is_ok());
+
+        let mut bad_contents = v.clone();
+        bad_contents["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/Contents"] =
+            serde_json::json!("u:Different");
+        assert!(inspect_json(&bad_contents, 1).is_err());
+
+        let mut bad_da = v.clone();
+        bad_da["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/DA"] =
+            serde_json::json!("u:/Courier 12 Tf");
+        assert!(inspect_json(&bad_da, 1).is_err());
+
+        let mut active = v.clone();
+        active["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/A"] =
+            serde_json::json!({"/S": "/JavaScript", "/JS": "u:alert(1)"});
+        assert!(inspect_json(&active, 1).is_err());
+        assert!(inspect_source_copy(&active, 1).is_err());
+
+        let mut widget = v;
+        widget["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/Subtype"] =
+            serde_json::json!("/Widget");
+        assert!(inspect_json(&widget, 1).is_err());
+    }
+    #[test]
+    fn signature_refs_allow_many_placements_and_reject_dangling_refs() -> Result<(), ExportError> {
+        let image = std::sync::Arc::new(SignatureImage {
+            width: 2,
+            height: 2,
+            rgba: [0, 0, 0, 255].repeat(4),
+        });
+        let first = Annotation {
+            id: 1,
+            highlight: false,
+            color: [0, 0, 0],
+            width: 1.,
+            points: vec![[0.1, 0.2], [0.3, 0.4]],
+            rectangles: false,
+            signature: Some(image.clone()),
+            text: None,
+        };
+        let mut annots = vec![serde_json::json!({
+            "/Type": "/Annot",
+            "/Subtype": "/Stamp",
+            "/NM": format!("u:{}", first.name()),
+            "/Rect": [0, 0, 100, 100],
+            "/C": [0, 0, 0],
+            "/CA": 1,
+            "/F": 4,
+        })];
+        for id in 2..=13 {
+            let copy = Annotation {
+                id,
+                signature: Some(image.clone()),
+                ..first.clone()
+            };
+            let ref_name = copy
+                .name_with_signature_ref(1)
+                .ok_or(ExportError::Inspection)?;
+            annots.push(serde_json::json!({
+                "/Type": "/Annot",
+                "/Subtype": "/Stamp",
+                "/NM": format!("u:{ref_name}"),
+                "/Rect": [0, 0, 100, 100],
+                "/C": [0, 0, 0],
+                "/CA": 1,
+                "/F": 4,
+            }));
+        }
+        let mut v = json();
+        v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!(annots);
+        assert!(inspect_json(&v, 1).is_ok());
+
+        let dangling = Annotation {
+            id: 2,
+            signature: Some(image.clone()),
+            ..first.clone()
+        };
+        let dangling_name = dangling
+            .name_with_signature_ref(99)
+            .ok_or(ExportError::Inspection)?;
+        let mut bad = json();
+        bad["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!([{
+            "/Type": "/Annot",
+            "/Subtype": "/Stamp",
+            "/NM": format!("u:{dangling_name}"),
+            "/Rect": [0, 0, 100, 100],
+            "/C": [0, 0, 0],
+            "/CA": 1,
+            "/F": 4,
+        }]);
+        assert!(inspect_json(&bad, 1).is_err());
+
+        let mismatched = Annotation {
+            id: 3,
+            signature: Some(std::sync::Arc::new(SignatureImage {
+                width: 3,
+                height: 2,
+                rgba: [0, 0, 0, 255].repeat(6),
+            })),
+            ..first.clone()
+        };
+        let mismatched_name = mismatched
+            .name_with_signature_ref(1)
+            .ok_or(ExportError::Inspection)?;
+        let mut mismatch = json();
+        mismatch["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!([
+            {
+                "/Type": "/Annot",
+                "/Subtype": "/Stamp",
+                "/NM": format!("u:{}", first.name()),
+                "/Rect": [0, 0, 100, 100],
+                "/C": [0, 0, 0],
+                "/CA": 1,
+                "/F": 4,
+            },
+            {
+                "/Type": "/Annot",
+                "/Subtype": "/Stamp",
+                "/NM": format!("u:{mismatched_name}"),
+                "/Rect": [0, 0, 100, 100],
+                "/C": [0, 0, 0],
+                "/CA": 1,
+                "/F": 4,
+            }
+        ]);
+        assert!(inspect_json(&mismatch, 1).is_err());
+        Ok(())
     }
     #[test]
     fn schema_cycles_counts_and_unsafe_objects_fail_closed() {

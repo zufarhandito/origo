@@ -54,13 +54,21 @@ impl DocumentSession {
                 if this.edits_locked() {
                     return;
                 }
-                if this.annotation.signature.placing || this.annotation.signature.gesture.is_some()
+                if this.annotation.signature.placing
+                    || this.annotation.text.placing.is_some()
+                    || this.annotation.signature.gesture.is_some()
                 {
                     this.cancel_signature_placement(cx);
                     cx.notify();
                     return;
                 }
+                if this.annotation.text.open || this.annotation.apply_pages.open {
+                    this.close_annotation_popups(cx);
+                    cx.notify();
+                    return;
+                }
                 if this.annotation.draft.take().is_some() || this.annotation.open {
+                    this.close_annotation_popups(cx);
                     this.annotation.selected = None;
                     this.annotation.tool = annotations::Tool::Select;
                     this.annotation.open = false;

@@ -93,6 +93,9 @@ impl DocumentSession {
                 s.annotation.signature.drawing = false;
                 s.annotation.draft = None;
                 if *open {
+                    s.annotation.text.open = false;
+                    s.annotation.text.editing = None;
+                    s.annotation.apply_pages.open = false;
                     s.cancel_signature_placement(cx);
                     s.annotation.signature.save_template = false;
                     s.init_signature_text(window, cx);
@@ -1115,6 +1118,8 @@ impl DocumentSession {
         if self.edits_locked()
             || self.opening
             || self.annotation.signature.open
+            || self.annotation.text.open
+            || self.annotation.apply_pages.open
             || !self.annotation.open
         {
             return;
@@ -1125,22 +1130,6 @@ impl DocumentSession {
         let Some(mut w) = self.workspace.as_mut() else {
             return;
         };
-        if duplicate
-            && w.pages()
-                .iter()
-                .map(|p| {
-                    w.annotations(p.id)
-                        .iter()
-                        .filter(|a| a.signature.is_some())
-                        .count()
-                })
-                .sum::<usize>()
-                >= 8
-        {
-            self.status = "Maksimal delapan tanda tangan/stempel per dokumen.".into();
-            cx.notify();
-            return;
-        }
         let turns = w
             .pages()
             .iter()
@@ -1150,10 +1139,23 @@ impl DocumentSession {
             .unwrap_or(0);
         let delta = signature_delta(delta, turns);
         let mut all = w.annotations(page).to_vec();
-        let Some(index) = all.iter().position(|a| a.id == id && a.signature.is_some()) else {
+        let Some(index) = all.iter().position(|a| a.id == id && a.is_box_object()) else {
             return;
         };
         let mut asset = all[index].clone();
+        if duplicate && asset.signature.is_some() {
+            let simulated = w
+                .pages()
+                .iter()
+                .flat_map(|p| w.annotations(p.id).iter())
+                .chain(std::iter::once(&asset));
+            if !pdf_domain::annotation::within_signature_budget(simulated) {
+                drop(w);
+                self.status = "Batas penempatan tanda tangan/stempel pada dokumen tercapai.".into();
+                cx.notify();
+                return;
+            }
+        }
         let dx = delta[0].clamp(-asset.points[0][0], 1. - asset.points[1][0]);
         let dy = delta[1].clamp(-asset.points[0][1], 1. - asset.points[1][1]);
         for p in &mut asset.points {
@@ -1172,6 +1174,7 @@ impl DocumentSession {
         cx.notify();
     }
     pub(super) fn cancel_signature_placement(&mut self, cx: &mut Context<Self>) {
+        self.annotation.text.placing = None;
         let state = &mut self.annotation.signature;
         state.placing = false;
         state.gesture = None;
@@ -1192,12 +1195,13 @@ impl DocumentSession {
     ) -> Option<(Arc<RenderImage>, [[f32; 2]; 2])> {
         let state = &self.annotation.signature;
         let images = state.placement_ghost.as_ref()?;
+        let placing = state.placing || self.annotation.text.placing.is_some();
         if !self.active
             || !self.annotation.open
             || self.mode != ViewerMode::Read
             || state.ghost_pointer_exited
             || self.edits_locked()
-            || (!state.placing
+            || (!placing
                 && !state
                     .gesture
                     .as_ref()
@@ -1206,9 +1210,29 @@ impl DocumentSession {
             return None;
         }
         let point = signature_page_point(bounds, cursor, geometry.quarter_turns);
+        let rect = if let Some(pending) = &self.annotation.text.placing {
+            crate::text_annotations::text_placement_rect(
+                &pending.content,
+                pending.font_size,
+                geometry,
+                point,
+            )?
+        } else if let Some((gesture_page, annotation, _, _)) = &state.gesture
+            && *gesture_page == page
+            && let Some(text) = &annotation.text
+        {
+            crate::text_annotations::text_placement_rect(
+                &text.content,
+                text.font_size,
+                geometry,
+                point,
+            )?
+        } else {
+            signature_placement_rect(state.asset.as_deref()?, geometry, point)
+        };
         Some((
             images[usize::from(geometry.quarter_turns % 4)].clone()?,
-            signature_placement_rect(state.asset.as_deref()?, geometry, point),
+            rect,
         ))
     }
 
@@ -1219,6 +1243,74 @@ impl DocumentSession {
         start: bool,
         cx: &mut Context<Self>,
     ) -> bool {
+        let placing_text = self.annotation.text.placing.is_some()
+            || (self.annotation.signature.placement_ghost.is_some()
+                && self
+                    .annotation
+                    .signature
+                    .gesture
+                    .as_ref()
+                    .is_some_and(|(_, a, _, _)| a.text.is_some()));
+        if placing_text {
+            if !start && self.annotation.text.placing.is_some() {
+                return true;
+            }
+            let Some(geometry) = self.workspace.as_ref().and_then(|w| {
+                w.pages()
+                    .iter()
+                    .position(|a| a.id == page)
+                    .and_then(|index| w.geometry(index).ok())
+            }) else {
+                return false;
+            };
+            if start && let Some(pending) = self.annotation.text.placing.take() {
+                let Some(corners) = crate::text_annotations::text_placement_rect(
+                    &pending.content,
+                    pending.font_size,
+                    geometry,
+                    p,
+                ) else {
+                    self.cancel_signature_placement(cx);
+                    return false;
+                };
+                let id = self
+                    .workspace
+                    .as_mut()
+                    .map(|mut w| w.allocate_annotation_id())
+                    .unwrap_or(1);
+                let annotation = Annotation {
+                    id,
+                    highlight: false,
+                    color: pending.color,
+                    width: 1.,
+                    points: corners.to_vec(),
+                    rectangles: false,
+                    signature: None,
+                    text: Some(pdf_domain::annotation::TextAnnotation {
+                        content: pending.content,
+                        font_size: pending.font_size,
+                    }),
+                };
+                self.annotation.selected = Some((page, id));
+                self.annotation.signature.gesture = Some((page, annotation, p, false));
+                cx.notify();
+            } else if let Some((gesture_page, annotation, _, _)) =
+                &mut self.annotation.signature.gesture
+                && *gesture_page == page
+                && let Some(text) = &annotation.text
+                && let Some(corners) = crate::text_annotations::text_placement_rect(
+                    &text.content,
+                    text.font_size,
+                    geometry,
+                    p,
+                )
+                && annotation.points.as_slice() != corners.as_slice()
+            {
+                annotation.points.copy_from_slice(&corners);
+                cx.notify();
+            }
+            return true;
+        }
         if self.annotation.signature.placing || self.annotation.signature.placement_ghost.is_some()
         {
             if !start && self.annotation.signature.placing {
@@ -1252,6 +1344,7 @@ impl DocumentSession {
                     points: corners.to_vec(),
                     rectangles: false,
                     signature: Some(asset),
+                    text: None,
                 };
                 self.annotation.selected = Some((page, id));
                 self.annotation.signature.gesture = Some((page, annotation, p, false));
@@ -1276,7 +1369,7 @@ impl DocumentSession {
                     .iter()
                     .rev()
                     .find(|a| {
-                        a.signature.is_some()
+                        a.is_box_object()
                             && signature_hit_bounds(a, false)
                                 .iter()
                                 .zip(p)
@@ -1305,8 +1398,29 @@ impl DocumentSession {
                 let height = a.points[1][1] - a.points[0][1];
                 let ratio = height / width;
                 let max = (1. - a.points[0][0]).min((1. - a.points[0][1]) / ratio);
-                let width = (p[0] - a.points[0][0]).clamp(0.02_f32.min(max), max);
-                a.points[1] = [a.points[0][0] + width, a.points[0][1] + width * ratio];
+                let new_width = (p[0] - a.points[0][0]).clamp(0.02_f32.min(max), max);
+                if let Some(text) = &mut a.text {
+                    if width > 0. {
+                        let scaled = (text.font_size * (new_width / width)).clamp(
+                            pdf_domain::annotation::MIN_TEXT_SIZE,
+                            pdf_domain::annotation::MAX_TEXT_SIZE,
+                        );
+                        let clamped_width = (width * (scaled / text.font_size)).min(max);
+                        text.font_size = (text.font_size * (clamped_width / width)).clamp(
+                            pdf_domain::annotation::MIN_TEXT_SIZE,
+                            pdf_domain::annotation::MAX_TEXT_SIZE,
+                        );
+                        a.points[1] = [
+                            a.points[0][0] + clamped_width,
+                            a.points[0][1] + clamped_width * ratio,
+                        ];
+                    }
+                } else {
+                    a.points[1] = [
+                        a.points[0][0] + new_width,
+                        a.points[0][1] + new_width * ratio,
+                    ];
+                }
             } else {
                 let dx = (p[0] - previous[0]).clamp(-a.points[0][0], 1. - a.points[1][0]);
                 let dy = (p[1] - previous[1]).clamp(-a.points[0][1], 1. - a.points[1][1]);
@@ -1413,7 +1527,7 @@ fn signature_placement_rect(
     ]
 }
 
-fn unrotated_page_size(geometry: PageGeometry) -> [f32; 2] {
+pub(super) fn unrotated_page_size(geometry: PageGeometry) -> [f32; 2] {
     // Annotation coordinates precede page rotation. Workspace sizes are displayed sizes.
     if geometry.quarter_turns % 2 == 1 {
         [geometry.height_points, geometry.width_points]
@@ -1422,7 +1536,7 @@ fn unrotated_page_size(geometry: PageGeometry) -> [f32; 2] {
     }
 }
 
-fn ghost_images(asset: &SignatureImage) -> [Option<Arc<RenderImage>>; 4] {
+pub(super) fn ghost_images(asset: &SignatureImage) -> [Option<Arc<RenderImage>>; 4] {
     let Some(mut image) = image::RgbaImage::from_raw(asset.width, asset.height, asset.rgba.clone())
     else {
         return std::array::from_fn(|_| None);
@@ -1738,6 +1852,7 @@ mod tests {
             points: vec![[0.4, 0.3], [0.7, 0.5]],
             rectangles: false,
             signature: Some(asset.clone()),
+            text: None,
         };
         let page = PageGeometry {
             width_points: 600.,

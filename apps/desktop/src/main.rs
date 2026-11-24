@@ -43,6 +43,7 @@ mod transitions;
 use chrome::ViewerMode;
 mod navigation;
 mod organizer;
+mod text_annotations;
 mod text_selection;
 mod views;
 use navigation::{Direction, Navigation};

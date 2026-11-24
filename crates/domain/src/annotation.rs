@@ -6,9 +6,40 @@ use std::io::Write;
 pub const MAX_POINTS: usize = 4096;
 pub const MAX_PAGE_ANNOTATIONS: usize = 256;
 pub const MAX_SIGNATURES: usize = 8;
+pub const MAX_SIGNATURE_PLACEMENTS: usize = 1024;
+pub const MAX_TEXT_CHARS: usize = 240;
+pub const MIN_TEXT_SIZE: f32 = 8.;
+pub const MAX_TEXT_SIZE: f32 = 48.;
 pub const PREFIX: &str = "pdf-studio-annotation-v1:";
 const MAX_SIGNATURE_BYTES: usize = SignatureImage::MAX_PIXELS as usize * 4;
 const MAX_NAME_BYTES: usize = MAX_SIGNATURE_BYTES.div_ceil(3) * 4 + 256;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnnotationKind {
+    Ink,
+    Highlight,
+    Stamp,
+    FreeText,
+}
+
+/// Passive, single-line text annotation (free text, date, or name — not an interactive form field).
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextAnnotation {
+    pub content: String,
+    /// Font size in PDF points, independent of zoom.
+    pub font_size: f32,
+}
+
+impl TextAnnotation {
+    pub fn valid(&self) -> bool {
+        !self.content.trim().is_empty()
+            && self.content.chars().count() <= MAX_TEXT_CHARS
+            && !self.content.chars().any(char::is_control)
+            && self.font_size.is_finite()
+            && (MIN_TEXT_SIZE..=MAX_TEXT_SIZE).contains(&self.font_size)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Annotation {
     pub id: u64,
@@ -16,20 +47,106 @@ pub struct Annotation {
     pub color: [u8; 3],
     /// Width in PDF points, independent of zoom.
     pub width: f32,
-    /// A stroke, or opposite corners of text rectangles (two points per rectangle).
+    /// A stroke, or opposite corners of rectangles/boxes (two points per rectangle).
     pub points: Vec<[f32; 2]>,
     pub rectangles: bool,
     pub signature: Option<std::sync::Arc<SignatureImage>>,
+    pub text: Option<TextAnnotation>,
 }
+
+/// Result of parsing an owned `/NM` annotation name, supporting deduplicated signature refs.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ParsedName {
+    Complete(Annotation),
+    SignatureRef {
+        id: u64,
+        color: [u8; 3],
+        width: f32,
+        points: Vec<[f32; 2]>,
+        image_width: u32,
+        image_height: u32,
+        ref_id: u64,
+    },
+}
+
+impl ParsedName {
+    pub fn kind(&self) -> AnnotationKind {
+        match self {
+            Self::Complete(a) => a.kind(),
+            Self::SignatureRef { .. } => AnnotationKind::Stamp,
+        }
+    }
+
+    pub fn resolve_signature(self, image: std::sync::Arc<SignatureImage>) -> Option<Annotation> {
+        match self {
+            Self::Complete(a) => Some(a),
+            Self::SignatureRef {
+                id,
+                color,
+                width,
+                points,
+                image_width,
+                image_height,
+                ..
+            } => {
+                if image.width != image_width || image.height != image_height {
+                    return None;
+                }
+                let annotation = Annotation {
+                    id,
+                    highlight: false,
+                    color,
+                    width,
+                    points,
+                    rectangles: false,
+                    signature: Some(image),
+                    text: None,
+                };
+                annotation.valid().then_some(annotation)
+            }
+        }
+    }
+}
+
 impl Annotation {
+    pub fn kind(&self) -> AnnotationKind {
+        if self.signature.is_some() {
+            AnnotationKind::Stamp
+        } else if self.text.is_some() {
+            AnnotationKind::FreeText
+        } else if self.rectangles {
+            AnnotationKind::Highlight
+        } else {
+            AnnotationKind::Ink
+        }
+    }
+
+    pub fn is_box_object(&self) -> bool {
+        self.signature.is_some() || self.text.is_some()
+    }
+
     pub fn valid(&self) -> bool {
-        (self.signature.as_ref().is_none_or(|s| s.valid())
-            && (self.signature.is_none()
-                || (!self.highlight
-                    && !self.rectangles
-                    && self.points.len() == 2
-                    && self.points[0][0] < self.points[1][0]
-                    && self.points[0][1] < self.points[1][1])))
+        if self.signature.is_some() && self.text.is_some() {
+            return false;
+        }
+        let box_valid = if let Some(signature) = &self.signature {
+            signature.valid()
+                && !self.highlight
+                && !self.rectangles
+                && self.points.len() == 2
+                && self.points[0][0] < self.points[1][0]
+                && self.points[0][1] < self.points[1][1]
+        } else if let Some(text) = &self.text {
+            text.valid()
+                && !self.highlight
+                && !self.rectangles
+                && self.points.len() == 2
+                && self.points[0][0] < self.points[1][0]
+                && self.points[0][1] < self.points[1][1]
+        } else {
+            true
+        };
+        box_valid
             && self.id > 0
             && self.width.is_finite()
             && (0.5..=40.).contains(&self.width)
@@ -41,64 +158,214 @@ impl Annotation {
                 .flatten()
                 .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
     }
+
     pub fn name(&self) -> String {
-        format!(
+        if let Some(text) = &self.text {
+            format!(
+                "{PREFIX}{}",
+                json!([
+                    self.id,
+                    false,
+                    self.color,
+                    self.width,
+                    self.points,
+                    false,
+                    Value::Null,
+                    [text.content, text.font_size]
+                ])
+            )
+        } else {
+            format!(
+                "{PREFIX}{}",
+                json!([
+                    self.id,
+                    self.highlight,
+                    self.color,
+                    self.width,
+                    self.points,
+                    self.rectangles,
+                    self.signature
+                        .as_ref()
+                        .map(|s| json!([s.width, s.height, s.encode()]))
+                ])
+            )
+        }
+    }
+
+    pub fn name_with_signature_ref(&self, ref_id: u64) -> Option<String> {
+        let s = self.signature.as_ref()?;
+        if ref_id == 0 || ref_id == self.id {
+            return None;
+        }
+        Some(format!(
             "{PREFIX}{}",
             json!([
                 self.id,
-                self.highlight,
+                false,
                 self.color,
                 self.width,
                 self.points,
-                self.rectangles,
-                self.signature
-                    .as_ref()
-                    .map(|s| json!([s.width, s.height, s.encode()]))
+                false,
+                [s.width, s.height, format!("ref:{ref_id}")]
             ])
-        )
+        ))
     }
+
     pub fn from_name(name: &str) -> Option<Self> {
-        Self::parse_name(name, None)
+        match Self::parse_with_kind(name, None)? {
+            ParsedName::Complete(a) => Some(a),
+            ParsedName::SignatureRef { .. } => None,
+        }
     }
+
     pub fn from_typed_name(name: &str, signature: bool) -> Option<Self> {
-        Self::parse_name(name, Some(signature))
+        let parsed = Self::parse_with_kind(name, None)?;
+        let ParsedName::Complete(a) = parsed else {
+            return None;
+        };
+        (a.signature.is_some() == signature).then_some(a)
     }
-    fn parse_name(name: &str, expected_signature: Option<bool>) -> Option<Self> {
+
+    pub fn parse_with_kind(name: &str, expected: Option<AnnotationKind>) -> Option<ParsedName> {
         if name.len() > MAX_NAME_BYTES {
             return None;
         }
         let v: Value = serde_json::from_str(name.strip_prefix(PREFIX)?).ok()?;
-        let signature = v.get(6).filter(|v| !v.is_null());
-        if expected_signature.is_some_and(|expected| expected != signature.is_some()) {
+        let array = v.as_array()?;
+        if array.len() != 7 && array.len() != 8 {
             return None;
         }
-        let a = Self {
-            id: v.get(0)?.as_u64()?,
-            highlight: v.get(1)?.as_bool()?,
-            color: [
-                u8::try_from(v[2][0].as_u64()?).ok()?,
-                u8::try_from(v[2][1].as_u64()?).ok()?,
-                u8::try_from(v[2][2].as_u64()?).ok()?,
-            ],
-            width: v.get(3)?.as_f64()? as f32,
-            points: v
-                .get(4)?
-                .as_array()?
-                .iter()
-                .map(|p| Some([p.get(0)?.as_f64()? as f32, p.get(1)?.as_f64()? as f32]))
-                .collect::<Option<Vec<_>>>()?,
-            rectangles: v.get(5)?.as_bool()?,
-            signature: match signature {
-                Some(s) => Some(std::sync::Arc::new(SignatureImage::decode(
-                    u32::try_from(s[0].as_u64()?).ok()?,
-                    u32::try_from(s[1].as_u64()?).ok()?,
-                    s[2].as_str()?,
-                )?)),
-                None => None,
-            },
+        let signature_val = v.get(6).filter(|v| !v.is_null());
+        let text_val = v.get(7).filter(|v| !v.is_null());
+        if signature_val.is_some() && text_val.is_some() {
+            return None;
+        }
+        let id = v.get(0)?.as_u64()?;
+        let highlight = v.get(1)?.as_bool()?;
+        let color = [
+            u8::try_from(v[2][0].as_u64()?).ok()?,
+            u8::try_from(v[2][1].as_u64()?).ok()?,
+            u8::try_from(v[2][2].as_u64()?).ok()?,
+        ];
+        let width = v.get(3)?.as_f64()? as f32;
+        let points = v
+            .get(4)?
+            .as_array()?
+            .iter()
+            .map(|p| Some([p.get(0)?.as_f64()? as f32, p.get(1)?.as_f64()? as f32]))
+            .collect::<Option<Vec<_>>>()?;
+        let rectangles = v.get(5)?.as_bool()?;
+        let kind = if signature_val.is_some() {
+            AnnotationKind::Stamp
+        } else if text_val.is_some() {
+            AnnotationKind::FreeText
+        } else if rectangles {
+            AnnotationKind::Highlight
+        } else {
+            AnnotationKind::Ink
         };
-        a.valid().then_some(a)
+        if expected.is_some_and(|expected| expected != kind) {
+            return None;
+        }
+        if let Some(s) = signature_val {
+            let image_width = u32::try_from(s[0].as_u64()?).ok()?;
+            let image_height = u32::try_from(s[1].as_u64()?).ok()?;
+            let payload = s[2].as_str()?;
+            if let Some(ref_text) = payload.strip_prefix("ref:") {
+                if !ref_text.bytes().all(|b| b.is_ascii_digit()) {
+                    return None;
+                }
+                let ref_id = ref_text.parse::<u64>().ok()?;
+                if id == 0
+                    || ref_id == 0
+                    || ref_id == id
+                    || highlight
+                    || rectangles
+                    || !width.is_finite()
+                    || !(0.5..=40.).contains(&width)
+                    || points.len() != 2
+                    || points
+                        .iter()
+                        .flatten()
+                        .any(|c| !c.is_finite() || !(0.0..=1.0).contains(c))
+                    || points[0][0] >= points[1][0]
+                    || points[0][1] >= points[1][1]
+                    || SignatureImage::byte_count(image_width, image_height).is_none()
+                {
+                    return None;
+                }
+                return Some(ParsedName::SignatureRef {
+                    id,
+                    color,
+                    width,
+                    points,
+                    image_width,
+                    image_height,
+                    ref_id,
+                });
+            }
+            let image = SignatureImage::decode(image_width, image_height, payload)?;
+            let a = Self {
+                id,
+                highlight,
+                color,
+                width,
+                points,
+                rectangles,
+                signature: Some(std::sync::Arc::new(image)),
+                text: None,
+            };
+            return a.valid().then_some(ParsedName::Complete(a));
+        }
+        let text = match text_val {
+            Some(t) => {
+                let arr = t.as_array()?;
+                if arr.len() != 2 {
+                    return None;
+                }
+                Some(TextAnnotation {
+                    content: arr[0].as_str()?.to_owned(),
+                    font_size: arr[1].as_f64()? as f32,
+                })
+            }
+            None => None,
+        };
+        let a = Self {
+            id,
+            highlight,
+            color,
+            width,
+            points,
+            rectangles,
+            signature: None,
+            text,
+        };
+        a.valid().then_some(ParsedName::Complete(a))
     }
+}
+
+/// Checks that signature/stamp annotations stay within the unique-asset and total-placement budgets.
+pub fn within_signature_budget<'a>(annotations: impl Iterator<Item = &'a Annotation>) -> bool {
+    let mut unique: Vec<&'a std::sync::Arc<SignatureImage>> = Vec::new();
+    let mut placements = 0usize;
+    for a in annotations {
+        let Some(image) = &a.signature else {
+            continue;
+        };
+        placements += 1;
+        if placements > MAX_SIGNATURE_PLACEMENTS {
+            return false;
+        }
+        if !unique.iter().any(|existing| {
+            std::sync::Arc::ptr_eq(existing, image) || existing.as_ref() == image.as_ref()
+        }) {
+            if unique.len() >= MAX_SIGNATURES {
+                return false;
+            }
+            unique.push(image);
+        }
+    }
+    true
 }
 /// Bounded RGBA signature asset; Arc shares it across history snapshots.
 #[derive(Clone, Debug, PartialEq)]
@@ -220,6 +487,7 @@ mod tests {
                 height: 1,
                 rgba: vec![0, 0, 0, 0, 20, 40, 60, 128],
             })),
+            text: None,
         };
         assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
         let legacy = format!(
@@ -294,6 +562,7 @@ mod tests {
             points: vec![[0.1, 0.2], [0.7, 0.8]],
             rectangles: false,
             signature: None,
+            text: None,
         };
         assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
         let mut bad = a;
@@ -306,5 +575,150 @@ mod tests {
             let point = [0.25, 0.75];
             assert_eq!(rotate(rotate(point, turn), (4 - turn) % 4), point);
         }
+    }
+
+    #[test]
+    fn text_annotation_roundtrip_and_validation() {
+        let text = Annotation {
+            id: 42,
+            highlight: false,
+            color: [30, 80, 180],
+            width: 1.,
+            points: vec![[0.1, 0.2], [0.4, 0.25]],
+            rectangles: false,
+            signature: None,
+            text: Some(TextAnnotation {
+                content: "24 November 2026".into(),
+                font_size: 12.,
+            }),
+        };
+        assert!(text.valid());
+        assert_eq!(text.kind(), AnnotationKind::FreeText);
+        assert_eq!(
+            Annotation::parse_with_kind(&text.name(), Some(AnnotationKind::FreeText)),
+            Some(ParsedName::Complete(text.clone()))
+        );
+        assert!(Annotation::parse_with_kind(&text.name(), Some(AnnotationKind::Stamp)).is_none());
+
+        let mut bad = text.clone();
+        bad.text = Some(TextAnnotation {
+            content: "   ".into(),
+            font_size: 12.,
+        });
+        assert!(!bad.valid());
+
+        bad.text = Some(TextAnnotation {
+            content: "line1\nline2".into(),
+            font_size: 12.,
+        });
+        assert!(!bad.valid());
+
+        bad.text = Some(TextAnnotation {
+            content: "a".repeat(MAX_TEXT_CHARS + 1),
+            font_size: 12.,
+        });
+        assert!(!bad.valid());
+
+        bad.text = Some(TextAnnotation {
+            content: "ok".into(),
+            font_size: 7.5,
+        });
+        assert!(!bad.valid());
+
+        bad.text = Some(TextAnnotation {
+            content: "ok".into(),
+            font_size: 50.,
+        });
+        assert!(!bad.valid());
+
+        // Cannot carry both signature and text.
+        let mut both = text;
+        both.signature = Some(std::sync::Arc::new(SignatureImage {
+            width: 1,
+            height: 1,
+            rgba: vec![0, 0, 0, 255],
+        }));
+        assert!(!both.valid());
+    }
+
+    #[test]
+    fn signature_ref_roundtrip_and_budget_limits() {
+        let asset = std::sync::Arc::new(SignatureImage {
+            width: 2,
+            height: 2,
+            rgba: [20, 40, 80, 255].repeat(4),
+        });
+        let second = Annotation {
+            id: 9,
+            highlight: false,
+            color: [0; 3],
+            width: 1.,
+            points: vec![[0.2, 0.3], [0.5, 0.4]],
+            rectangles: false,
+            signature: Some(asset.clone()),
+            text: None,
+        };
+        let Some(encoded) = second.name_with_signature_ref(3) else {
+            panic!("signature ref name");
+        };
+        let Some(parsed) = Annotation::parse_with_kind(&encoded, Some(AnnotationKind::Stamp))
+        else {
+            panic!("parsed signature ref");
+        };
+        assert!(matches!(
+            parsed,
+            ParsedName::SignatureRef {
+                id: 9,
+                ref_id: 3,
+                image_width: 2,
+                image_height: 2,
+                ..
+            }
+        ));
+        assert_eq!(parsed.resolve_signature(asset.clone()), Some(second));
+
+        // Self-reference is rejected.
+        assert!(
+            Annotation::parse_with_kind(
+                &format!("{PREFIX}[9,false,[0,0,0],1,[[0.2,0.3],[0.5,0.4]],false,[2,2,\"ref:9\"]]"),
+                Some(AnnotationKind::Stamp),
+            )
+            .is_none()
+        );
+
+        // One unique signature placed 24 times is within budget.
+        let many_same: Vec<_> = (1..=24)
+            .map(|id| Annotation {
+                id,
+                highlight: false,
+                color: [0; 3],
+                width: 1.,
+                points: vec![[0.1, 0.1], [0.2, 0.2]],
+                rectangles: false,
+                signature: Some(asset.clone()),
+                text: None,
+            })
+            .collect();
+        assert!(within_signature_budget(many_same.iter()));
+
+        // Nine distinct signatures exceed MAX_SIGNATURES.
+        let distinct: Vec<_> = (1..=9u8)
+            .map(|i| Annotation {
+                id: u64::from(i),
+                highlight: false,
+                color: [0; 3],
+                width: 1.,
+                points: vec![[0.1, 0.1], [0.2, 0.2]],
+                rectangles: false,
+                signature: Some(std::sync::Arc::new(SignatureImage {
+                    width: 1,
+                    height: 1,
+                    rgba: vec![i, 0, 0, 255],
+                })),
+                text: None,
+            })
+            .collect();
+        assert!(within_signature_budget(distinct[..8].iter()));
+        assert!(!within_signature_budget(distinct.iter()));
     }
 }

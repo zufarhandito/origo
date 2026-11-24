@@ -1,5 +1,33 @@
 # Pengujian Origo
 
+## Anotasi teks pasif dan terapkan ke banyak halaman (dev mode)
+
+Verifikasi dijalankan dalam mode pengembangan (`--locked --offline`, tanpa build release/installer):
+
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked --offline -- -D warnings`
+  (0 warning), dan `cargo test --workspace --locked --offline` lulus (**97 unit test**:
+  29 `pdf-application`, 13 `pdf-domain`, 5 `pdf-ocr`, 5 `pdf-platform`, 30 `pdf-studio`,
+  15 `qpdf-adapter`), termasuk validasi teks, pengukuran/rasterisasi font bundel IBM Plex Sans,
+  parser rentang halaman (`1-3, 5`), anggaran 8 aset unik / 1.024 penempatan, serta preflight
+  `/FreeText` pasif dan deduplikasi `/Image` + `/SMask`.
+- `pdf-smoke --annotation-smoke` (debug) lulus seluruh 5 fixture, termasuk:
+  - `/FreeText` pasif dengan `/Contents`, `/DA`, `/AP /N`, tanpa `/AcroForm`, selisih piksel
+    editor vs render native `< 0,75` di 4 orientasi rotasi, serta buka ulang, edit, dan hapus.
+  - Penempatan stempel ke 12 halaman dalam 1 langkah Undo/Redo atomik, hanya menghasilkan
+    **2 stream `/Image`** (1 RGB + 1 SMask) untuk 12 penempatan dengan 11 referensi `ref:` pada
+    `/NM`, berbagi `Arc<SignatureImage>` saat dibuka ulang, serta hasil **Split** per 1 halaman
+    yang mandiri.
+- `scripts/text-multipage-ui-smoke.ps1 -Profile debug` lulus seluruh 6 skenario UI Windows
+  (preset Tanggal + pratinjau langsung, penempatan ghost, edit teks di tempat, terapkan ke
+  rentang `2-4` + Undo/Redo 1 langkah, terapkan tanda tangan ke semua halaman + Undo/Redo 1
+  langkah, serta Simpan sebagai & buka ulang dengan hash sumber identik). Bukti lokal ada di
+  `.research/text-multipage-ui-75b5134bb44045fca6955c1970ebfe23`.
+- `scripts/annotation-ui-smoke.ps1 -Profile debug` lulus seluruh 9 skenario regresi anotasi.
+  Bukti lokal ada di `.research/annotation-ui-09e767f2be074d618e81fd56fefdbd9b`.
+- `scripts/signature-ui-smoke.ps1 -Profile debug` terhenti pada pemeriksaan fokus jendela
+  sistem (`The test window must be in front for the system cursor check`) karena dijalankan
+  di latar tanpa jendela foreground.
+
 ## Pembaruan delta, feed HTTPS GitHub, dan audit notice Velopack
 
 `scripts/package-installer.ps1` kini memakai `-DeltaMode BestSpeed` secara

@@ -4651,6 +4651,7 @@ dependencies = [
 name = "pdf-application"
 version = "0.1.0"
 dependencies = [
+ "fontdue",
  "pdf-domain",
  "thiserror 2.0.21",
 ]
