@@ -33,6 +33,11 @@ try {
     Invoke 'Bintangi: A.pdf'
     $null = Wait-State {param($s) $s.starredTabIds.Count -eq 1 -and $s.pendingPreferences -eq 0}
     $package = "$id-0.1.1-preview-full.nupkg"
+    $deltaPackage = "$id-0.1.1-preview-delta.nupkg"
+    $feedFull = Join-Path $feed $package
+    $feedDelta = Join-Path $feed $deltaPackage
+    if (!(Test-Path -LiteralPath $feedDelta -PathType Leaf)) { throw 'Delta update package was not generated' }
+    if ((Get-Item -LiteralPath $feedDelta).Length -ge (Get-Item -LiteralPath $feedFull).Length) { throw 'Delta package is not smaller than full package' }
     $download = Join-Path $installation "packages/$package"
     $null = Find 'Unduh'
     $null = Find 'Nanti'
@@ -43,17 +48,25 @@ try {
     if (Test-Path -LiteralPath $download) { throw 'Update downloaded after clicking Nanti' }
     Write-Host 'PASS updater: version 0.1.1 prompts before download and Nanti defers cleanly'
 
-    Menu-Action 'Bantuan' 'Periksa pembaruan'
-    $null = Find 'Unduh'
-    Invoke 'Unduh'
-    $limit = (Get-Date).AddSeconds(30)
-    while (!(Test-Path -LiteralPath $download -PathType Leaf) -and (Get-Date) -lt $limit) { Start-Sleep -Milliseconds 150 }
-    if (!(Test-Path -LiteralPath $download -PathType Leaf)) { throw 'Approved update did not finish downloading' }
-    if ((Get-FileHash -LiteralPath $download).Hash -ne (Get-FileHash -LiteralPath (Join-Path $feed $package)).Hash) { throw 'Staged update checksum mismatch' }
-    $null = Find 'Origo 0.1.1 siap dipasang. Keluar dan buka lagi untuk memperbarui.'
+    # Temporarily hide the full package from the feed so Velopack must apply the delta patch.
+    $hiddenFull = "$feedFull.disabled"
+    Move-Item -LiteralPath $feedFull -Destination $hiddenFull
+    try {
+        Menu-Action 'Bantuan' 'Periksa pembaruan'
+        $null = Find 'Unduh'
+        Invoke 'Unduh'
+        $limit = (Get-Date).AddSeconds(45)
+        while (!(Test-Path -LiteralPath $download -PathType Leaf) -and (Get-Date) -lt $limit) { Start-Sleep -Milliseconds 150 }
+        if (!(Test-Path -LiteralPath $download -PathType Leaf)) { throw 'Approved delta update did not finish downloading' }
+        $null = Find 'Origo 0.1.1 siap dipasang. Keluar dan buka lagi untuk memperbarui.'
+    } finally {
+        if (Test-Path -LiteralPath $hiddenFull -PathType Leaf) {
+            Move-Item -LiteralPath $hiddenFull -Destination $feedFull
+        }
+    }
     Capture 'update-ready.png'
     Assert-Version '0.1.0'
-    Write-Host 'PASS updater: version 0.1.1 downloaded after user confirmation'
+    Write-Host 'PASS updater: version 0.1.1 downloaded via delta package after user confirmation'
 
     Invoke 'Panel alat'; Invoke 'Putar kanan'
     $null = Wait-State {param($s) $s.dirty}
@@ -85,6 +98,7 @@ try {
     if (!$owner -or !(Test-Path -LiteralPath $metrics)) { throw 'Updated app did not reopen' }
     $app = Get-Process -Id $owner.ProcessId
     Assert-Version '0.1.1'
+    if ((Get-FileHash -LiteralPath $installed).Hash -ne (Get-FileHash -LiteralPath $ExecutablePath).Hash) { throw 'Updated executable checksum mismatch' }
     $null = Find 'Origo 0.1.1 sekarang aktif.'
     Capture 'update-active.png'
     $null = Wait-State {param($s) $s.pageCount -gt 0 -and $s.starredTabIds.Count -eq 1}

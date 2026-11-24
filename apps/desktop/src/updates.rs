@@ -19,7 +19,7 @@ use std::{
 };
 use velopack::{
     UpdateCheck, UpdateInfo, UpdateManager, VelopackApp,
-    sources::{FileSource, HttpSource},
+    sources::{FileSource, GithubSource, HttpSource, NoneSource},
 };
 
 const PREVIEW_ID: &str = "Origo.Preview";
@@ -55,22 +55,27 @@ pub(super) fn start(executable: &Path) -> anyhow::Result<Startup> {
         Ok(feed) => feed,
         Err(_) => return Ok(Startup::Unmanaged),
     };
-    let feed = feed.trim();
-    let manager = if feed.starts_with("https://") {
-        UpdateManager::new(HttpSource::new(feed), None, None)
-    } else if Path::new(feed).is_absolute() {
-        UpdateManager::new(FileSource::new(feed), None, None)
-    } else {
+    let Ok(probe) = UpdateManager::new(NoneSource {}, None, None) else {
         return Ok(Startup::Unmanaged);
+    };
+    let id = probe.get_app_id();
+    let preview = id == PREVIEW_ID || id == "Origo.Preview.Fixture";
+    if probe.get_is_portable() {
+        return Ok(Startup::Unmanaged);
+    }
+    let Some(target) = classify_feed(&feed, preview) else {
+        return Ok(Startup::Unmanaged);
+    };
+    let manager = match target {
+        FeedTarget::GithubRepo(url) => {
+            UpdateManager::new(GithubSource::new(url, None, preview), None, None)
+        }
+        FeedTarget::Https(url) => UpdateManager::new(HttpSource::new(url), None, None),
+        FeedTarget::LocalDir(path) => UpdateManager::new(FileSource::new(path), None, None),
     };
     let Ok(manager) = manager else {
         return Ok(Startup::Unmanaged);
     };
-    let id = manager.get_app_id();
-    let preview = id == PREVIEW_ID || id == "Origo.Preview.Fixture";
-    if manager.get_is_portable() || (!preview && !feed.starts_with("https://")) {
-        return Ok(Startup::Unmanaged);
-    }
     let root = bin
         .parent()
         .context("Folder instalasi Origo tidak ditemukan")?;
@@ -659,6 +664,65 @@ fn should_prompt_for_version(
     dismissed != Some(version) && already_prompted != Some(version)
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum FeedTarget<'a> {
+    GithubRepo(&'a str),
+    Https(&'a str),
+    LocalDir(&'a str),
+}
+
+fn classify_feed(feed: &str, allow_local: bool) -> Option<FeedTarget<'_>> {
+    let feed = feed.trim();
+    if feed.is_empty() {
+        return None;
+    }
+    if let Some(rest) = feed.strip_prefix("https://") {
+        let trimmed = rest.trim_end_matches('/');
+        if trimmed.is_empty() || trimmed.contains(char::is_whitespace) {
+            return None;
+        }
+        let authority = trimmed.split('/').next().unwrap_or("");
+        if authority.is_empty() || authority.contains('@') {
+            return None;
+        }
+        if is_github_repo_path(trimmed) {
+            return Some(FeedTarget::GithubRepo(feed.trim_end_matches('/')));
+        }
+        return Some(FeedTarget::Https(feed));
+    }
+    if allow_local && Path::new(feed).is_absolute() {
+        return Some(FeedTarget::LocalDir(feed));
+    }
+    None
+}
+
+fn is_github_repo_path(https_rest_trimmed: &str) -> bool {
+    if https_rest_trimmed.contains('?') || https_rest_trimmed.contains('#') {
+        return false;
+    }
+    let mut segments = https_rest_trimmed.split('/');
+    let Some(host) = segments.next() else {
+        return false;
+    };
+    if !host.eq_ignore_ascii_case("github.com") {
+        return false;
+    }
+    let (Some(owner), Some(repo), None) = (segments.next(), segments.next(), segments.next())
+    else {
+        return false;
+    };
+    is_github_segment(owner) && is_github_segment(repo) && !repo.ends_with(".git")
+}
+
+fn is_github_segment(segment: &str) -> bool {
+    !segment.is_empty()
+        && segment != "."
+        && segment != ".."
+        && segment
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -670,6 +734,60 @@ mod tests {
             Size: size,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn classifies_github_https_and_local_update_feeds() {
+        assert_eq!(
+            classify_feed("https://github.com/zufarhandito/origo", true),
+            Some(FeedTarget::GithubRepo(
+                "https://github.com/zufarhandito/origo"
+            ))
+        );
+        assert_eq!(
+            classify_feed("  https://github.com/zufarhandito/origo/ \n", false),
+            Some(FeedTarget::GithubRepo(
+                "https://github.com/zufarhandito/origo"
+            ))
+        );
+        assert_eq!(
+            classify_feed("https://updates.example.com/origo-preview/", false),
+            Some(FeedTarget::Https(
+                "https://updates.example.com/origo-preview/"
+            ))
+        );
+        assert_eq!(
+            classify_feed(
+                "https://github.com/zufarhandito/origo/releases/latest/download",
+                false
+            ),
+            Some(FeedTarget::Https(
+                "https://github.com/zufarhandito/origo/releases/latest/download"
+            ))
+        );
+        assert_eq!(
+            classify_feed(r"D:\projects\bpdf\dist\origo-preview", true),
+            Some(FeedTarget::LocalDir(r"D:\projects\bpdf\dist\origo-preview"))
+        );
+        assert_eq!(
+            classify_feed(r"D:\projects\bpdf\dist\origo-preview", false),
+            None
+        );
+        assert_eq!(classify_feed("http://updates.example.com/feed", true), None);
+        assert_eq!(
+            classify_feed("https://user@github.com/zufarhandito/origo", true),
+            None
+        );
+        assert_eq!(
+            classify_feed("https://github.com/./origo", true),
+            Some(FeedTarget::Https("https://github.com/./origo"))
+        );
+        assert_eq!(
+            classify_feed("https://github.com/zufarhandito/..", true),
+            Some(FeedTarget::Https("https://github.com/zufarhandito/.."))
+        );
+        assert_eq!(classify_feed("relative/feed", true), None);
+        assert_eq!(classify_feed("   ", true), None);
     }
 
     #[test]

@@ -1,5 +1,31 @@
 # Pengujian Origo
 
+## Pembaruan delta, feed HTTPS GitHub, dan audit notice Velopack
+
+`scripts/package-installer.ps1` kini memakai `-DeltaMode BestSpeed` secara
+default (dengan opsi `BestSize` dan `None`). Benchmark delta nyata dari
+`Origo.Preview 0.1.3` ke `0.1.4` menghasilkan paket delta **5,09 MiB**
+(turun **88,8%** dari paket penuh 45,57 MiB) dalam 16,5 detik.
+
+`scripts/installer-ui-smoke.ps1` menguji alur delta end-to-end dengan
+menyembunyikan `Origo.Preview.Fixture-0.1.1-preview-full.nupkg` dari feed
+sebelum tombol **Unduh** diklik sehingga Velopack wajib mengunduh dan menambal
+paket `0.1.1-preview-delta.nupkg` (559,5 KiB pada fixture). Prompt menampilkan
+ukuran delta, tombol **Nanti** menunda tanpa mengunduh, **Bantuan > Periksa
+pembaruan** + **Unduh** menambal paket lokal, dan setelah buka ulang versi
+aktif menjadi `0.1.1` dengan SHA-256 `pdf-studio.exe` cocok persis. Bukti lokal
+ada di `.research/installer-ui-d16183422911403585c78ef37bda879a`.
+
+Dry-run lokal `scripts/publish-preview-github.ps1 -Version 0.1.5` memverifikasi
+staging paket dengan `origo-update-feed.txt` tersemat
+`https://github.com/zufarhandito/origo` tanpa mengunggah ke GitHub. Audit
+distribusi (`scripts/audit-distribution.ps1`) memverifikasi notice suplemen
+`LICENSES/supplemental/velopack-1.2.161-LICENSE.txt` (`501 notice-collected`,
+`3 missing-license-evidence`: `mac`, `seahash`, `simd_helpers`,
+`1 copyleft-source-review`, `7 project-license-unset`). `cargo fmt --check`,
+`clippy --workspace --all-targets -- -D warnings`, 89 unit test (termasuk
+klasifikasi feed GitHub/HTTPS/lokal), dan build release lulus.
+
 ## Konfirmasi unduhan pembaruan Preview
 
 `scripts/installer-ui-smoke.ps1` memeriksa bahwa versi baru (`0.1.1`) tidak

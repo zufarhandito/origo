@@ -120,6 +120,14 @@
         "Sha256":  "f97daf1a0124413dccf399a4e6626b4b74acd05282f80b6d64ac82225650b77a"
     },
     {
+        "Name":  "velopack",
+        "Version":  "1.2.161",
+        "File":  "velopack-1.2.161-LICENSE.txt",
+        "Url":  "https://raw.githubusercontent.com/velopack/velopack/92d6a1c91716729d449034df5c50307dcce39493/LICENSE",
+        "Commit":  "92d6a1c91716729d449034df5c50307dcce39493",
+        "Sha256":  "91845db83551c877ebbb1118e0fb92e4e527290d23b995c55dcd438b3293943f"
+    },
+    {
         "Name":  "zune-core",
         "Version":  "0.4.12",
         "File":  "zune-core-0.4.12-LICENSE-md.txt",

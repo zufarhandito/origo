@@ -56,15 +56,16 @@ tests only; it does not claim UI/GPU or clean-machine acceptance.
 
 ## Notice inventory and remaining decisions
 
-The Windows desktop normal/build graph has 469 records, including six project crates.
+The Windows desktop normal/build graph has 512 records, including seven project crates.
 It conservatively includes workspace-unified feature dependencies, so it is a superset
 of code linked into the desktop executable, not a perfect runtime SBOM.
 
 The actual GPUI crate-family metadata declares Apache-2.0. The audit preserves notice
 files across the graph rather than assuming a license from the Zed project name.
-Eighteen crates with omitted published notice texts have supplemental files fetched
-from the exact upstream commit recorded in their `.cargo_vcs_info.json`; the checked-in
-manifest pins URLs and SHA-256. The builder validates these stored files offline.
+Nineteen crates with omitted published notice texts (including `velopack 1.2.161`,
+pinned to the release commit recorded in `vpk.nuspec`) have supplemental files fetched
+from the exact upstream commit; the checked-in manifest pins URLs and SHA-256. The
+builder validates these stored files offline.
 
 Three evidence gaps remain: **mac 0.1.1, seahash 4.1.0, simd_helpers 0.1.0**. Metadata
 declarations alone do not close them. `option-ext 0.2.0` declares MPL-2.0; its license
