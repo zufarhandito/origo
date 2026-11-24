@@ -17,6 +17,9 @@
   publikasi binary, atau pengiriman PDF/data privat.
 - Pertahankan perubahan pengguna; stage hanya file/hunk terkait pekerjaan yang ditinjau.
   Catat SHA dan hasil push sebenarnya; jangan menyatakan sukses jika gagal/ditolak.
+- Mode development sehari-hari memakai build dev (`run.cmd`) tanpa otomatis
+  membangun `--release` atau mengemas versi `Origo.Preview` baru; bangun
+  release dan naikkan versi installer hanya saat pemilik meminta up versi.
 - PDF sumber tetap read-only; pertahankan snapshot/preflight/consent/validasi/no-overwrite.
   `.research`, PDF pengguna, `.tools`, `sidecars`, `target` dan `dist` tetap lokal/ignored.
   Jangan membaca catatan privat atau mengunggahnya. Jangan menghapus/memindahkan toolchain

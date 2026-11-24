@@ -28,6 +28,7 @@ if ($UpdateFeed.StartsWith('https://')) {
 if ($ExecutablePath) { $ExecutablePath = (Resolve-Path -LiteralPath $ExecutablePath).Path }
 if ($ReleaseNotes) { $ReleaseNotes = (Resolve-Path -LiteralPath $ReleaseNotes).Path }
 & (Join-Path $PSScriptRoot 'setup-velopack.ps1') | Out-Host
+$ownsStage = $false
 if ($PreparedPayload) {
     $payload = (Resolve-Path -LiteralPath $PreparedPayload).Path
     if ((Get-Content -Raw -LiteralPath (Join-Path $payload 'origo-update-feed.txt')).Trim() -ne $UpdateFeed) { throw 'The prepared payload points to a different feed' }
@@ -35,6 +36,7 @@ if ($PreparedPayload) {
     if ($ExecutablePath -and (Get-FileHash -LiteralPath (Join-Path $payload 'pdf-studio.exe')).Hash -ne (Get-FileHash -LiteralPath $ExecutablePath).Hash) { throw 'The prepared payload contains a different executable' }
 } else {
     $payload = & (Join-Path $PSScriptRoot 'package-portable.ps1') -ExecutablePath $ExecutablePath -StageOnly -UpdateFeed $UpdateFeed
+    $ownsStage = $true
 }
 $tools = Join-Path $root '.tools/velopack-1.2.161'
 # Velopack reuses a scratch directory for commands under the same Windows user.
@@ -70,4 +72,8 @@ try {
 } finally {
     if ($locked) { $packLock.ReleaseMutex() }
     $packLock.Dispose()
+    if ($ownsStage -and $payload) {
+        Remove-Item -LiteralPath $payload -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath ($payload + '-verified-inputs') -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }

@@ -32,3 +32,8 @@ unsafe_code = "forbid"
 unwrap_used = "deny"
 expect_used = "deny"
 
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = 0
