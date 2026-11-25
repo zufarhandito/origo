@@ -80,7 +80,97 @@ fn suggested_pdf_name(images: &[PathBuf]) -> String {
     {
         return format!("{stem}.pdf");
     }
+    if images.len() > 1
+        && let Some(folder) = images[0]
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+        && !folder.trim().is_empty()
+    {
+        return format!("{folder}.pdf");
+    }
     "gambar-ke-pdf.pdf".into()
+}
+
+fn quick_base_stem(images: &[PathBuf]) -> String {
+    let raw = if images.len() == 1 {
+        images[0]
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("gambar-ke-pdf")
+    } else {
+        images
+            .first()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("gambar-ke-pdf")
+    };
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .map(|c| {
+            if matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') || c.is_control() {
+                '-'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let cleaned = cleaned.trim_matches(|c| c == '.' || c == ' ');
+    if cleaned.is_empty() {
+        "gambar-ke-pdf".into()
+    } else {
+        cleaned.to_owned()
+    }
+}
+
+pub(super) fn compute_quick_destination(images: &[PathBuf]) -> Option<PathBuf> {
+    let parent = images.first()?.parent()?;
+    if parent.as_os_str().is_empty() {
+        return None;
+    }
+    let stem = quick_base_stem(images);
+    let candidate = parent.join(format!("{stem}.pdf"));
+    if !candidate.exists() {
+        return Some(candidate);
+    }
+    for n in 2..=999 {
+        let next = parent.join(format!("{stem}-{n}.pdf"));
+        if !next.exists() {
+            return Some(next);
+        }
+    }
+    None
+}
+
+fn filter_incoming_images(paths: Vec<PathBuf>) -> (Vec<PathBuf>, Option<String>) {
+    let mut accepted = Vec::new();
+    let mut rejected = 0usize;
+    let mut truncated = false;
+    for path in paths {
+        if !is_supported_image_extension(&path) {
+            rejected += 1;
+            continue;
+        }
+        if accepted.len() >= MAX_IMAGES {
+            truncated = true;
+            break;
+        }
+        accepted.push(path);
+    }
+    let note = if truncated {
+        Some(format!(
+            "Maksimal {MAX_IMAGES} gambar per PDF. Sebagian file dilewati."
+        ))
+    } else if rejected > 0 {
+        Some(format!(
+            "{rejected} file dilewati karena bukan PNG atau JPEG."
+        ))
+    } else {
+        None
+    };
+    (accepted, note)
 }
 
 fn summary_text(ui: &ImagesPdfDialog) -> String {
@@ -114,16 +204,33 @@ impl WindowShell {
     }
 
     pub(super) fn show_images_to_pdf(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_images_to_pdf_with_paths(Vec::new(), window, cx);
+    }
+
+    pub(super) fn show_images_to_pdf_with_paths(
+        &mut self,
+        initial_images: Vec<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if !self.can_start_images_to_pdf(cx) {
+            if !initial_images.is_empty() {
+                self.notice = Some(
+                    "Selesaikan dialog atau proses ekspor yang sedang berjalan terlebih dahulu."
+                        .into(),
+                );
+                cx.notify();
+            }
             return;
         }
+        let (images, error) = filter_incoming_images(initial_images);
         self.tab_picker_open = false;
         self.images_pdf.dialog = Some(ImagesPdfDialog {
-            images: Vec::new(),
+            images,
             options: ImagesToPdfOptions::default(),
             open_after: true,
             picking: false,
-            error: None,
+            error,
         });
         self.resources
             .modal_owner
@@ -737,9 +844,51 @@ impl WindowShell {
         self.start_images_to_pdf(plan, ui.open_after, cx);
     }
 
+    pub(super) fn quick_convert_images_to_pdf(
+        &mut self,
+        raw_images: Vec<PathBuf>,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.can_start_images_to_pdf(cx) {
+            self.notice = Some(
+                "Selesaikan dialog atau proses ekspor yang sedang berjalan terlebih dahulu.".into(),
+            );
+            cx.notify();
+            return;
+        }
+        let (images, _) = filter_incoming_images(raw_images);
+        let plan = match ImagesToPdfPlan::new(images, ImagesToPdfOptions::default()) {
+            Ok(plan) => plan,
+            Err(error) => {
+                self.notice = Some(format!("Gambar ke PDF gagal: {error}"));
+                cx.notify();
+                return;
+            }
+        };
+        let Some(destination) = compute_quick_destination(plan.images()) else {
+            self.notice = Some(
+                "Tidak dapat menentukan file PDF tujuan yang bebas konflik di folder sumber."
+                    .into(),
+            );
+            cx.notify();
+            return;
+        };
+        self.start_images_to_pdf_with_destination(plan, Some(destination), true, cx);
+    }
+
     fn start_images_to_pdf(
         &mut self,
         plan: ImagesToPdfPlan,
+        open_after: bool,
+        cx: &mut Context<Self>,
+    ) {
+        self.start_images_to_pdf_with_destination(plan, None, open_after, cx);
+    }
+
+    fn start_images_to_pdf_with_destination(
+        &mut self,
+        plan: ImagesToPdfPlan,
+        fixed_destination: Option<PathBuf>,
         open_after: bool,
         cx: &mut Context<Self>,
     ) {
@@ -751,14 +900,18 @@ impl WindowShell {
         {
             return;
         }
-        let parent = plan
-            .images()
-            .first()
-            .and_then(|p| p.parent())
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
-        let suggested = suggested_pdf_name(plan.images());
-        let dialog = cx.prompt_for_new_path(&parent, Some(&suggested));
+        let dialog = if fixed_destination.is_none() {
+            let parent = plan
+                .images()
+                .first()
+                .and_then(|p| p.parent())
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("."));
+            let suggested = suggested_pdf_name(plan.images());
+            Some(cx.prompt_for_new_path(&parent, Some(&suggested)))
+        } else {
+            None
+        };
         let control = ExportControl::with_budget(std::time::Duration::from_secs(600));
         let done = Arc::new(AtomicUsize::new(0));
         self.images_pdf.job_seq += 1;
@@ -805,26 +958,37 @@ impl WindowShell {
 
         let renderer = self.renderer.clone();
         cx.spawn(async move |this, cx| {
-            let destination = match dialog.await {
-                Ok(Ok(Some(path))) => {
-                    if path.extension().is_none() {
-                        path.with_extension("pdf")
-                    } else {
-                        path
+            let destination = match fixed_destination {
+                Some(path) => path,
+                None => match dialog {
+                    Some(dialog) => match dialog.await {
+                        Ok(Ok(Some(path))) => {
+                            if path.extension().is_none() {
+                                path.with_extension("pdf")
+                            } else {
+                                path
+                            }
+                        }
+                        Ok(Ok(None)) => {
+                            let _ = this.update(cx, |this, cx| {
+                                this.finish_images_to_pdf(Err(ImagesToPdfError::Cancelled), cx)
+                            });
+                            return;
+                        }
+                        _ => {
+                            let _ = this.update(cx, |this, cx| {
+                                this.finish_images_to_pdf(Err(ImagesToPdfError::Destination), cx)
+                            });
+                            return;
+                        }
+                    },
+                    None => {
+                        let _ = this.update(cx, |this, cx| {
+                            this.finish_images_to_pdf(Err(ImagesToPdfError::Destination), cx)
+                        });
+                        return;
                     }
-                }
-                Ok(Ok(None)) => {
-                    let _ = this.update(cx, |this, cx| {
-                        this.finish_images_to_pdf(Err(ImagesToPdfError::Cancelled), cx)
-                    });
-                    return;
-                }
-                _ => {
-                    let _ = this.update(cx, |this, cx| {
-                        this.finish_images_to_pdf(Err(ImagesToPdfError::Destination), cx)
-                    });
-                    return;
-                }
+                },
             };
             let result = cx
                 .background_executor()
@@ -892,5 +1056,39 @@ impl WindowShell {
         }
         self.report(cx);
         cx.notify();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quick_destination_picks_non_colliding_names() {
+        let dir = tempfile::tempdir().ok();
+        assert!(dir.is_some());
+        let Some(dir) = dir else { return };
+        let sub = dir.path().join("Foto Liburan");
+        assert!(std::fs::create_dir_all(&sub).is_ok());
+
+        let one = vec![sub.join("nota.png")];
+        assert_eq!(compute_quick_destination(&one), Some(sub.join("nota.pdf")));
+
+        assert!(std::fs::write(sub.join("nota.pdf"), b"%PDF-1.4").is_ok());
+        assert_eq!(
+            compute_quick_destination(&one),
+            Some(sub.join("nota-2.pdf"))
+        );
+
+        let many = vec![sub.join("a.png"), sub.join("b.jpg")];
+        assert_eq!(
+            compute_quick_destination(&many),
+            Some(sub.join("Foto Liburan.pdf"))
+        );
+        assert!(std::fs::write(sub.join("Foto Liburan.pdf"), b"%PDF-1.4").is_ok());
+        assert_eq!(
+            compute_quick_destination(&many),
+            Some(sub.join("Foto Liburan-2.pdf"))
+        );
     }
 }

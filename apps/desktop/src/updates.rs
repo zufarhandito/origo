@@ -32,6 +32,7 @@ struct ActiveVersionNoticeId;
 pub(super) enum Startup {
     Unmanaged,
     Installed(Installed),
+    AlreadyRunning { state_dir: Option<PathBuf> },
     Exit,
 }
 
@@ -86,7 +87,11 @@ pub(super) fn start(executable: &Path) -> anyhow::Result<Startup> {
         .open(root.join("origo-instance.lock"))?;
     match instance.try_lock() {
         Ok(()) => {}
-        Err(TryLockError::WouldBlock) => return Ok(Startup::Exit),
+        Err(TryLockError::WouldBlock) => {
+            return Ok(Startup::AlreadyRunning {
+                state_dir: preview.then(|| root.join("UserData")),
+            });
+        }
         Err(TryLockError::Error(error)) => return Err(error.into()),
     }
 

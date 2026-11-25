@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/desktop", "apps/smoke", "crates/domain", "crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "crates/platform", "crates/ocr"]
+members = ["apps/desktop", "apps/smoke", "crates/domain", "crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "crates/platform", "crates/ocr", "crates/shell-ext"]
 default-members = ["crates/application", "crates/pdf-engine", "crates/qpdf-adapter", "crates/ocr", "apps/smoke"]
 
 [workspace.package]

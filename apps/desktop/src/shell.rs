@@ -103,6 +103,7 @@ pub(super) struct WindowShell {
     split_view: Option<split_view::SplitView>,
     tab_picker_pairing: bool,
     pub(super) images_pdf: images_to_pdf::ImagesPdfState,
+    _ipc_guard: Option<ipc::IpcGuard>,
 }
 
 fn path_key(path: &std::path::Path) -> String {
@@ -121,6 +122,8 @@ impl WindowShell {
             metrics,
             state_dir,
             initial,
+            ipc_guard,
+            ipc_rx,
         } = options;
         cx.new(|cx| {
             let weak = cx.weak_entity();
@@ -204,6 +207,7 @@ impl WindowShell {
                 split_view: None,
                 tab_picker_pairing: false,
                 images_pdf: images_to_pdf::ImagesPdfState::default(),
+                _ipc_guard: ipc_guard,
             };
             cx.subscribe(&shell.tab_picker_input, |this, _, event, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -214,7 +218,7 @@ impl WindowShell {
             .detach();
             shell.load_favorites(cx);
             shell.load_recents(cx);
-            shell.initialize_session_restore(initial.is_some(), cx);
+            shell.initialize_session_restore(initial.has_document_open(), cx);
             shell.focus.focus(window, cx);
             if shell.metrics.is_some() {
                 cx.spawn(async move |this, cx| {
@@ -229,11 +233,80 @@ impl WindowShell {
                 })
                 .detach();
             }
-            if let Some(path) = initial {
-                shell.open_paths(vec![path], cx);
+            if let Some(rx) = ipc_rx {
+                let handle = window.window_handle();
+                cx.spawn(async move |this, cx| {
+                    loop {
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(150))
+                            .await;
+                        let mut pending = Vec::new();
+                        loop {
+                            match rx.try_recv() {
+                                Ok(intent) => pending.push(intent),
+                                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                                Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
+                            }
+                        }
+                        if pending.is_empty() {
+                            continue;
+                        }
+                        for intent in pending {
+                            let ok = handle
+                                .update(cx, |_, window, cx| {
+                                    window.activate_window();
+                                    let _ = this.update(cx, |this, cx| {
+                                        this.handle_launch_intent(intent, window, cx);
+                                    });
+                                })
+                                .is_ok();
+                            if !ok {
+                                return;
+                            }
+                        }
+                    }
+                })
+                .detach();
+            }
+            match initial {
+                ipc::LaunchIntent::None => {}
+                ipc::LaunchIntent::OpenPdf(path) => {
+                    shell.open_paths(vec![path], cx);
+                }
+                ipc::LaunchIntent::ImagesToPdfDialog(paths) => {
+                    let weak = cx.weak_entity();
+                    window.defer(cx, move |window, cx| {
+                        let _ = weak.update(cx, |this, cx| {
+                            this.show_images_to_pdf_with_paths(paths, window, cx);
+                        });
+                    });
+                }
+                ipc::LaunchIntent::ImagesToPdfQuick(paths) => {
+                    shell.quick_convert_images_to_pdf(paths, cx);
+                }
             }
             shell
         })
+    }
+
+    pub(super) fn handle_launch_intent(
+        &mut self,
+        intent: ipc::LaunchIntent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match intent {
+            ipc::LaunchIntent::None => {}
+            ipc::LaunchIntent::OpenPdf(path) => {
+                self.open_paths(vec![path], cx);
+            }
+            ipc::LaunchIntent::ImagesToPdfDialog(paths) => {
+                self.show_images_to_pdf_with_paths(paths, window, cx);
+            }
+            ipc::LaunchIntent::ImagesToPdfQuick(paths) => {
+                self.quick_convert_images_to_pdf(paths, cx);
+            }
+        }
     }
     fn session(&self) -> Option<Entity<DocumentSession>> {
         self.tabs
@@ -917,7 +990,9 @@ pub(super) struct ShellOptions {
     pub version: String,
     pub metrics: Option<PathBuf>,
     pub state_dir: Option<PathBuf>,
-    pub initial: Option<PathBuf>,
+    pub initial: ipc::LaunchIntent,
+    pub ipc_guard: Option<ipc::IpcGuard>,
+    pub ipc_rx: Option<std::sync::mpsc::Receiver<ipc::LaunchIntent>>,
 }
 
 #[derive(Clone, Copy)]

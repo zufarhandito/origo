@@ -23,6 +23,7 @@ mod document_model;
 mod exporting;
 mod feedback;
 mod images_to_pdf;
+mod ipc;
 mod local_state;
 mod ocr;
 mod outline;
@@ -190,43 +191,122 @@ fn cache_budget(name: &str, default: usize, min: usize, max: usize) -> anyhow::R
 #[cfg(windows)]
 mod updates;
 
+struct CliOptions {
+    initial: ipc::LaunchIntent,
+    metrics: Option<PathBuf>,
+    state_dir: Option<PathBuf>,
+}
+
+fn parse_cli_args(
+    args: impl IntoIterator<Item = std::ffi::OsString>,
+) -> anyhow::Result<CliOptions> {
+    let mut initial_pdf: Option<PathBuf> = None;
+    let mut images_dialog: Vec<PathBuf> = Vec::new();
+    let mut images_quick: Vec<PathBuf> = Vec::new();
+    let mut dialog_list: Option<PathBuf> = None;
+    let mut quick_list: Option<PathBuf> = None;
+    let mut delete_list = false;
+    let mut metrics = None;
+    let mut state_dir = None;
+    let mut collect_mode: Option<bool> = None; // Some(false) = dialog, Some(true) = quick
+    let mut iter = args.into_iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--metrics" {
+            collect_mode = None;
+            metrics =
+                Some(PathBuf::from(iter.next().ok_or_else(|| {
+                    anyhow::anyhow!("--metrics requires a path")
+                })?));
+        } else if arg == "--state-dir" {
+            collect_mode = None;
+            let path = PathBuf::from(
+                iter.next()
+                    .ok_or_else(|| anyhow::anyhow!("--state-dir requires a path"))?,
+            );
+            anyhow::ensure!(path.is_absolute(), "--state-dir requires an absolute path");
+            state_dir = Some(path);
+        } else if arg == "--images-to-pdf" {
+            collect_mode = Some(false);
+        } else if arg == "--images-to-pdf-quick" {
+            collect_mode = Some(true);
+        } else if arg == "--images-to-pdf-list" {
+            collect_mode = None;
+            dialog_list =
+                Some(PathBuf::from(iter.next().ok_or_else(|| {
+                    anyhow::anyhow!("--images-to-pdf-list requires a path")
+                })?));
+        } else if arg == "--images-to-pdf-quick-list" {
+            collect_mode = None;
+            quick_list = Some(PathBuf::from(iter.next().ok_or_else(|| {
+                anyhow::anyhow!("--images-to-pdf-quick-list requires a path")
+            })?));
+        } else if arg == "--delete-list" {
+            collect_mode = None;
+            delete_list = true;
+        } else if let Some(quick) = collect_mode {
+            if quick {
+                images_quick.push(PathBuf::from(arg));
+            } else {
+                images_dialog.push(PathBuf::from(arg));
+            }
+        } else if initial_pdf.is_none() {
+            initial_pdf = Some(PathBuf::from(arg));
+        } else {
+            anyhow::bail!(
+                "Usage: pdf-studio [file.pdf] [--images-to-pdf <img...>] [--images-to-pdf-quick <img...>] [--images-to-pdf-list <file>] [--images-to-pdf-quick-list <file>] [--delete-list] [--metrics diagnostics.json] [--state-dir directory]"
+            );
+        }
+    }
+    if let Some(list_path) = dialog_list {
+        images_dialog.extend(ipc::parse_manifest_file(&list_path, delete_list)?);
+    }
+    if let Some(list_path) = quick_list {
+        images_quick.extend(ipc::parse_manifest_file(&list_path, delete_list)?);
+    }
+    let initial = if !images_quick.is_empty() {
+        ipc::LaunchIntent::ImagesToPdfQuick(images_quick)
+    } else if !images_dialog.is_empty() {
+        ipc::LaunchIntent::ImagesToPdfDialog(images_dialog)
+    } else if let Some(path) = initial_pdf {
+        ipc::LaunchIntent::OpenPdf(path)
+    } else {
+        ipc::LaunchIntent::None
+    };
+    Ok(CliOptions {
+        initial,
+        metrics,
+        state_dir,
+    })
+}
+
 fn main() -> anyhow::Result<()> {
     let executable = std::env::current_exe()?;
+    let cli = parse_cli_args(std::env::args_os().skip(1))?;
+    let initial = cli.initial;
+    let metrics = cli.metrics;
+    let mut state_dir = cli.state_dir;
     #[cfg(windows)]
     let installed = match updates::start(&executable)? {
         updates::Startup::Unmanaged => None,
         updates::Startup::Installed(app) => Some(app),
+        updates::Startup::AlreadyRunning {
+            state_dir: installed_state,
+        } => {
+            if let Some(dir) = state_dir
+                .or(installed_state)
+                .or_else(local_state::directory)
+                && (metrics.is_none() || !initial.has_document_open())
+            {
+                let _ = ipc::try_forward_to_running(&dir, &initial);
+            }
+            return Ok(());
+        }
         updates::Startup::Exit => return Ok(()),
     };
     let sidecars = executable
         .parent()
         .ok_or_else(|| anyhow::anyhow!("Executable directory missing"))?
         .join("sidecars");
-    let mut initial = None;
-    let mut metrics = None;
-    let mut state_dir = None;
-    let mut args = std::env::args_os().skip(1);
-    while let Some(arg) = args.next() {
-        if arg == "--metrics" {
-            metrics =
-                Some(PathBuf::from(args.next().ok_or_else(|| {
-                    anyhow::anyhow!("--metrics requires a path")
-                })?));
-        } else if arg == "--state-dir" {
-            let path = PathBuf::from(
-                args.next()
-                    .ok_or_else(|| anyhow::anyhow!("--state-dir requires a path"))?,
-            );
-            anyhow::ensure!(path.is_absolute(), "--state-dir requires an absolute path");
-            state_dir = Some(path);
-        } else if initial.is_none() {
-            initial = Some(PathBuf::from(arg));
-        } else {
-            anyhow::bail!(
-                "Usage: pdf-studio [file.pdf] [--metrics diagnostics.json] [--state-dir directory]"
-            );
-        }
-    }
     let version = env!("CARGO_PKG_VERSION").to_owned();
     #[cfg(windows)]
     let version = if let Some(installed) = &installed {
@@ -236,6 +316,18 @@ fn main() -> anyhow::Result<()> {
         installed.version()
     } else {
         version
+    };
+    let effective_state_dir = state_dir.or_else(local_state::directory);
+    if !initial.is_none()
+        && let Some(dir) = effective_state_dir.as_deref()
+        && (metrics.is_none() || !initial.has_document_open())
+        && ipc::try_forward_to_running(dir, &initial)
+    {
+        return Ok(());
+    }
+    let (ipc_guard, ipc_rx) = match effective_state_dir.as_deref().and_then(ipc::start_listener) {
+        Some((guard, rx)) => (Some(guard), Some(rx)),
+        None => (None, None),
     };
     #[cfg(windows)]
     let updater = installed.as_ref().map(updates::Installed::updater);
@@ -329,8 +421,10 @@ fn main() -> anyhow::Result<()> {
                             thumbnail_budget,
                             version: version.clone(),
                             metrics: metrics.clone(),
-                            state_dir: state_dir.clone().or_else(local_state::directory),
+                            state_dir: effective_state_dir.clone(),
                             initial: initial.clone(),
+                            ipc_guard,
+                            ipc_rx,
                         },
                     )
                 },

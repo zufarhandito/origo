@@ -1,5 +1,27 @@
 # Pengujian Origo
 
+## Menu klik kanan Windows 11 File Explorer (`Origo > …`, dev mode)
+
+Verifikasi dijalankan dalam mode pengembangan (`--locked --offline`, tanpa build release/installer):
+
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked --offline -- -D warnings`
+  (0 warning), dan `cargo test --workspace --locked --offline` lulus (**113 unit test**, termasuk
+  5 unit test baru di `origo-shell-ext` untuk `IExplorerCommand` + `IEnumExplorerCommand`,
+  deteksi bahasa OS, klasifikasi gambar, dan manifest launcher, serta 3 unit test baru di
+  `pdf-studio` untuk IPC lokal ber-token dan penamaan no-clobber konversi cepat).
+- `scripts/shell-ext-ui-smoke.ps1 -Profile debug` lulus seluruh 5 pemeriksaan end-to-end:
+  - Pemaketan & penandatanganan Sparse MSIX (`OrigoShellExt.msix` lewat `makeappx.exe` +
+    `signtool.exe` dengan sertifikat dev `CN=Origo Dev`).
+  - Peluncuran dingin `--images-to-pdf-list ... --delete-list` membuka dialog **Gambar ke PDF**
+    yang langsung terisi 2 gambar terpilih dan menghapus berkas manifest sementara.
+  - Peluncuran hangat `--images-to-pdf-quick-list` meneruskan perintah lewat IPC lokal ke jendela
+    Origo yang sudah aktif, membuat `Foto Proyek.pdf` di folder sumber, dan membukanya di tab baru.
+  - Konversi cepat kedua pada folder yang sama memakai akhiran *no-clobber* (`Foto Proyek-2.pdf`)
+    dengan hash `Foto Proyek.pdf` tetap identik.
+  - Peluncuran hangat `--images-to-pdf-list` membuka dialog terisi di atas 2 tab aktif tanpa
+    mengubah berkas gambar sumber.
+  - Bukti lokal ada di `.research/shell-ext-ui-c90b60356c93498ba6c2f741c9c326ef`.
+
 ## Gambar (PNG/JPEG) ke PDF — Stage C2 (dev mode)
 
 Verifikasi dijalankan dalam mode pengembangan (`--locked --offline`, tanpa build release/installer):
