@@ -6,6 +6,7 @@ pub use pdf_domain::{
 };
 use std::path::{Path, PathBuf};
 pub mod annotation;
+pub mod compress;
 pub mod export;
 pub mod images_to_pdf;
 pub mod png;

@@ -27,6 +27,7 @@ mod ipc;
 mod local_state;
 mod ocr;
 mod outline;
+mod pdf_compress;
 mod pdf_security;
 mod pdf_shell_actions;
 mod pdf_stamps;

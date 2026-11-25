@@ -105,6 +105,7 @@ pub(super) struct WindowShell {
     pub(super) images_pdf: images_to_pdf::ImagesPdfState,
     pub(super) pdf_merge: pdf_shell_actions::PdfMergeState,
     pub(super) security: pdf_security::SecurityState,
+    pub(super) compress: pdf_compress::CompressState,
     pub(super) pending_pdf_action: Option<ipc::PdfShellAction>,
     #[cfg(windows)]
     pub(super) shell_ext_dialog: Option<pdf_shell_actions::ShellExtDialog>,
@@ -214,6 +215,7 @@ impl WindowShell {
                 images_pdf: images_to_pdf::ImagesPdfState::default(),
                 pdf_merge: pdf_shell_actions::PdfMergeState::default(),
                 security: pdf_security::SecurityState::default(),
+                compress: pdf_compress::CompressState::default(),
                 pending_pdf_action: None,
                 #[cfg(windows)]
                 shell_ext_dialog: None,
@@ -473,6 +475,12 @@ impl WindowShell {
         json["securityRunning"] = serde_json::json!(self.security.job.is_some());
         json["securityCompleted"] = serde_json::json!(self.security.completed);
         json["securitySuccess"] = serde_json::json!(self.security.success);
+        json["compressDialog"] = serde_json::json!(self.compress.dialog.is_some());
+        json["compressRunning"] = serde_json::json!(self.compress.job.is_some());
+        json["compressCompleted"] = serde_json::json!(self.compress.completed);
+        json["compressSuccess"] = serde_json::json!(self.compress.success);
+        json["compressBeforeBytes"] = serde_json::json!(self.compress.last_before_bytes);
+        json["compressAfterBytes"] = serde_json::json!(self.compress.last_after_bytes);
         json["sessions"] = serde_json::json!(sessions);
         let sequence = self.resources.metrics_sequence.clone();
         let number = sequence.fetch_add(1, Ordering::SeqCst) + 1;
@@ -491,6 +499,7 @@ impl WindowShell {
         self.resources.modal_owner.load(Ordering::SeqCst) != 0
             || self.security.dialog.is_some()
             || self.security.password_prompt.is_some()
+            || self.compress.dialog.is_some()
             || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
                 s.error_popup
@@ -908,6 +917,13 @@ impl WindowShell {
                     cx.notify();
                     return;
                 }
+                if self.close.as_ref().is_some_and(|b| b.window) && self.compress.job.is_some() {
+                    self.notice = Some(
+                        "Menunggu kompresi PDF selesai sebelum menutup jendela. Gunakan Batal atau Tetap di aplikasi.".into(),
+                    );
+                    cx.notify();
+                    return;
+                }
                 if let Some(batch) = &self.close
                     && self.ocr.update(cx, |ocr, cx| ocr.stop_tabs(&batch.ids, cx))
                 {
@@ -1116,6 +1132,7 @@ enum MenuAction {
     Png,
     ImagesToPdf,
     Optimize,
+    CompressPdf,
     PageNumbers,
     Watermark,
     EncryptPdf,
@@ -1177,6 +1194,7 @@ impl WindowShell {
             DuplicateView => self.duplicate_view(window, cx),
             Open => self.choose_open(cx),
             ImagesToPdf => self.show_images_to_pdf(window, cx),
+            CompressPdf => self.show_compress_pdf(window, cx),
             EncryptPdf => self.show_encrypt_pdf(window, cx),
             DecryptPdf => self.show_decrypt_pdf(window, cx),
             Close => {
@@ -1347,9 +1365,10 @@ impl WindowShell {
             Copy => s.text.selection.is_some(),
             OcrBatch => content && s.navigation.count > 0 && !self.ocr.read(cx).has_batch(),
             Select | Clear => content && s.mode == ViewerMode::Organize,
-            Save | OcrExport | Optimize | Split | Png => {
+            Save | OcrExport | Optimize | CompressPdf | Split | Png => {
                 content
                     && s.navigation.count > 0
+                    && self.compress.job.is_none()
                     && self.resources.export_owner.load(Ordering::SeqCst) == 0
             }
             Extract => {
@@ -1631,6 +1650,7 @@ impl Render for WindowShell {
                     ("Ekspor PNG…", Png),
                     ("Gambar ke PDF…", ImagesToPdf),
                     ("Optimize PDF (lossless)…", Optimize),
+                    ("Kompres PDF (Ukuran)…", CompressPdf),
                     ("Nomor Halaman…", PageNumbers),
                     ("Watermark…", Watermark),
                     ("Lindungi PDF (Password)…", EncryptPdf),
@@ -1929,6 +1949,24 @@ impl Render for WindowShell {
                                 .label("Batal")
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.cancel_security_job(cx);
+                                })),
+                        ),
+                )
+            })
+            .when(self.compress.job.is_some(), |el| {
+                let text = self.compress.status_label();
+                el.child(
+                    div()
+                        .flex()
+                        .px_3()
+                        .items_center()
+                        .child(div().flex_1().text_sm().child(text))
+                        .child(
+                            Button::new("cancel-compress-job")
+                                .ghost()
+                                .label("Batal")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.cancel_compress_job(cx);
                                 })),
                         ),
                 )

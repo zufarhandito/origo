@@ -80,7 +80,7 @@ anotator inti dan tanda tangan visual sudah diotorisasi dan diimplementasikan.
 | OCR lokal | [Mesin dan perilaku OCR](ocr.md), [checklist implementasi](plans/OCR_IMPLEMENTATION_PLAN.md) |
 | Installer Windows | [Installer dan pembaruan Origo Preview](installer.md) |
 | Pengaturan halaman | [Organizer](organizer.md), [perubahan belum disimpan](unsaved-changes.md) |
-| Output PDF | [Save As/Extract](m3-safe-export-plan.md), [Split](split.md), [Optimize](optimize.md) |
+| Output PDF | [Save As/Extract](m3-safe-export-plan.md), [Split](split.md), [Optimize (lossless)](optimize.md), [Kompresi PDF Pintar](compress.md) |
 | Utilitas PDF harian | [Nomor halaman, watermark, enkripsi AES-256 & buka kunci](daily-utilities.md) |
 | Integrasi Explorer Windows 11 | [Menu klik kanan gambar & PDF](explorer-shell-extension.md) |
 | Dukungan/pengujian | [Kompatibilitas](compatibility.md), [hasil pengujian](testing.md) |
