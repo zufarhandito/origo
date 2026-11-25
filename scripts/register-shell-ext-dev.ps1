@@ -1,5 +1,6 @@
 param(
     [ValidateSet('debug', 'release')][string]$Profile = 'debug',
+    [string]$TargetExe,
     [switch]$SkipBuild,
     [switch]$PackageOnly,
     [switch]$NoElevate
@@ -53,12 +54,13 @@ if (-not $SkipBuild) {
 
 $targetDir = Join-Path $root "target\$Profile"
 $dllPath = Join-Path $targetDir 'origo_shell_ext.dll'
-$exePath = Join-Path $targetDir 'pdf-studio.exe'
+$exePath = if ($TargetExe) { $TargetExe } else { Join-Path $targetDir 'pdf-studio.exe' }
+$stageExePath = Join-Path $targetDir 'pdf-studio.exe'
 $icoPath = Join-Path $root 'apps\desktop\resources\branding\origo.ico'
 $srcPng = Join-Path $root 'apps\desktop\resources\branding\origo-source.png'
 $manifestSrc = Join-Path $root 'packaging\shell-ext\AppxManifest.xml'
 
-foreach ($required in @($dllPath, $exePath, $icoPath, $srcPng, $manifestSrc)) {
+foreach ($required in @($dllPath, $stageExePath, $icoPath, $srcPng, $manifestSrc)) {
     if (-not (Test-Path -LiteralPath $required)) {
         throw "Required file missing: $required"
     }
@@ -81,9 +83,9 @@ New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
 
 # Stage external location files (isolated per run to avoid dllhost.exe file-lock conflicts)
 Copy-Item -LiteralPath $dllPath -Destination (Join-Path $extDir 'origo_shell_ext.dll') -Force
-Copy-Item -LiteralPath $exePath -Destination (Join-Path $extDir 'pdf-studio.exe') -Force
+Copy-Item -LiteralPath $stageExePath -Destination (Join-Path $extDir 'pdf-studio.exe') -Force
 Copy-Item -LiteralPath $icoPath -Destination (Join-Path $extDir 'origo.ico') -Force
-# Write UTF-8 (no BOM) target pointer so the DLL always launches the latest dev pdf-studio.exe directly
+# Write UTF-8 (no BOM) target pointer so the DLL launches the configured pdf-studio.exe directly
 [IO.File]::WriteAllText((Join-Path $extDir 'origo-target.txt'), $exePath, (New-Object Text.UTF8Encoding($false)))
 
 # Stage MSIX sparse package content (manifest + visual assets)
