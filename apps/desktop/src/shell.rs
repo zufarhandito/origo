@@ -36,11 +36,11 @@ pub(super) struct WindowResources {
     pub gpu_release_errors: Arc<AtomicU64>,
 }
 pub(super) struct Tab {
-    id: TabId,
-    path: PathBuf,
-    session: Option<Entity<DocumentSession>>,
-    secondary: Option<Entity<DocumentSession>>,
-    preferred_secondary: bool,
+    pub(super) id: TabId,
+    pub(super) path: PathBuf,
+    pub(super) session: Option<Entity<DocumentSession>>,
+    pub(super) secondary: Option<Entity<DocumentSession>>,
+    pub(super) preferred_secondary: bool,
 }
 pub(super) struct CloseBatch {
     ids: Vec<TabId>,
@@ -55,19 +55,19 @@ pub(super) struct CloseBatch {
 pub(super) struct WindowShell {
     pub(super) tabs: Vec<Tab>,
     active: Option<TabId>,
-    next_id: u64,
-    sidecars: PathBuf,
+    pub(super) next_id: u64,
+    pub(super) sidecars: PathBuf,
     pub(super) renderer: PdfiumRenderer,
-    ocr: Entity<ocr::OcrJobs>,
+    pub(super) ocr: Entity<ocr::OcrJobs>,
     #[cfg(windows)]
     ocr_tray: Option<ocr_tray::OcrTray>,
     #[cfg(windows)]
     updater: Option<Entity<updates::Updater>>,
     pub(super) resources: Arc<WindowResources>,
-    page_budget: usize,
-    thumbnail_budget: usize,
+    pub(super) page_budget: usize,
+    pub(super) thumbnail_budget: usize,
     version: String,
-    metrics: Option<PathBuf>,
+    pub(super) metrics: Option<PathBuf>,
     focus: FocusHandle,
     tab_scroll: ScrollHandle,
     pub(super) handle: gpui::AnyWindowHandle,
@@ -93,8 +93,8 @@ pub(super) struct WindowShell {
     tab_picker_selected: usize,
     tab_picker_scroll: ScrollHandle,
     session_ready: bool,
-    session_offer: Option<crate::local_state::SessionSnapshot>,
-    session_offer_dismissed: bool,
+    pub(super) session_offer: Option<crate::local_state::SessionSnapshot>,
+    pub(super) session_offer_dismissed: bool,
     restoring_session: Option<crate::local_state::SessionSnapshot>,
     session_last: Option<crate::local_state::SessionSnapshot>,
     session_writing: bool,
@@ -103,6 +103,10 @@ pub(super) struct WindowShell {
     split_view: Option<split_view::SplitView>,
     tab_picker_pairing: bool,
     pub(super) images_pdf: images_to_pdf::ImagesPdfState,
+    pub(super) pdf_merge: pdf_shell_actions::PdfMergeState,
+    pub(super) pending_pdf_action: Option<ipc::PdfShellAction>,
+    #[cfg(windows)]
+    pub(super) shell_ext_dialog: Option<pdf_shell_actions::ShellExtDialog>,
     _ipc_guard: Option<ipc::IpcGuard>,
 }
 
@@ -207,6 +211,10 @@ impl WindowShell {
                 split_view: None,
                 tab_picker_pairing: false,
                 images_pdf: images_to_pdf::ImagesPdfState::default(),
+                pdf_merge: pdf_shell_actions::PdfMergeState::default(),
+                pending_pdf_action: None,
+                #[cfg(windows)]
+                shell_ext_dialog: None,
                 _ipc_guard: ipc_guard,
             };
             cx.subscribe(&shell.tab_picker_input, |this, _, event, cx| {
@@ -273,6 +281,15 @@ impl WindowShell {
                 ipc::LaunchIntent::OpenPdf(path) => {
                     shell.open_paths(vec![path], cx);
                 }
+                ipc::LaunchIntent::PdfAction { path, action } => {
+                    shell.open_pdf_with_action(path, action, cx);
+                }
+                ipc::LaunchIntent::PdfCombineOrganize(paths) => {
+                    shell.combine_pdfs_in_organizer(paths, cx);
+                }
+                ipc::LaunchIntent::PdfCombineQuick(paths) => {
+                    shell.quick_combine_pdfs(paths, cx);
+                }
                 ipc::LaunchIntent::ImagesToPdfDialog(paths) => {
                     let weak = cx.weak_entity();
                     window.defer(cx, move |window, cx| {
@@ -300,6 +317,15 @@ impl WindowShell {
             ipc::LaunchIntent::OpenPdf(path) => {
                 self.open_paths(vec![path], cx);
             }
+            ipc::LaunchIntent::PdfAction { path, action } => {
+                self.open_pdf_with_action(path, action, cx);
+            }
+            ipc::LaunchIntent::PdfCombineOrganize(paths) => {
+                self.combine_pdfs_in_organizer(paths, cx);
+            }
+            ipc::LaunchIntent::PdfCombineQuick(paths) => {
+                self.quick_combine_pdfs(paths, cx);
+            }
             ipc::LaunchIntent::ImagesToPdfDialog(paths) => {
                 self.show_images_to_pdf_with_paths(paths, window, cx);
             }
@@ -308,7 +334,7 @@ impl WindowShell {
             }
         }
     }
-    fn session(&self) -> Option<Entity<DocumentSession>> {
+    pub(super) fn session(&self) -> Option<Entity<DocumentSession>> {
         self.tabs
             .iter()
             .find(|t| Some(t.id) == self.active)
@@ -430,6 +456,10 @@ impl WindowShell {
         json["imagesPdfCompleted"] = serde_json::json!(self.images_pdf.completed);
         json["imagesPdfSuccess"] = serde_json::json!(self.images_pdf.success);
         json["imagesPdfPages"] = serde_json::json!(self.images_pdf.pages);
+        json["pdfMergeRunning"] = serde_json::json!(self.pdf_merge.job.is_some());
+        json["pdfMergeCompleted"] = serde_json::json!(self.pdf_merge.completed);
+        json["pdfMergeSuccess"] = serde_json::json!(self.pdf_merge.success);
+        json["pdfMergePages"] = serde_json::json!(self.pdf_merge.pages);
         json["sessions"] = serde_json::json!(sessions);
         let sequence = self.resources.metrics_sequence.clone();
         let number = sequence.fetch_add(1, Ordering::SeqCst) + 1;
@@ -546,6 +576,7 @@ impl WindowShell {
         if !capacity(self.tabs.len(), paths.len()) {
             self.opening = false;
             self.reopening_tab = None;
+            self.pending_pdf_action = None;
             self.finish_session_restore(cx);
             self.notice = Some(format!(
                 "Maksimal 8 tab. Tersisa {} slot; tutup tab atau pilih lebih sedikit PDF.",
@@ -558,9 +589,12 @@ impl WindowShell {
             self.opening = false;
             if let Some(id) = first_existing {
                 self.activate(id, cx);
+                self.trigger_pending_pdf_action(cx);
                 if self.reopening_tab.take().is_some() {
                     self.closed_tabs.pop_back();
                 }
+            } else {
+                self.pending_pdf_action = None;
             }
             self.reopening_tab = None;
             self.finish_session_restore(cx);
@@ -662,6 +696,9 @@ impl WindowShell {
                         .then(|| format!("PDF yang gagal dibuka:\n{}", failures.join("\n")));
                     if let Some(id) = first.or(first_existing) {
                         this.activate(id, cx);
+                        this.trigger_pending_pdf_action(cx);
+                    } else {
+                        this.pending_pdf_action = None;
                     }
                     this.finish_session_restore(cx);
                     cx.notify();
@@ -671,7 +708,7 @@ impl WindowShell {
         .detach();
         cx.notify();
     }
-    fn activate(&mut self, id: TabId, cx: &mut Context<Self>) {
+    pub(super) fn activate(&mut self, id: TabId, cx: &mut Context<Self>) {
         if !self.tabs.iter().any(|t| t.id == id && t.session.is_some()) {
             return;
         }
@@ -1035,6 +1072,8 @@ enum MenuAction {
     Png,
     ImagesToPdf,
     Optimize,
+    #[cfg(windows)]
+    ShellIntegration,
     Help,
     #[cfg(windows)]
     CheckUpdates,
@@ -1067,6 +1106,8 @@ impl WindowShell {
                     updater.update(cx, |updater, cx| updater.check_manually(cx));
                 }
             }
+            #[cfg(windows)]
+            ShellIntegration => self.show_shell_integration_dialog(window, cx),
             ClearOcr => {
                 let reply = window.prompt(
                     gpui::PromptLevel::Warning,
@@ -1194,6 +1235,10 @@ impl WindowShell {
         }
         if matches!(action, ImagesToPdf) {
             return self.can_start_images_to_pdf(cx);
+        }
+        #[cfg(windows)]
+        if matches!(action, ShellIntegration) {
+            return !self.opening;
         }
         if matches!(action, Reopen) {
             return !self.opening && !self.closed_tabs.is_empty() && self.tabs.len() < MAX_TABS;
@@ -1528,6 +1573,8 @@ impl Render for WindowShell {
                     ("Ekspor PNG…", Png),
                     ("Gambar ke PDF…", ImagesToPdf),
                     ("Optimize PDF (lossless)…", Optimize),
+                    #[cfg(windows)]
+                    ("Integrasi Menu Explorer…", ShellIntegration),
                 ],
             ),
             (
@@ -1784,6 +1831,24 @@ impl Render for WindowShell {
                                 .label("Batal ekspor")
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.cancel_images_to_pdf(cx);
+                                })),
+                        ),
+                )
+            })
+            .when(self.pdf_merge.job.is_some(), |el| {
+                let text = format!("Gabungkan PDF — {}", self.pdf_merge.phase_label());
+                el.child(
+                    div()
+                        .flex()
+                        .px_3()
+                        .items_center()
+                        .child(div().flex_1().text_sm().child(text))
+                        .child(
+                            Button::new("cancel-pdf-merge-export")
+                                .ghost()
+                                .label("Batal ekspor")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.cancel_quick_combine_pdfs(cx);
                                 })),
                         ),
                 )

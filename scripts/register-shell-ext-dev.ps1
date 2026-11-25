@@ -161,7 +161,7 @@ if (-not $trusted) {
 # Replace any prior dev registration cleanly
 $existing = Get-AppxPackage -Name 'Origo.ShellExtension' -ErrorAction SilentlyContinue
 if ($existing) {
-    $existing | Remove-AppxPackage
+    $existing | Remove-AppxPackage -ErrorAction SilentlyContinue
 }
 
 Add-AppxPackage -Path $msixPath -ExternalLocation $extDir
@@ -172,4 +172,4 @@ Get-ChildItem -LiteralPath $devBase -Directory -Filter 'ext-*' -ErrorAction Sile
     ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host 'PASS: Origo Windows 11 Explorer shell extension registered!'
-Write-Host 'Right-click one or more PNG/JPEG files in File Explorer -> Origo.'
+Write-Host 'Right-click PNG/JPEG images or PDF files in File Explorer -> Origo.'

@@ -85,6 +85,57 @@ pub fn quick_title(
     }
 }
 
+pub fn pdf_open_title(lang: ShellLanguage) -> &'static str {
+    match lang {
+        ShellLanguage::Indonesian => "Buka di Origo",
+        ShellLanguage::English => "Open in Origo",
+    }
+}
+
+pub fn pdf_compress_title(lang: ShellLanguage) -> &'static str {
+    match lang {
+        ShellLanguage::Indonesian => "Kompres PDF (lossless)…",
+        ShellLanguage::English => "Compress PDF (lossless)…",
+    }
+}
+
+pub fn pdf_split_title(lang: ShellLanguage) -> &'static str {
+    match lang {
+        ShellLanguage::Indonesian => "Pisahkan PDF…",
+        ShellLanguage::English => "Split PDF…",
+    }
+}
+
+pub fn pdf_png_title(lang: ShellLanguage) -> &'static str {
+    match lang {
+        ShellLanguage::Indonesian => "Ekspor ke PNG…",
+        ShellLanguage::English => "Export to PNG…",
+    }
+}
+
+pub fn pdf_ocr_title(lang: ShellLanguage) -> &'static str {
+    match lang {
+        ShellLanguage::Indonesian => "OCR seluruh dokumen",
+        ShellLanguage::English => "OCR document",
+    }
+}
+
+pub fn pdf_combine_organize_title(lang: ShellLanguage) -> &'static str {
+    match lang {
+        ShellLanguage::Indonesian => "Gabungkan PDF di Origo…",
+        ShellLanguage::English => "Combine PDFs in Origo…",
+    }
+}
+
+pub fn pdf_combine_quick_title(lang: ShellLanguage, target_pdf_name: Option<&str>) -> String {
+    match (lang, target_pdf_name) {
+        (ShellLanguage::Indonesian, Some(name)) => format!("Gabungkan ke \"{name}\""),
+        (ShellLanguage::Indonesian, None) => "Gabungkan langsung ke PDF".into(),
+        (ShellLanguage::English, Some(name)) => format!("Combine into \"{name}\""),
+        (ShellLanguage::English, None) => "Combine directly into PDF".into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,6 +169,20 @@ mod tests {
         assert_eq!(
             quick_title(ShellLanguage::Indonesian, Some("scan.pdf"), 1),
             "Buat \"scan.pdf\" di sini"
+        );
+        assert_eq!(pdf_open_title(ShellLanguage::Indonesian), "Buka di Origo");
+        assert_eq!(pdf_open_title(ShellLanguage::English), "Open in Origo");
+        assert_eq!(
+            pdf_compress_title(ShellLanguage::English),
+            "Compress PDF (lossless)…"
+        );
+        assert_eq!(
+            pdf_combine_organize_title(ShellLanguage::Indonesian),
+            "Gabungkan PDF di Origo…"
+        );
+        assert_eq!(
+            pdf_combine_quick_title(ShellLanguage::English, Some("Kontrak.pdf")),
+            "Combine into \"Kontrak.pdf\""
         );
     }
 }

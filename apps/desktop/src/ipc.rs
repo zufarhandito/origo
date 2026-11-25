@@ -15,10 +15,24 @@ const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(500);
 const IO_TIMEOUT: Duration = Duration::from_millis(1500);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PdfShellAction {
+    Compress,
+    Split,
+    Png,
+    Ocr,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum LaunchIntent {
     None,
     OpenPdf(PathBuf),
+    PdfAction {
+        path: PathBuf,
+        action: PdfShellAction,
+    },
+    PdfCombineOrganize(Vec<PathBuf>),
+    PdfCombineQuick(Vec<PathBuf>),
     ImagesToPdfDialog(Vec<PathBuf>),
     ImagesToPdfQuick(Vec<PathBuf>),
 }
@@ -29,7 +43,10 @@ impl LaunchIntent {
     }
 
     pub(super) fn has_document_open(&self) -> bool {
-        matches!(self, Self::OpenPdf(_))
+        matches!(
+            self,
+            Self::OpenPdf(_) | Self::PdfAction { .. } | Self::PdfCombineOrganize(_)
+        )
     }
 }
 
@@ -88,24 +105,30 @@ fn read_endpoint(state_dir: &Path) -> Option<(u16, String)> {
     Some((port, token))
 }
 
+fn encode_paths(paths: &[PathBuf]) -> Vec<String> {
+    paths
+        .iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
+}
+
 fn encode_intent(token: &str, intent: &LaunchIntent) -> Option<String> {
     let (kind, paths): (&str, Vec<String>) = match intent {
         LaunchIntent::None => return None,
         LaunchIntent::OpenPdf(path) => ("open_pdf", vec![path.to_string_lossy().into_owned()]),
-        LaunchIntent::ImagesToPdfDialog(paths) => (
-            "images_dialog",
-            paths
-                .iter()
-                .map(|p| p.to_string_lossy().into_owned())
-                .collect(),
-        ),
-        LaunchIntent::ImagesToPdfQuick(paths) => (
-            "images_quick",
-            paths
-                .iter()
-                .map(|p| p.to_string_lossy().into_owned())
-                .collect(),
-        ),
+        LaunchIntent::PdfAction { path, action } => {
+            let kind = match action {
+                PdfShellAction::Compress => "pdf_compress",
+                PdfShellAction::Split => "pdf_split",
+                PdfShellAction::Png => "pdf_png",
+                PdfShellAction::Ocr => "pdf_ocr",
+            };
+            (kind, vec![path.to_string_lossy().into_owned()])
+        }
+        LaunchIntent::PdfCombineOrganize(paths) => ("pdf_combine_organize", encode_paths(paths)),
+        LaunchIntent::PdfCombineQuick(paths) => ("pdf_combine_quick", encode_paths(paths)),
+        LaunchIntent::ImagesToPdfDialog(paths) => ("images_dialog", encode_paths(paths)),
+        LaunchIntent::ImagesToPdfQuick(paths) => ("images_quick", encode_paths(paths)),
     };
     let payload = serde_json::json!({
         "token": token,
@@ -132,6 +155,24 @@ fn decode_intent(line: &str, expected_token: &str) -> Option<LaunchIntent> {
         .collect();
     match kind {
         "open_pdf" => paths.into_iter().next().map(LaunchIntent::OpenPdf),
+        "pdf_compress" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
+            path,
+            action: PdfShellAction::Compress,
+        }),
+        "pdf_split" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
+            path,
+            action: PdfShellAction::Split,
+        }),
+        "pdf_png" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
+            path,
+            action: PdfShellAction::Png,
+        }),
+        "pdf_ocr" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
+            path,
+            action: PdfShellAction::Ocr,
+        }),
+        "pdf_combine_organize" if !paths.is_empty() => Some(LaunchIntent::PdfCombineOrganize(paths)),
+        "pdf_combine_quick" if !paths.is_empty() => Some(LaunchIntent::PdfCombineQuick(paths)),
         "images_dialog" if !paths.is_empty() => Some(LaunchIntent::ImagesToPdfDialog(paths)),
         "images_quick" if !paths.is_empty() => Some(LaunchIntent::ImagesToPdfQuick(paths)),
         _ => None,
@@ -277,6 +318,26 @@ mod tests {
         assert_eq!(
             rx.recv_timeout(Duration::from_secs(2)).ok(),
             Some(quick_intent)
+        );
+
+        let split_intent = LaunchIntent::PdfAction {
+            path: PathBuf::from("C:\\tmp\\doc.pdf"),
+            action: PdfShellAction::Split,
+        };
+        assert!(try_forward_to_running(dir.path(), &split_intent));
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(2)).ok(),
+            Some(split_intent)
+        );
+
+        let merge_intent = LaunchIntent::PdfCombineQuick(vec![
+            PathBuf::from("C:\\tmp\\1.pdf"),
+            PathBuf::from("C:\\tmp\\2.pdf"),
+        ]);
+        assert!(try_forward_to_running(dir.path(), &merge_intent));
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(2)).ok(),
+            Some(merge_intent)
         );
 
         // Bad token must be rejected.

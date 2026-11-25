@@ -14,7 +14,7 @@ impl Tab {
     }
 }
 impl WindowShell {
-    pub(super) fn observe_document_view(
+    pub(crate) fn observe_document_view(
         &mut self,
         session: &Entity<DocumentSession>,
         id: TabId,

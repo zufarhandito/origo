@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 pub enum SelectionKind {
     Empty,
     Images(Vec<PathBuf>),
+    Pdfs(Vec<PathBuf>),
     Unsupported,
 }
 
@@ -18,12 +19,19 @@ pub fn is_supported_image(path: &Path) -> bool {
     })
 }
 
+pub fn is_supported_pdf(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
+}
+
 pub fn classify_paths(paths: Vec<PathBuf>) -> SelectionKind {
     if paths.is_empty() {
         return SelectionKind::Empty;
     }
     if paths.iter().all(|p| is_supported_image(p)) {
         SelectionKind::Images(paths)
+    } else if paths.iter().all(|p| is_supported_pdf(p)) {
+        SelectionKind::Pdfs(paths)
     } else {
         SelectionKind::Unsupported
     }
@@ -74,12 +82,29 @@ pub fn quick_pdf_display_name(images: &[PathBuf], lang: ShellLanguage) -> String
     format!("{}.pdf", truncate_display(&stem, 40))
 }
 
+pub fn quick_merge_pdf_display_name(pdfs: &[PathBuf], lang: ShellLanguage) -> String {
+    let raw = pdfs
+        .first()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    let stem = sanitize_stem(raw);
+    if stem.is_empty() {
+        return match lang {
+            ShellLanguage::Indonesian => "gabungan.pdf".into(),
+            ShellLanguage::English => "combined.pdf".into(),
+        };
+    }
+    format!("{}.pdf", truncate_display(&stem, 40))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn classifies_image_selections_strictly() {
+    fn classifies_image_and_pdf_selections_strictly() {
         assert_eq!(classify_paths(vec![]), SelectionKind::Empty);
         let imgs = vec![
             PathBuf::from("C:\\Pictures\\a.PNG"),
@@ -87,10 +112,24 @@ mod tests {
             PathBuf::from("C:\\Pictures\\c.jpg"),
         ];
         assert_eq!(classify_paths(imgs.clone()), SelectionKind::Images(imgs));
+
+        let pdfs = vec![
+            PathBuf::from("C:\\Docs\\bab1.pdf"),
+            PathBuf::from("C:\\Docs\\bab2.PDF"),
+        ];
+        assert_eq!(classify_paths(pdfs.clone()), SelectionKind::Pdfs(pdfs));
+
         assert_eq!(
             classify_paths(vec![
                 PathBuf::from("C:\\Pictures\\a.png"),
                 PathBuf::from("C:\\Pictures\\notes.txt"),
+            ]),
+            SelectionKind::Unsupported
+        );
+        assert_eq!(
+            classify_paths(vec![
+                PathBuf::from("C:\\Docs\\a.pdf"),
+                PathBuf::from("C:\\Docs\\b.png"),
             ]),
             SelectionKind::Unsupported
         );
@@ -110,6 +149,14 @@ mod tests {
         assert_eq!(
             quick_pdf_display_name(&many, ShellLanguage::English),
             "Pictures.pdf"
+        );
+        let pdfs = vec![
+            PathBuf::from("C:\\Users\\demo\\Kontrak\\01.pdf"),
+            PathBuf::from("C:\\Users\\demo\\Kontrak\\02.pdf"),
+        ];
+        assert_eq!(
+            quick_merge_pdf_display_name(&pdfs, ShellLanguage::Indonesian),
+            "Kontrak.pdf"
         );
     }
 }

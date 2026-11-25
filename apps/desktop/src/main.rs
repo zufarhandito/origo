@@ -27,6 +27,7 @@ mod ipc;
 mod local_state;
 mod ocr;
 mod outline;
+mod pdf_shell_actions;
 mod png_export;
 mod printing;
 mod reading_position;
@@ -200,11 +201,22 @@ struct CliOptions {
 fn parse_cli_args(
     args: impl IntoIterator<Item = std::ffi::OsString>,
 ) -> anyhow::Result<CliOptions> {
+    enum ManifestKind {
+        ImagesDialog,
+        ImagesQuick,
+        PdfOpen,
+        PdfCompress,
+        PdfSplit,
+        PdfPng,
+        PdfOcr,
+        PdfCombineOrganize,
+        PdfCombineQuick,
+    }
+
     let mut initial_pdf: Option<PathBuf> = None;
     let mut images_dialog: Vec<PathBuf> = Vec::new();
     let mut images_quick: Vec<PathBuf> = Vec::new();
-    let mut dialog_list: Option<PathBuf> = None;
-    let mut quick_list: Option<PathBuf> = None;
+    let mut manifest: Option<(ManifestKind, PathBuf)> = None;
     let mut delete_list = false;
     let mut metrics = None;
     let mut state_dir = None;
@@ -229,17 +241,30 @@ fn parse_cli_args(
             collect_mode = Some(false);
         } else if arg == "--images-to-pdf-quick" {
             collect_mode = Some(true);
-        } else if arg == "--images-to-pdf-list" {
+        } else if let Some((kind, flag_name)) = match arg.to_str() {
+            Some("--images-to-pdf-list") => {
+                Some((ManifestKind::ImagesDialog, "--images-to-pdf-list"))
+            }
+            Some("--images-to-pdf-quick-list") => {
+                Some((ManifestKind::ImagesQuick, "--images-to-pdf-quick-list"))
+            }
+            Some("--open-pdf-list") => Some((ManifestKind::PdfOpen, "--open-pdf-list")),
+            Some("--pdf-compress-list") => Some((ManifestKind::PdfCompress, "--pdf-compress-list")),
+            Some("--pdf-split-list") => Some((ManifestKind::PdfSplit, "--pdf-split-list")),
+            Some("--pdf-png-list") => Some((ManifestKind::PdfPng, "--pdf-png-list")),
+            Some("--pdf-ocr-list") => Some((ManifestKind::PdfOcr, "--pdf-ocr-list")),
+            Some("--merge-pdf-list") => Some((ManifestKind::PdfCombineOrganize, "--merge-pdf-list")),
+            Some("--merge-pdf-quick-list") => {
+                Some((ManifestKind::PdfCombineQuick, "--merge-pdf-quick-list"))
+            }
+            _ => None,
+        } {
             collect_mode = None;
-            dialog_list =
-                Some(PathBuf::from(iter.next().ok_or_else(|| {
-                    anyhow::anyhow!("--images-to-pdf-list requires a path")
-                })?));
-        } else if arg == "--images-to-pdf-quick-list" {
-            collect_mode = None;
-            quick_list = Some(PathBuf::from(iter.next().ok_or_else(|| {
-                anyhow::anyhow!("--images-to-pdf-quick-list requires a path")
-            })?));
+            let list_path = PathBuf::from(
+                iter.next()
+                    .ok_or_else(|| anyhow::anyhow!("{flag_name} requires a path"))?,
+            );
+            manifest = Some((kind, list_path));
         } else if arg == "--delete-list" {
             collect_mode = None;
             delete_list = true;
@@ -253,25 +278,71 @@ fn parse_cli_args(
             initial_pdf = Some(PathBuf::from(arg));
         } else {
             anyhow::bail!(
-                "Usage: pdf-studio [file.pdf] [--images-to-pdf <img...>] [--images-to-pdf-quick <img...>] [--images-to-pdf-list <file>] [--images-to-pdf-quick-list <file>] [--delete-list] [--metrics diagnostics.json] [--state-dir directory]"
+                "Usage: pdf-studio [file.pdf] [--images-to-pdf <img...>] [--images-to-pdf-quick <img...>] [--images-to-pdf-list <file>] [--images-to-pdf-quick-list <file>] [--open-pdf-list <file>] [--pdf-compress-list <file>] [--pdf-split-list <file>] [--pdf-png-list <file>] [--pdf-ocr-list <file>] [--merge-pdf-list <file>] [--merge-pdf-quick-list <file>] [--delete-list] [--metrics diagnostics.json] [--state-dir directory]"
             );
         }
     }
-    if let Some(list_path) = dialog_list {
-        images_dialog.extend(ipc::parse_manifest_file(&list_path, delete_list)?);
+    let mut initial = ipc::LaunchIntent::None;
+    if let Some((kind, list_path)) = manifest {
+        let paths = ipc::parse_manifest_file(&list_path, delete_list)?;
+        match kind {
+            ManifestKind::ImagesDialog => images_dialog.extend(paths),
+            ManifestKind::ImagesQuick => images_quick.extend(paths),
+            ManifestKind::PdfOpen => {
+                if let Some(path) = paths.into_iter().next() {
+                    initial = ipc::LaunchIntent::OpenPdf(path);
+                }
+            }
+            ManifestKind::PdfCompress => {
+                if let Some(path) = paths.into_iter().next() {
+                    initial = ipc::LaunchIntent::PdfAction {
+                        path,
+                        action: ipc::PdfShellAction::Compress,
+                    };
+                }
+            }
+            ManifestKind::PdfSplit => {
+                if let Some(path) = paths.into_iter().next() {
+                    initial = ipc::LaunchIntent::PdfAction {
+                        path,
+                        action: ipc::PdfShellAction::Split,
+                    };
+                }
+            }
+            ManifestKind::PdfPng => {
+                if let Some(path) = paths.into_iter().next() {
+                    initial = ipc::LaunchIntent::PdfAction {
+                        path,
+                        action: ipc::PdfShellAction::Png,
+                    };
+                }
+            }
+            ManifestKind::PdfOcr => {
+                if let Some(path) = paths.into_iter().next() {
+                    initial = ipc::LaunchIntent::PdfAction {
+                        path,
+                        action: ipc::PdfShellAction::Ocr,
+                    };
+                }
+            }
+            ManifestKind::PdfCombineOrganize if !paths.is_empty() => {
+                initial = ipc::LaunchIntent::PdfCombineOrganize(paths);
+            }
+            ManifestKind::PdfCombineQuick if !paths.is_empty() => {
+                initial = ipc::LaunchIntent::PdfCombineQuick(paths);
+            }
+            _ => {}
+        }
     }
-    if let Some(list_path) = quick_list {
-        images_quick.extend(ipc::parse_manifest_file(&list_path, delete_list)?);
-    }
-    let initial = if !images_quick.is_empty() {
-        ipc::LaunchIntent::ImagesToPdfQuick(images_quick)
+    if !images_quick.is_empty() {
+        initial = ipc::LaunchIntent::ImagesToPdfQuick(images_quick);
     } else if !images_dialog.is_empty() {
-        ipc::LaunchIntent::ImagesToPdfDialog(images_dialog)
-    } else if let Some(path) = initial_pdf {
-        ipc::LaunchIntent::OpenPdf(path)
-    } else {
-        ipc::LaunchIntent::None
-    };
+        initial = ipc::LaunchIntent::ImagesToPdfDialog(images_dialog);
+    } else if initial.is_none()
+        && let Some(path) = initial_pdf
+    {
+        initial = ipc::LaunchIntent::OpenPdf(path);
+    }
     Ok(CliOptions {
         initial,
         metrics,

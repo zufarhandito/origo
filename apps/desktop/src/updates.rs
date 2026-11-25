@@ -48,6 +48,9 @@ pub(super) fn start(executable: &Path) -> anyhow::Result<Startup> {
     VelopackApp::build()
         .set_auto_apply_on_startup(false)
         .on_restarted(|_| restarted = true)
+        .on_before_uninstall_fast_callback(|_| {
+            crate::pdf_shell_actions::unregister_shell_extension_silently();
+        })
         .run();
     let Some(bin) = executable.parent() else {
         return Ok(Startup::Unmanaged);

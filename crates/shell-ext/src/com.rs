@@ -30,8 +30,15 @@ use windows_core::{BOOL, GUID, HRESULT, IUnknown, Interface, PWSTR, Ref, Result,
 /// Stable CLSID for Origo's root Explorer submenu (`Origo > ...`).
 /// Must match `packaging/shell-ext/AppxManifest.xml`.
 pub const CLSID_ORIGO_ROOT: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D241);
-const CLSID_ORIGO_DIALOG: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D242);
-const CLSID_ORIGO_QUICK: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D243);
+const CLSID_ORIGO_IMAGES_DIALOG: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D242);
+const CLSID_ORIGO_IMAGES_QUICK: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D243);
+const CLSID_ORIGO_PDF_OPEN: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D244);
+const CLSID_ORIGO_PDF_COMPRESS: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D245);
+const CLSID_ORIGO_PDF_SPLIT: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D246);
+const CLSID_ORIGO_PDF_PNG: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D247);
+const CLSID_ORIGO_PDF_OCR: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D248);
+const CLSID_ORIGO_PDF_COMBINE_ORG: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D249);
+const CLSID_ORIGO_PDF_COMBINE_QUICK: GUID = GUID::from_u128(0x8F4B2C91_5D3A_4E12_9A7B_3C6E81F0D24A);
 
 static MODULE_HANDLE: AtomicUsize = AtomicUsize::new(0);
 
@@ -100,6 +107,27 @@ fn extract_shell_paths(items: Ref<'_, IShellItemArray>) -> Option<Vec<PathBuf>> 
     Some(paths)
 }
 
+fn matches_action_selection(mode: ActionMode, kind: &SelectionKind) -> bool {
+    match (mode, kind) {
+        (ActionMode::ImagesDialog | ActionMode::ImagesQuickConvert, SelectionKind::Images(_)) => {
+            true
+        }
+        (
+            ActionMode::PdfOpen
+            | ActionMode::PdfCompress
+            | ActionMode::PdfSplit
+            | ActionMode::PdfPng
+            | ActionMode::PdfOcr,
+            SelectionKind::Pdfs(pdfs),
+        ) => pdfs.len() == 1,
+        (
+            ActionMode::PdfCombineOrganize | ActionMode::PdfCombineQuick,
+            SelectionKind::Pdfs(pdfs),
+        ) => pdfs.len() >= 2,
+        _ => false,
+    }
+}
+
 #[implement(IExplorerCommand)]
 struct OrigoRootCommand;
 
@@ -128,7 +156,7 @@ impl IExplorerCommand_Impl for OrigoRootCommand_Impl {
             return Ok(ECS_ENABLED.0 as u32);
         };
         match selection::classify_paths(paths) {
-            SelectionKind::Images(_) => Ok(ECS_ENABLED.0 as u32),
+            SelectionKind::Images(_) | SelectionKind::Pdfs(_) => Ok(ECS_ENABLED.0 as u32),
             SelectionKind::Empty | SelectionKind::Unsupported => Ok(ECS_HIDDEN.0 as u32),
         }
     }
@@ -146,16 +174,21 @@ impl IExplorerCommand_Impl for OrigoRootCommand_Impl {
     }
 
     fn EnumSubCommands(&self) -> Result<IEnumExplorerCommand> {
-        let commands: Vec<IExplorerCommand> = vec![
-            OrigoActionCommand {
-                mode: ActionMode::Dialog,
-            }
-            .into(),
-            OrigoActionCommand {
-                mode: ActionMode::QuickConvert,
-            }
-            .into(),
+        let modes = [
+            ActionMode::ImagesDialog,
+            ActionMode::ImagesQuickConvert,
+            ActionMode::PdfOpen,
+            ActionMode::PdfCompress,
+            ActionMode::PdfSplit,
+            ActionMode::PdfPng,
+            ActionMode::PdfOcr,
+            ActionMode::PdfCombineOrganize,
+            ActionMode::PdfCombineQuick,
         ];
+        let commands: Vec<IExplorerCommand> = modes
+            .into_iter()
+            .map(|mode| OrigoActionCommand { mode }.into())
+            .collect();
         Ok(OrigoEnumCommands {
             commands,
             index: AtomicUsize::new(0),
@@ -172,23 +205,34 @@ struct OrigoActionCommand {
 impl IExplorerCommand_Impl for OrigoActionCommand_Impl {
     fn GetTitle(&self, psiitemarray: Ref<'_, IShellItemArray>) -> Result<PWSTR> {
         let lang = locale::detect_language();
-        let images = extract_shell_paths(psiitemarray)
-            .map(selection::classify_paths)
-            .and_then(|kind| match kind {
-                SelectionKind::Images(paths) => Some(paths),
-                _ => None,
-            });
+        let kind = extract_shell_paths(psiitemarray).map(selection::classify_paths);
         let label = match self.mode {
-            ActionMode::Dialog => {
-                let count = images.as_ref().map_or(2, Vec::len);
+            ActionMode::ImagesDialog => {
+                let count = match &kind {
+                    Some(SelectionKind::Images(paths)) => paths.len(),
+                    _ => 2,
+                };
                 locale::dialog_title(lang, count).to_owned()
             }
-            ActionMode::QuickConvert => match images {
-                Some(ref imgs) if !imgs.is_empty() => {
+            ActionMode::ImagesQuickConvert => match &kind {
+                Some(SelectionKind::Images(imgs)) if !imgs.is_empty() => {
                     let pdf_name = selection::quick_pdf_display_name(imgs, lang);
                     locale::quick_title(lang, Some(&pdf_name), imgs.len())
                 }
                 _ => locale::quick_title(lang, None, 2),
+            },
+            ActionMode::PdfOpen => locale::pdf_open_title(lang).to_owned(),
+            ActionMode::PdfCompress => locale::pdf_compress_title(lang).to_owned(),
+            ActionMode::PdfSplit => locale::pdf_split_title(lang).to_owned(),
+            ActionMode::PdfPng => locale::pdf_png_title(lang).to_owned(),
+            ActionMode::PdfOcr => locale::pdf_ocr_title(lang).to_owned(),
+            ActionMode::PdfCombineOrganize => locale::pdf_combine_organize_title(lang).to_owned(),
+            ActionMode::PdfCombineQuick => match &kind {
+                Some(SelectionKind::Pdfs(pdfs)) if pdfs.len() >= 2 => {
+                    let pdf_name = selection::quick_merge_pdf_display_name(pdfs, lang);
+                    locale::pdf_combine_quick_title(lang, Some(&pdf_name))
+                }
+                _ => locale::pdf_combine_quick_title(lang, None),
             },
         };
         alloc_co_pwstr(&label)
@@ -207,8 +251,15 @@ impl IExplorerCommand_Impl for OrigoActionCommand_Impl {
 
     fn GetCanonicalName(&self) -> Result<GUID> {
         Ok(match self.mode {
-            ActionMode::Dialog => CLSID_ORIGO_DIALOG,
-            ActionMode::QuickConvert => CLSID_ORIGO_QUICK,
+            ActionMode::ImagesDialog => CLSID_ORIGO_IMAGES_DIALOG,
+            ActionMode::ImagesQuickConvert => CLSID_ORIGO_IMAGES_QUICK,
+            ActionMode::PdfOpen => CLSID_ORIGO_PDF_OPEN,
+            ActionMode::PdfCompress => CLSID_ORIGO_PDF_COMPRESS,
+            ActionMode::PdfSplit => CLSID_ORIGO_PDF_SPLIT,
+            ActionMode::PdfPng => CLSID_ORIGO_PDF_PNG,
+            ActionMode::PdfOcr => CLSID_ORIGO_PDF_OCR,
+            ActionMode::PdfCombineOrganize => CLSID_ORIGO_PDF_COMBINE_ORG,
+            ActionMode::PdfCombineQuick => CLSID_ORIGO_PDF_COMBINE_QUICK,
         })
     }
 
@@ -216,9 +267,11 @@ impl IExplorerCommand_Impl for OrigoActionCommand_Impl {
         let Some(paths) = extract_shell_paths(psiitemarray) else {
             return Ok(ECS_ENABLED.0 as u32);
         };
-        match selection::classify_paths(paths) {
-            SelectionKind::Images(_) => Ok(ECS_ENABLED.0 as u32),
-            SelectionKind::Empty | SelectionKind::Unsupported => Ok(ECS_HIDDEN.0 as u32),
+        let kind = selection::classify_paths(paths);
+        if matches_action_selection(self.mode, &kind) {
+            Ok(ECS_ENABLED.0 as u32)
+        } else {
+            Ok(ECS_HIDDEN.0 as u32)
         }
     }
 
@@ -230,13 +283,18 @@ impl IExplorerCommand_Impl for OrigoActionCommand_Impl {
         let Some(paths) = extract_shell_paths(psiitemarray) else {
             return Ok(());
         };
-        let SelectionKind::Images(images) = selection::classify_paths(paths) else {
+        let kind = selection::classify_paths(paths);
+        if !matches_action_selection(self.mode, &kind) {
             return Ok(());
+        }
+        let selected = match kind {
+            SelectionKind::Images(paths) | SelectionKind::Pdfs(paths) => paths,
+            SelectionKind::Empty | SelectionKind::Unsupported => return Ok(()),
         };
         let Some(dir) = dll_directory() else {
             return Err(E_FAIL.into());
         };
-        launch::launch_origo(&dir, self.mode, &images).map_err(|_| E_FAIL.into())
+        launch::launch_origo(&dir, self.mode, &selected).map_err(|_| E_FAIL.into())
     }
 
     fn GetFlags(&self) -> Result<u32> {
@@ -420,7 +478,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn root_command_enumerates_two_subcommands() {
+    fn root_command_enumerates_all_subcommands_and_gates_selection() {
         let root = create_root_command_for_test();
         // SAFETY: Calling COM methods on our own freshly created in-proc object.
         unsafe {
@@ -436,14 +494,34 @@ mod tests {
             let enumerator = root.EnumSubCommands().ok();
             assert!(enumerator.is_some());
             if let Some(enumerator) = enumerator {
-                let mut items: [Option<IExplorerCommand>; 4] = [None, None, None, None];
+                let mut items: [Option<IExplorerCommand>; 12] = Default::default();
                 let mut fetched = 0u32;
                 let _ = enumerator.Next(&mut items, Some(&mut fetched));
-                assert_eq!(fetched, 2);
-                assert!(items[0].is_some());
-                assert!(items[1].is_some());
+                assert_eq!(fetched, 9);
+                for slot in &items[..9] {
+                    assert!(slot.is_some());
+                }
             }
         }
+
+        let one_pdf = SelectionKind::Pdfs(vec![PathBuf::from("C:\\a.pdf")]);
+        let two_pdfs = SelectionKind::Pdfs(vec![PathBuf::from("C:\\a.pdf"), PathBuf::from("C:\\b.pdf")]);
+        let imgs = SelectionKind::Images(vec![PathBuf::from("C:\\a.png")]);
+
+        assert!(matches_action_selection(ActionMode::PdfOpen, &one_pdf));
+        assert!(matches_action_selection(ActionMode::PdfCompress, &one_pdf));
+        assert!(!matches_action_selection(ActionMode::PdfCombineOrganize, &one_pdf));
+        assert!(!matches_action_selection(ActionMode::ImagesDialog, &one_pdf));
+
+        assert!(matches_action_selection(ActionMode::PdfCombineOrganize, &two_pdfs));
+        assert!(matches_action_selection(ActionMode::PdfCombineQuick, &two_pdfs));
+        assert!(!matches_action_selection(ActionMode::PdfCompress, &two_pdfs));
+        assert!(!matches_action_selection(ActionMode::PdfOpen, &two_pdfs));
+
+        assert!(matches_action_selection(ActionMode::ImagesDialog, &imgs));
+        assert!(matches_action_selection(ActionMode::ImagesQuickConvert, &imgs));
+        assert!(!matches_action_selection(ActionMode::PdfOpen, &imgs));
+
         assert_eq!(S_OK.0, 0);
     }
 }

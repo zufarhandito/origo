@@ -151,6 +151,43 @@ try {
     $null=Wait-State {param($s) -not $s.imagesPdfDialog}
     Write-Host 'PASS shell-ext UI: ipc-warm-prefilled-dialog'
 
+    # 6. Warm IPC 1-click PDF combine (no-clobber: Foto Proyek-3.pdf) combining $pdf1 (2p) + $pdf2 (2p) = 4p
+    $pdf2Hash=(Get-FileHash $pdf2).Hash
+    $manifest5=Join-Path $directory 'ipc-merge-quick-list.txt'
+    [IO.File]::WriteAllLines($manifest5, @($pdf1, $pdf2), (New-Object Text.UTF8Encoding($false)))
+    $mergeBefore=(Read-Metrics).pdfMergeCompleted
+    $sender4=Start-Process -FilePath $exe -ArgumentList @('--merge-pdf-quick-list', $manifest5, '--delete-list', '--state-dir', $stateDir) -WorkingDirectory (Split-Path $exe) -PassThru
+    if(-not $sender4.WaitForExit(6000)){ $sender4.Kill(); throw 'Quick PDF merge IPC forwarder did not exit promptly' }
+    if($sender4.ExitCode -ne 0){ throw "Quick PDF merge forwarder failed with exit code $($sender4.ExitCode)" }
+    if(Test-Path -LiteralPath $manifest5){throw 'Merge quick manifest was not deleted'}
+    $mergeDone=Wait-State {param($s) -not $s.pdfMergeRunning -and $s.pdfMergeCompleted -gt $mergeBefore -and $s.tabCount -eq 3 -and $s.pageCount -eq 4}
+    if(-not $mergeDone.pdfMergeSuccess -or $mergeDone.pdfMergePages -ne 4){throw 'Quick PDF combine failed'}
+    $mergedPdf=Join-Path $photoDir 'Foto Proyek-3.pdf'
+    if(-not (Test-Path -LiteralPath $mergedPdf)){throw "Expected no-clobber merged PDF missing: $mergedPdf"}
+    if((Get-FileHash $pdf1).Hash -ne $pdf1Hash -or (Get-FileHash $pdf2).Hash -ne $pdf2Hash){throw 'Source PDFs were modified'}
+    Capture 'ipc-pdf-quick-combine.png'
+    Write-Host 'PASS shell-ext UI: ipc-pdf-quick-combine-noclobber'
+
+    # 7. Warm IPC combine PDFs in Organizer mode ($pdf1 + $pdf2 -> 4 pages, 2 sources, organizing=true)
+    $manifest6=Join-Path $directory 'ipc-merge-org-list.txt'
+    [IO.File]::WriteAllLines($manifest6, @($pdf1, $pdf2), (New-Object Text.UTF8Encoding($false)))
+    $sender5=Start-Process -FilePath $exe -ArgumentList @('--merge-pdf-list', $manifest6, '--delete-list', '--state-dir', $stateDir) -WorkingDirectory (Split-Path $exe) -PassThru
+    if(-not $sender5.WaitForExit(6000)){ $sender5.Kill(); throw 'Organizer PDF merge IPC forwarder did not exit promptly' }
+    $orgState=Wait-State {param($s) $s.tabCount -eq 4 -and $s.organizing -and $s.sourceCount -eq 2 -and $s.pageCount -eq 4}
+    Capture 'ipc-pdf-combine-organizer.png'
+    Write-Host 'PASS shell-ext UI: ipc-pdf-combine-organizer'
+
+    # 8. Warm IPC single-PDF Split action (--pdf-split-list -> activates tab & opens Split PDF dialog)
+    $manifest7=Join-Path $directory 'ipc-pdf-split-list.txt'
+    [IO.File]::WriteAllLines($manifest7, @($pdf1), (New-Object Text.UTF8Encoding($false)))
+    $sender6=Start-Process -FilePath $exe -ArgumentList @('--pdf-split-list', $manifest7, '--delete-list', '--state-dir', $stateDir) -WorkingDirectory (Split-Path $exe) -PassThru
+    if(-not $sender6.WaitForExit(6000)){ $sender6.Kill(); throw 'Split PDF IPC forwarder did not exit promptly' }
+    $splitState=Wait-State {param($s) $s.splitDialog}
+    Capture 'ipc-pdf-split-dialog.png'
+    Invoke-Node 'Batal'
+    $null=Wait-State {param($s) -not $s.splitDialog}
+    Write-Host 'PASS shell-ext UI: ipc-pdf-split-dialog'
+
     if((Get-FileHash $img1).Hash -ne $hash1 -or (Get-FileHash $img2).Hash -ne $hash2){throw 'Source images modified'}
     Write-Host "Shell-Ext UI evidence: $directory"
 } catch {

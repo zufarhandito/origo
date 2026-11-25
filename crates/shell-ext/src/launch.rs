@@ -17,8 +17,31 @@ static MANIFEST_SEQ: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActionMode {
-    Dialog,
-    QuickConvert,
+    ImagesDialog,
+    ImagesQuickConvert,
+    PdfOpen,
+    PdfCompress,
+    PdfSplit,
+    PdfPng,
+    PdfOcr,
+    PdfCombineOrganize,
+    PdfCombineQuick,
+}
+
+impl ActionMode {
+    pub fn cli_flag(self) -> &'static str {
+        match self {
+            Self::ImagesDialog => "--images-to-pdf-list",
+            Self::ImagesQuickConvert => "--images-to-pdf-quick-list",
+            Self::PdfOpen => "--open-pdf-list",
+            Self::PdfCompress => "--pdf-compress-list",
+            Self::PdfSplit => "--pdf-split-list",
+            Self::PdfPng => "--pdf-png-list",
+            Self::PdfOcr => "--pdf-ocr-list",
+            Self::PdfCombineOrganize => "--merge-pdf-list",
+            Self::PdfCombineQuick => "--merge-pdf-quick-list",
+        }
+    }
 }
 
 pub fn resolve_origo_exe(dll_dir: &Path) -> Option<PathBuf> {
@@ -67,12 +90,8 @@ pub fn launch_origo(dll_dir: &Path, mode: ActionMode, paths: &[PathBuf]) -> std:
         std::io::Error::new(std::io::ErrorKind::NotFound, "pdf-studio.exe not found")
     })?;
     let manifest = write_temp_manifest(paths)?;
-    let flag = match mode {
-        ActionMode::Dialog => "--images-to-pdf-list",
-        ActionMode::QuickConvert => "--images-to-pdf-quick-list",
-    };
     let mut cmd = Command::new(&exe);
-    cmd.arg(flag).arg(&manifest).arg("--delete-list");
+    cmd.arg(mode.cli_flag()).arg(&manifest).arg("--delete-list");
     if let Some(parent) = exe.parent() {
         cmd.current_dir(parent);
     }
