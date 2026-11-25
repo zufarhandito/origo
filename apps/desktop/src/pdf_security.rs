@@ -11,6 +11,7 @@ use gpui::component::{
 };
 use pdf_application::export::ExportControl;
 use qpdf_adapter::{EncryptOptions, EncryptPermissions, QpdfSecurity, SecurityReport};
+use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -33,6 +34,14 @@ pub(super) struct SecurityDialog {
     pub error: Option<String>,
 }
 
+#[derive(Clone)]
+pub(super) struct PasswordPromptDialog {
+    pub path: PathBuf,
+    pub password: Entity<InputState>,
+    pub error: Option<String>,
+    pub verifying: bool,
+}
+
 pub(super) struct SecurityJob {
     pub mode: SecurityMode,
     pub control: ExportControl,
@@ -43,6 +52,8 @@ pub(super) struct SecurityJob {
 #[derive(Default)]
 pub(super) struct SecurityState {
     pub dialog: Option<SecurityDialog>,
+    pub password_prompt: Option<PasswordPromptDialog>,
+    pub pending_passwords: VecDeque<PathBuf>,
     pub job: Option<SecurityJob>,
     pub job_seq: u64,
     pub completed: u64,
@@ -115,7 +126,11 @@ impl WindowShell {
             });
             (active_path, dirty)
         } else {
-            (None, false)
+            let active_encrypted = self
+                .active_tab()
+                .filter(|tab| self.renderer.has_password(&tab.path))
+                .map(|tab| tab.path.clone());
+            (active_encrypted, false)
         };
 
         let password = cx.new(|cx| {
@@ -704,4 +719,329 @@ impl WindowShell {
         self.report(cx);
         cx.notify();
     }
+
+    pub(super) fn queue_password_prompt(
+        &mut self,
+        path: PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let norm = |p: &std::path::Path| p.to_string_lossy().replace('/', "\\").to_lowercase();
+        let key = norm(&path);
+        let already_showing = self
+            .security
+            .password_prompt
+            .as_ref()
+            .is_some_and(|d| norm(&d.path) == key);
+        let already_queued = self
+            .security
+            .pending_passwords
+            .iter()
+            .any(|p| norm(p) == key);
+        if !already_showing && !already_queued {
+            self.security.pending_passwords.push_back(path);
+        }
+        self.show_next_password_prompt(window, cx);
+    }
+
+    pub(super) fn show_next_password_prompt(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.security.password_prompt.is_some()
+            || self.close.is_some()
+            || self.opening
+            || self.modal(cx)
+        {
+            return;
+        }
+        let Some(path) = self.security.pending_passwords.pop_front() else {
+            return;
+        };
+        let password = cx.new(|cx| {
+            let mut s = InputState::new(window, cx).placeholder("Masukkan password PDF");
+            s.set_masked(true, window, cx);
+            s
+        });
+        cx.subscribe_in(&password, window, |this, _, event: &InputEvent, window, cx| {
+            match event {
+                InputEvent::Change => {
+                    if let Some(dialog) = &mut this.security.password_prompt {
+                        dialog.error = None;
+                    }
+                    window.refresh();
+                    cx.notify();
+                }
+                InputEvent::PressEnter { .. } => {
+                    this.submit_password_prompt(window, cx);
+                }
+                _ => {}
+            }
+        })
+        .detach();
+
+        self.security.password_prompt = Some(PasswordPromptDialog {
+            path,
+            password: password.clone(),
+            error: None,
+            verifying: false,
+        });
+        self.resources
+            .modal_owner
+            .store(SHELL_EXPORT_OWNER, Ordering::SeqCst);
+        self.report(cx);
+
+        let weak = cx.weak_entity();
+        window.open_alert_dialog(cx, move |dialog, _, cx| {
+            let Some(ui) = weak
+                .read_with(cx, |this, _| this.security.password_prompt.clone())
+                .ok()
+                .flatten()
+            else {
+                return dialog;
+            };
+            let file_name = ui
+                .path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| ui.path.display().to_string());
+            let colors = cx.theme().colors;
+            let cancel = weak.clone();
+            let submit = weak.clone();
+            let closed = weak.clone();
+
+            let mut body = gpui::div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    gpui::div()
+                        .px_2p5()
+                        .py_1p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(colors.border)
+                        .bg(colors.muted)
+                        .text_xs()
+                        .overflow_hidden()
+                        .child(ui.path.display().to_string()),
+                )
+                .child(
+                    gpui::div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(gpui::div().text_xs().font_semibold().child("Password PDF"))
+                        .child(
+                            Input::new(&ui.password)
+                                .mask_toggle()
+                                .aria_label("Password buka PDF"),
+                        ),
+                );
+
+            if let Some(err) = ui.error.clone() {
+                body = body.child(
+                    gpui::div()
+                        .id("password-prompt-error")
+                        .role(gpui::Role::Group)
+                        .aria_label(err.clone())
+                        .text_xs()
+                        .text_color(cx.theme().danger)
+                        .child(err),
+                );
+            }
+
+            dialog
+                .title(
+                    gpui::div()
+                        .id("password-prompt-title")
+                        .role(gpui::Role::Group)
+                        .aria_label("PDF Dilindungi Password")
+                        .child("PDF Dilindungi Password"),
+                )
+                .description(format!(
+                    "Masukkan password untuk membuka \"{file_name}\". Password hanya disimpan sementara di memori selama tab terbuka."
+                ))
+                .centered()
+                .width(px(460.))
+                .close_button(!ui.verifying)
+                .child(body)
+                .footer(
+                    DialogFooter::new()
+                        .child(
+                            Button::new("password-prompt-cancel")
+                                .label("Batal")
+                                .disabled(ui.verifying)
+                                .on_click(move |_, window, cx| {
+                                    window.close_dialog(cx);
+                                    let _ = cancel.update(cx, |this, cx| {
+                                        this.close_password_prompt(cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("password-prompt-submit")
+                                .primary()
+                                .disabled(ui.verifying)
+                                .label(if ui.verifying {
+                                    "Memeriksa…"
+                                } else {
+                                    "Buka Dokumen"
+                                })
+                                .on_click(move |_, window, cx| {
+                                    let _ = submit.update(cx, |this, cx| {
+                                        this.submit_password_prompt(window, cx);
+                                    });
+                                }),
+                        ),
+                )
+                .on_close(move |_, _, cx| {
+                    let _ = closed.update(cx, |this, cx| this.close_password_prompt(cx));
+                })
+        });
+
+        window.defer(cx, move |window, cx| {
+            password.update(cx, |state, cx| state.focus(window, cx));
+        });
+        cx.notify();
+    }
+
+    fn close_password_prompt(&mut self, cx: &mut Context<Self>) {
+        if let Some(prompt) = self.security.password_prompt.take() {
+            self.renderer.clear_password(&prompt.path);
+            let _ = self.resources.modal_owner.compare_exchange(
+                SHELL_EXPORT_OWNER,
+                0,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            );
+            if self.security.pending_passwords.is_empty() && self.active_tab().is_none() {
+                self.pending_pdf_action = None;
+            }
+            self.report(cx);
+            cx.notify();
+            if !self.security.pending_passwords.is_empty() {
+                let handle = self.handle;
+                let weak = cx.weak_entity();
+                cx.defer(move |cx| {
+                    let _ = handle.update(cx, |_, window, cx| {
+                        let _ = weak.update(cx, |this, cx| {
+                            this.show_next_password_prompt(window, cx);
+                        });
+                    });
+                });
+            }
+        }
+    }
+
+    fn submit_password_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(prompt) = self.security.password_prompt.clone() else {
+            return;
+        };
+        if prompt.verifying {
+            return;
+        }
+        let pw = prompt.password.read(cx).value().to_string();
+        if pw.is_empty() {
+            if let Some(d) = &mut self.security.password_prompt {
+                d.error = Some("Masukkan password terlebih dahulu.".into());
+            }
+            self.report(cx);
+            window.refresh();
+            cx.notify();
+            return;
+        }
+        if let Some(d) = &mut self.security.password_prompt {
+            d.verifying = true;
+            d.error = None;
+        }
+        self.report(cx);
+        window.refresh();
+        cx.notify();
+
+        let path = prompt.path;
+        let input = prompt.password;
+        let renderer = self.renderer.clone();
+        let handle = self.handle;
+        cx.spawn(async move |this, cx| {
+            let renderer_bg = renderer.clone();
+            let path_bg = path.clone();
+            let check = cx
+                .background_executor()
+                .spawn(async move {
+                    renderer_bg.set_password(&path_bg, pw);
+                    let res = pdf_application::PdfInspector::inspect(&renderer_bg, &path_bg);
+                    if res.is_err() {
+                        renderer_bg.clear_password(&path_bg);
+                    }
+                    res
+                })
+                .await;
+
+            let _ = handle.update(cx, |_, window, cx| {
+                let _ = this.update(cx, |this, cx| {
+                    let still_same = this
+                        .security
+                        .password_prompt
+                        .as_ref()
+                        .is_some_and(|d| d.path == path);
+                    if !still_same {
+                        renderer.clear_password(&path);
+                        return;
+                    }
+                    match check {
+                        Ok(_) => {
+                            // Clear state BEFORE close_dialog so on_close does not wipe the verified password.
+                            this.security.password_prompt = None;
+                            let _ = this.resources.modal_owner.compare_exchange(
+                                SHELL_EXPORT_OWNER,
+                                0,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            );
+                            window.close_dialog(cx);
+                            this.report(cx);
+                            this.open_paths(vec![path], cx);
+                        }
+                        Err(pdf_application::RenderError::PasswordRequired) => {
+                            if let Some(d) = &mut this.security.password_prompt {
+                                d.verifying = false;
+                                d.error = Some(
+                                    "Password salah. Periksa kembali lalu coba lagi.".into(),
+                                );
+                            }
+                            this.report(cx);
+                            input.update(cx, |state, cx| state.focus(window, cx));
+                            window.refresh();
+                            cx.notify();
+                        }
+                        Err(err) => {
+                            this.security.password_prompt = None;
+                            let _ = this.resources.modal_owner.compare_exchange(
+                                SHELL_EXPORT_OWNER,
+                                0,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            );
+                            window.close_dialog(cx);
+                            this.notice = Some(format!("{}: {err}", path.display()));
+                            this.report(cx);
+                            cx.notify();
+                            if !this.security.pending_passwords.is_empty() {
+                                let weak = cx.weak_entity();
+                                window.defer(cx, move |window, cx| {
+                                    let _ = weak.update(cx, |this, cx| {
+                                        this.show_next_password_prompt(window, cx);
+                                    });
+                                });
+                            }
+                        }
+                    }
+                });
+            });
+        })
+        .detach();
+    }
 }
+

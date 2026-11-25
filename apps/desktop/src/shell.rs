@@ -463,6 +463,13 @@ impl WindowShell {
         json["pdfMergeSuccess"] = serde_json::json!(self.pdf_merge.success);
         json["pdfMergePages"] = serde_json::json!(self.pdf_merge.pages);
         json["securityDialog"] = serde_json::json!(self.security.dialog.is_some());
+        json["passwordPromptDialog"] = serde_json::json!(self.security.password_prompt.is_some());
+        json["passwordPromptError"] = serde_json::json!(
+            self.security
+                .password_prompt
+                .as_ref()
+                .is_some_and(|d| d.error.is_some())
+        );
         json["securityRunning"] = serde_json::json!(self.security.job.is_some());
         json["securityCompleted"] = serde_json::json!(self.security.completed);
         json["securitySuccess"] = serde_json::json!(self.security.success);
@@ -483,6 +490,7 @@ impl WindowShell {
     pub(super) fn modal(&self, cx: &App) -> bool {
         self.resources.modal_owner.load(Ordering::SeqCst) != 0
             || self.security.dialog.is_some()
+            || self.security.password_prompt.is_some()
             || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
                 s.error_popup
@@ -626,6 +634,11 @@ impl WindowShell {
             });
             jobs.push((id, path));
         }
+        enum OpenOutcome {
+            Opened(pdf_domain::Workspace),
+            PasswordRequired(PathBuf),
+            Failed(String),
+        }
         let renderer = self.renderer.clone();
         self.resources
             .tab_count
@@ -633,7 +646,7 @@ impl WindowShell {
         let task = cx.background_executor().spawn(async move {
             jobs.into_iter()
                 .map(|(id, path)| {
-                    let result = pdf_application::open_document(
+                    let outcome = match pdf_application::open_document(
                         &renderer,
                         &path,
                         pdf_domain::SourceId(id.0 << 32),
@@ -645,9 +658,15 @@ impl WindowShell {
                             return Err(pdf_application::RenderError::SourceChanged);
                         }
                         Ok(w)
-                    })
-                    .map_err(|e| format!("{}: {e}", path.display()));
-                    (id, result)
+                    }) {
+                        Ok(w) => OpenOutcome::Opened(w),
+                        Err(pdf_application::RenderError::PasswordRequired) => {
+                            renderer.clear_password(&path);
+                            OpenOutcome::PasswordRequired(path)
+                        }
+                        Err(e) => OpenOutcome::Failed(format!("{}: {e}", path.display())),
+                    };
+                    (id, outcome)
                 })
                 .collect::<Vec<_>>()
         });
@@ -657,9 +676,10 @@ impl WindowShell {
             let _ = handle.update(cx, |_, window, cx| {
                 let _ = this.update(cx, |this, cx| {
                     let mut first = None;
-                    for (id, result) in results {
-                        match result {
-                            Ok(workspace) => {
+                    let mut password_paths = Vec::new();
+                    for (id, outcome) in results {
+                        match outcome {
+                            OpenOutcome::Opened(workspace) => {
                                 let owner = cx.weak_entity();
                                 let session = DocumentSession::new(
                                     window,
@@ -692,7 +712,11 @@ impl WindowShell {
                                 }
                                 first.get_or_insert(id);
                             }
-                            Err(e) => {
+                            OpenOutcome::PasswordRequired(path) => {
+                                this.tabs.retain(|t| t.id != id);
+                                password_paths.push(path);
+                            }
+                            OpenOutcome::Failed(e) => {
                                 failures.push(e);
                                 this.tabs.retain(|t| t.id != id);
                             }
@@ -708,10 +732,18 @@ impl WindowShell {
                     if let Some(id) = first.or(first_existing) {
                         this.activate(id, cx);
                         this.trigger_pending_pdf_action(cx);
-                    } else {
+                    } else if password_paths.is_empty() && this.security.pending_passwords.is_empty()
+                    {
                         this.pending_pdf_action = None;
                     }
                     this.finish_session_restore(cx);
+                    if !password_paths.is_empty() {
+                        for path in password_paths {
+                            this.queue_password_prompt(path, window, cx);
+                        }
+                    } else if !this.security.pending_passwords.is_empty() {
+                        this.show_next_password_prompt(window, cx);
+                    }
                     cx.notify();
                 });
             });
@@ -896,6 +928,7 @@ impl WindowShell {
                 }
                 for tab in &self.tabs {
                     if batch.ids.contains(&tab.id) {
+                        self.renderer.clear_password(&tab.path);
                         for s in tab.views() {
                             s.update(cx, |s, cx| {
                                 s.active = false;

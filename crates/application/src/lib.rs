@@ -20,6 +20,8 @@ pub enum RenderError {
     DependencyUnavailable(String),
     #[error("PDF tidak dapat dibuka atau dirender.")]
     InvalidPdf,
+    #[error("PDF dilindungi password. Masukkan password untuk membuka dokumen.")]
+    PasswordRequired,
     #[error("Dokumen atau bitmap melebihi batas sumber daya yang dikonfigurasi.")]
     ResourceLimit,
     #[error("Halaman tidak ditemukan.")]

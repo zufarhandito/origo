@@ -26,11 +26,20 @@ Empat utilitas PDF harian tersedia di menu **Alat** dan bekerja 100% lokal (offl
 
 - Menghapus proteksi password PDF terenkripsi ke file baru secara lokal (bekerja meskipun belum ada tab PDF yang terbuka).
 - Memverifikasi password secara deterministik (`--requires-password`), memvalidasi PDF hasil (`--is-encrypted` & `--check`), dan menyediakan opsi membuka hasil langsung di tab Origo.
+- Jika tab aktif sedang membuka PDF berpassword, file sumber otomatis terisi.
+
+## 5. Buka PDF Berpassword Langsung di Viewer
+
+- Saat membuka PDF terenkripsi (lewat `Buka PDF`, klik ganda, drag/CLI, daftar terakhir, atau menu konteks Explorer), Origo otomatis menampilkan dialog **PDF Dilindungi Password** dengan input bertopeng (*mask toggle*).
+- Password diverifikasi langsung lewat PDFium sebelum dialog ditutup; jika salah, pesan galat ditampilkan inline tanpa menutup dialog.
+- Password disimpan **hanya di memori proses** (`SecretString` yang dibersihkan otomatis saat `Drop`), tidak pernah ditulis ke disk atau log, dan otomatis dihapus saat tab atau jendela ditutup.
+- Setelah terbuka, seluruh fitur baca langsung bekerja: pratinjau halaman, thumbnail, pencarian & salin teks, daftar isi (*outline*), ekspor PNG, cetak, dan OCR.
 
 ## Verifikasi
 
 ```powershell
 . .\scripts\use-build-environment.ps1
-cargo test -p qpdf-adapter -p pdf-application --locked --offline
+cargo test -p qpdf-adapter -p pdf-application -p pdf-engine --locked --offline
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\daily-utilities-ui-smoke.ps1 -Profile debug
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\encrypted-viewer-ui-smoke.ps1 -Profile debug
 ```

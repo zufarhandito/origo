@@ -49,12 +49,83 @@ pub struct SessionStats {
     pub renders: u64,
     pub active_documents: u64,
 }
+struct SecretString(String);
+
+impl SecretString {
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Clone for SecretString {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl Drop for SecretString {
+    fn drop(&mut self) {
+        let mut bytes = std::mem::take(&mut self.0).into_bytes();
+        bytes.fill(0);
+    }
+}
+
+#[derive(Default)]
+struct PasswordStore {
+    entries: Mutex<std::collections::HashMap<String, (SecretString, u64)>>,
+    revision: AtomicU64,
+}
+
+impl PasswordStore {
+    fn key(path: &Path) -> String {
+        let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        #[cfg(windows)]
+        {
+            let text = resolved.to_string_lossy().replace('/', "\\");
+            text.strip_prefix("\\\\?\\").unwrap_or(&text).to_lowercase()
+        }
+        #[cfg(not(windows))]
+        {
+            resolved.to_string_lossy().into_owned()
+        }
+    }
+
+    fn set(&self, path: &Path, password: String) {
+        let rev = self.revision.fetch_add(1, Ordering::AcqRel) + 1;
+        if let Ok(mut entries) = self.entries.lock() {
+            entries.insert(Self::key(path), (SecretString(password), rev));
+        }
+    }
+
+    fn clear(&self, path: &Path) {
+        self.revision.fetch_add(1, Ordering::AcqRel);
+        if let Ok(mut entries) = self.entries.lock() {
+            entries.remove(&Self::key(path));
+        }
+    }
+
+    fn has(&self, path: &Path) -> bool {
+        self.entries
+            .lock()
+            .ok()
+            .is_some_and(|entries| entries.contains_key(&Self::key(path)))
+    }
+
+    fn get(&self, path: &Path) -> Option<(SecretString, u64)> {
+        self.entries
+            .lock()
+            .ok()
+            .and_then(|entries| entries.get(&Self::key(path)).cloned())
+    }
+}
+
 #[derive(Clone)]
 pub struct PdfiumRenderer {
     library: PathBuf,
     limits: ResourceLimits,
     worker: Arc<OnceLock<Result<mpsc::SyncSender<Job>, String>>>,
     counters: Arc<Counters>,
+    passwords: Arc<PasswordStore>,
 }
 enum Operation {
     Inspect,
@@ -84,6 +155,7 @@ impl PdfiumRenderer {
             limits: ResourceLimits::default(),
             worker: Arc::new(OnceLock::new()),
             counters: Arc::new(Counters::default()),
+            passwords: Arc::new(PasswordStore::default()),
         }
     }
     pub fn with_limits(mut self, limits: ResourceLimits) -> Result<Self, RenderError> {
@@ -99,7 +171,21 @@ impl PdfiumRenderer {
         self.limits = limits;
         self.worker = Arc::new(OnceLock::new());
         self.counters = Arc::new(Counters::default());
+        self.passwords = Arc::new(PasswordStore::default());
         Ok(self)
+    }
+    /// Store an in-memory, process-local password for opening an encrypted PDF.
+    /// Passwords are never persisted to disk and should be cleared on tab close.
+    pub fn set_password(&self, path: &Path, password: String) {
+        self.passwords.set(path, password);
+    }
+    /// Remove and wipe any in-memory password stored for `path`.
+    pub fn clear_password(&self, path: &Path) {
+        self.passwords.clear(path);
+    }
+    /// Return whether an in-memory password is currently registered for `path`.
+    pub fn has_password(&self, path: &Path) -> bool {
+        self.passwords.has(path)
     }
     pub fn outline(
         &self,
@@ -141,9 +227,10 @@ impl PdfiumRenderer {
                 let library = self.library.clone();
                 let limits = self.limits;
                 let counters = self.counters.clone();
+                let passwords = self.passwords.clone();
                 std::thread::Builder::new()
                     .name("pdfium-document".into())
-                    .spawn(move || worker(receiver, library, limits, counters))
+                    .spawn(move || worker(receiver, library, limits, counters, passwords))
                     .map_err(|error| error.to_string())?;
                 Ok(sender)
             })
@@ -185,6 +272,7 @@ fn worker(
     library: PathBuf,
     limits: ResourceLimits,
     counters: Arc<Counters>,
+    passwords: Arc<PasswordStore>,
 ) {
     // Construct Pdfium and its borrowed document on this thread. No self-reference,
     // native handle, or borrowed object crosses the channel.
@@ -219,14 +307,25 @@ fn worker(
                 session_key = None;
                 return Err(RenderError::SourceChanged);
             }
-            let key = (job.path.clone(), before);
+            let pw_entry = if matches!(job.operation, Operation::InspectOutput) {
+                None
+            } else {
+                passwords.get(&job.path)
+            };
+            let pw_rev = pw_entry.as_ref().map_or(0, |(_, rev)| *rev);
+            let key = (job.path.clone(), before, pw_rev);
             if session_key.as_ref() != Some(&key) || renders >= SESSION_RENDERS {
                 session = None;
                 session_key = None;
                 renders = 0;
                 let document = pdfium
-                    .load_pdf_from_file(&job.path, None)
-                    .map_err(|_| RenderError::InvalidPdf)?;
+                    .load_pdf_from_file(&job.path, pw_entry.as_ref().map(|(pw, _)| pw.as_str()))
+                    .map_err(|err| match err {
+                        PdfiumError::PdfiumLibraryInternalError(
+                            PdfiumInternalError::PasswordError,
+                        ) => RenderError::PasswordRequired,
+                        _ => RenderError::InvalidPdf,
+                    })?;
                 counters.opens.fetch_add(1, Ordering::Relaxed);
                 if document.pages().is_empty() {
                     return Err(RenderError::InvalidPdf);
@@ -237,6 +336,7 @@ fn worker(
                 session = Some(document);
                 session_key = Some(key);
             }
+            drop(pw_entry);
             let document = session.as_ref().ok_or_else(worker_error)?;
             let result = match &job.operation {
                 Operation::Outline => Output::Outline(read_outline(document)?),
@@ -860,3 +960,107 @@ fn read_outline(
     }
     Ok(result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn minimal_pdf() -> Vec<u8> {
+        let mut pdf = Vec::from(b"%PDF-1.4\n".as_slice());
+        let mut offsets = vec![0usize];
+        let objects = [
+            "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+            "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+            "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>\nendobj\n",
+        ];
+        for obj in objects {
+            offsets.push(pdf.len());
+            pdf.extend_from_slice(obj.as_bytes());
+        }
+        let xref = pdf.len();
+        pdf.extend_from_slice(b"xref\n0 4\n0000000000 65535 f \n");
+        for off in &offsets[1..] {
+            pdf.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
+        }
+        pdf.extend_from_slice(
+            format!("trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n").as_bytes(),
+        );
+        pdf
+    }
+
+    #[test]
+    fn password_store_normalizes_and_clears() {
+        let store = PasswordStore::default();
+        let a = Path::new("D:/Tmp/Secret.PDF");
+        let b = Path::new("d:\\tmp\\secret.pdf");
+        store.set(a, "pw-123".into());
+        #[cfg(windows)]
+        assert!(store.has(b));
+        assert!(store.has(a));
+        store.clear(b);
+        assert!(!store.has(a));
+    }
+
+    #[test]
+    fn opens_encrypted_pdf_only_with_correct_password() -> Result<(), Box<dyn std::error::Error>> {
+        let sidecars = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../sidecars");
+        let qpdf = sidecars.join("qpdf/bin/qpdf.exe");
+        if !qpdf.is_file() || !sidecars.join("pdfium/bin/pdfium.dll").is_file() {
+            return Ok(());
+        }
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!("origo-pdfium-pw-{nonce}"));
+        std::fs::create_dir_all(&dir)?;
+        let plain = dir.join("plain.pdf");
+        let locked = dir.join("locked.pdf");
+        std::fs::write(&plain, minimal_pdf())?;
+
+        let status = Command::new(&qpdf)
+            .args(["--encrypt", "rahasia99", "owner99", "256", "--"])
+            .arg(&plain)
+            .arg(&locked)
+            .status()?;
+        assert!(status.success());
+
+        let renderer = PdfiumRenderer::new(&sidecars);
+        assert!(matches!(
+            renderer.inspect(&locked),
+            Err(RenderError::PasswordRequired)
+        ));
+
+        renderer.set_password(&locked, "salah".into());
+        assert!(matches!(
+            renderer.inspect(&locked),
+            Err(RenderError::PasswordRequired)
+        ));
+
+        renderer.set_password(&locked, "rahasia99".into());
+        assert!(renderer.has_password(&locked));
+        let inspected = renderer.inspect(&locked)?;
+        assert_eq!(inspected.pages.len(), 1);
+        let rendered = renderer.render(&locked, 0)?;
+        assert!(rendered.width > 0 && rendered.height > 0);
+        let text = renderer.extract_text(&TextRequest {
+            path: locked.clone(),
+            page_index: 0,
+            fingerprint: inspected.fingerprint,
+        })?;
+        assert!(text.chars.is_empty());
+
+        renderer.clear_password(&locked);
+        assert!(!renderer.has_password(&locked));
+        assert!(matches!(
+            renderer.inspect(&locked),
+            Err(RenderError::PasswordRequired)
+        ));
+
+        let _ = std::fs::remove_dir_all(&dir);
+        Ok(())
+    }
+}
+
