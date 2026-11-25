@@ -1,5 +1,24 @@
 # Pengujian Origo
 
+## Rilis Origo Preview 0.1.6
+
+Paket rilis `Origo.Preview 0.1.6` dibangun (`--release --locked --offline`) dan dipaketkan ke
+feed lokal `dist/origo-preview` (mencakup anotasi teks pasif + terapkan ke banyak halaman,
+konverter luring PNG/JPEG → PDF, serta integrasi menu klik kanan modern Windows 11 File Explorer
++ IPC single-instance):
+
+- Paket penuh `Origo.Preview-0.1.6-preview-full.nupkg`: **46,07 MiB**
+  (`SHA-256: A08F92DBB7B5495CDCD2F536DD6CF4E82A8030839F01E4F33765F49FD3BBA0AD`).
+- Paket delta `0.1.5 → 0.1.6` (`Origo.Preview-0.1.6-preview-delta.nupkg`): **6,10 MiB**
+  (turun **86,8%**; 5 berkas ditambal, 1.194 tidak berubah;
+  `SHA-256: 213EEC355FF7A322ACCEAC21A83F6E96482B7907BBBDF0DDF30E54D7428A0287`).
+- Installer `Origo.Preview-preview-Setup.exe`: **53,27 MiB**
+  (`SHA-256: 0371E1216DAD53FFF8061CFA160AF0E9E60B534D1971BF95E0A20D8B603265DD`).
+- Ekstensi shell release `origo_shell_ext.dll`: **268,0 KiB**, lulus
+  `scripts/shell-ext-ui-smoke.ps1 -Profile release` (5/5 pemeriksaan, bukti lokal di
+  `.research/shell-ext-ui-d09aa0d084ca4f35bd561abb01463e19`) dan didaftarkan ulang menunjuk ke
+  `%LocalAppData%\Origo.Preview\current\pdf-studio.exe`.
+
 ## Menu klik kanan Windows 11 File Explorer (`Origo > …`, dev mode)
 
 Verifikasi dijalankan dalam mode pengembangan (`--locked --offline`, tanpa build release/installer):
