@@ -215,6 +215,242 @@ pub fn parse_page_targets(
         .collect())
 }
 
+pub const MAX_WATERMARK_CHARS: usize = 64;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PageNumberFormat {
+    #[default]
+    NumberOnly,
+    SlashTotal,
+    IndonesianFull,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PageNumberPosition {
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    #[default]
+    BottomCenter,
+    BottomRight,
+}
+
+/// Formats a 1-based display number and total count for passive page numbering.
+pub fn format_page_number(format: PageNumberFormat, number: usize, total: usize) -> String {
+    match format {
+        PageNumberFormat::NumberOnly => number.to_string(),
+        PageNumberFormat::SlashTotal => format!("{number} / {total}"),
+        PageNumberFormat::IndonesianFull => format!("Halaman {number} dari {total}"),
+    }
+}
+
+/// Computes normalized unrotated bounding corners `[[x0, y0], [x1, y1]]` for a page number label.
+pub fn page_number_rect(
+    content: &str,
+    font_size: f32,
+    page_w: f32,
+    page_h: f32,
+    position: PageNumberPosition,
+) -> Option<[[f32; 2]; 2]> {
+    if !page_w.is_finite() || !page_h.is_finite() || page_w <= 0. || page_h <= 0. {
+        return None;
+    }
+    let [pts_w, pts_h] = measure_text_points(content, font_size)?;
+    let mut width = (pts_w / page_w).clamp(0.01, 0.92);
+    let mut height = (pts_h / page_h).clamp(0.01, 0.40);
+    let fit = (0.92 / width).min(0.40 / height).min(1.0);
+    width *= fit;
+    height *= fit;
+    let margin_x = (36.0 / page_w).clamp(0.02, 0.12);
+    let margin_y = (28.0 / page_h).clamp(0.02, 0.12);
+    let left = match position {
+        PageNumberPosition::TopLeft | PageNumberPosition::BottomLeft => margin_x,
+        PageNumberPosition::TopCenter | PageNumberPosition::BottomCenter => (1.0 - width) * 0.5,
+        PageNumberPosition::TopRight | PageNumberPosition::BottomRight => 1.0 - margin_x - width,
+    }
+    .clamp(0.01, (0.99 - width).max(0.01));
+    let top = match position {
+        PageNumberPosition::TopLeft
+        | PageNumberPosition::TopCenter
+        | PageNumberPosition::TopRight => margin_y,
+        PageNumberPosition::BottomLeft
+        | PageNumberPosition::BottomCenter
+        | PageNumberPosition::BottomRight => 1.0 - margin_y - height,
+    }
+    .clamp(0.01, (0.99 - height).max(0.01));
+    Some([
+        [left, top],
+        [(left + width).min(0.999), (top + height).min(0.999)],
+    ])
+}
+
+/// Rasterizes a semi-transparent rotated single-line text watermark into a deduplicatable RGBA stamp.
+pub fn rasterize_watermark(
+    content: &str,
+    color: [u8; 3],
+    opacity_percent: u8,
+    angle_deg: i16,
+) -> Option<SignatureImage> {
+    let trimmed = content.trim();
+    if trimmed.is_empty()
+        || trimmed.chars().count() > MAX_WATERMARK_CHARS
+        || validate_text(trimmed).is_err()
+    {
+        return None;
+    }
+    let font = text_font().ok()?;
+    let base_pt = 48.0_f32;
+    let [pts_w, pts_h] = measure_text_points(trimmed, base_pt)?;
+    let clamped_angle = f32::from(angle_deg.clamp(-90, 90)).to_radians();
+    let cos = clamped_angle.cos();
+    let sin = clamped_angle.sin();
+    let rot_w_unit = pts_w * cos.abs() + pts_h * sin.abs();
+    let rot_h_unit = pts_w * sin.abs() + pts_h * cos.abs();
+    if rot_w_unit <= 0. || rot_h_unit <= 0. {
+        return None;
+    }
+    let max_side = (SignatureImage::MAX_SIDE - 8) as f32;
+    let max_pixels = (SignatureImage::MAX_PIXELS as f32) * 0.85;
+    let scale = 2.0_f32
+        .min(max_side / rot_w_unit)
+        .min(max_side / rot_h_unit)
+        .min((max_pixels / (rot_w_unit * rot_h_unit)).sqrt())
+        .max(0.25);
+
+    let px_size = base_pt * scale;
+    let pad = (base_pt * 0.15).max(2.0) * scale;
+    let (layout, left, top, right, bottom) = layout_text(font, trimmed, px_size);
+    let src_w = ((right - left + pad * 2.0).ceil() as usize).clamp(1, 2048);
+    let src_h = ((bottom - top + pad * 2.0).ceil() as usize).clamp(1, 2048);
+    let mut src_alpha = vec![0u8; src_w * src_h];
+    let offset_x = pad - left;
+    let offset_y = pad - top;
+    for glyph in layout.glyphs() {
+        if glyph.width == 0 || glyph.height == 0 {
+            continue;
+        }
+        let (_, mask) = font.rasterize_config(glyph.key);
+        let gx = (glyph.x + offset_x).round() as i32;
+        let gy = (glyph.y + offset_y).round() as i32;
+        for y in 0..glyph.height {
+            let py = gy + y as i32;
+            if py < 0 || py >= src_h as i32 {
+                continue;
+            }
+            for x in 0..glyph.width {
+                let px = gx + x as i32;
+                if px < 0 || px >= src_w as i32 {
+                    continue;
+                }
+                let alpha = mask[y * glyph.width + x];
+                if alpha == 0 {
+                    continue;
+                }
+                let idx = py as usize * src_w + px as usize;
+                let prev = u16::from(src_alpha[idx]);
+                let combined = u16::from(alpha) + prev * (255 - u16::from(alpha)) / 255;
+                src_alpha[idx] = combined.min(255) as u8;
+            }
+        }
+    }
+
+    let raw_dst_w = (src_w as f32 * cos.abs() + src_h as f32 * sin.abs()).ceil() + 4.0;
+    let raw_dst_h = (src_w as f32 * sin.abs() + src_h as f32 * cos.abs()).ceil() + 4.0;
+    let dst_w = (raw_dst_w as u32).clamp(1, SignatureImage::MAX_SIDE);
+    let dst_h = (raw_dst_h as u32).clamp(1, SignatureImage::MAX_SIDE);
+    if u64::from(dst_w) * u64::from(dst_h) > u64::from(SignatureImage::MAX_PIXELS) {
+        return None;
+    }
+
+    let sample_alpha = |fx: f32, fy: f32| -> f32 {
+        let x0 = fx.floor() as i32;
+        let y0 = fy.floor() as i32;
+        let tx = fx - x0 as f32;
+        let ty = fy - y0 as f32;
+        let at = |ix: i32, iy: i32| -> f32 {
+            if ix < 0 || iy < 0 || ix >= src_w as i32 || iy >= src_h as i32 {
+                0.0
+            } else {
+                f32::from(src_alpha[iy as usize * src_w + ix as usize])
+            }
+        };
+        let a00 = at(x0, y0);
+        let a10 = at(x0 + 1, y0);
+        let a01 = at(x0, y0 + 1);
+        let a11 = at(x0 + 1, y0 + 1);
+        let top_mix = a00 * (1.0 - tx) + a10 * tx;
+        let bot_mix = a01 * (1.0 - tx) + a11 * tx;
+        top_mix * (1.0 - ty) + bot_mix * ty
+    };
+
+    let opacity = f32::from(opacity_percent.clamp(5, 100)) / 100.0;
+    let [r, g, b] = color;
+    let mut rgba = vec![0u8; dst_w as usize * dst_h as usize * 4];
+    let dst_cx = dst_w as f32 * 0.5;
+    let dst_cy = dst_h as f32 * 0.5;
+    let src_cx = src_w as f32 * 0.5;
+    let src_cy = src_h as f32 * 0.5;
+    let mut any_visible = false;
+    for y in 0..dst_h as usize {
+        let dy = (y as f32 + 0.5) - dst_cy;
+        for x in 0..dst_w as usize {
+            let dx = (x as f32 + 0.5) - dst_cx;
+            let sx = dx * cos + dy * sin + src_cx - 0.5;
+            let sy = -dx * sin + dy * cos + src_cy - 0.5;
+            let alpha = (sample_alpha(sx, sy) * opacity).round().clamp(0.0, 255.0) as u8;
+            let offset = (y * dst_w as usize + x) * 4;
+            rgba[offset] = r;
+            rgba[offset + 1] = g;
+            rgba[offset + 2] = b;
+            rgba[offset + 3] = alpha;
+            if alpha > 0 {
+                any_visible = true;
+            }
+        }
+    }
+    if !any_visible {
+        return None;
+    }
+    let image = SignatureImage {
+        width: dst_w,
+        height: dst_h,
+        rgba,
+    };
+    image.valid().then_some(image)
+}
+
+/// Computes centered normalized bounding corners `[[x0, y0], [x1, y1]]` for a watermark stamp.
+pub fn watermark_rect(
+    image_width: u32,
+    image_height: u32,
+    page_w: f32,
+    page_h: f32,
+    coverage: f32,
+) -> Option<[[f32; 2]; 2]> {
+    if image_width == 0
+        || image_height == 0
+        || !page_w.is_finite()
+        || !page_h.is_finite()
+        || page_w <= 0.
+        || page_h <= 0.
+    {
+        return None;
+    }
+    let cov = coverage.clamp(0.20, 0.90);
+    let max_w = page_w * cov;
+    let max_h = page_h * cov;
+    let scale = (max_w / image_width as f32).min(max_h / image_height as f32);
+    let norm_w = ((image_width as f32 * scale) / page_w).clamp(0.05, 0.94);
+    let norm_h = ((image_height as f32 * scale) / page_h).clamp(0.05, 0.94);
+    let left = (0.5 - norm_w * 0.5).clamp(0.02, 0.98 - norm_w);
+    let top = (0.5 - norm_h * 0.5).clamp(0.02, 0.98 - norm_h);
+    Some([
+        [left, top],
+        [(left + norm_w).min(0.98), (top + norm_h).min(0.98)],
+    ])
+}
+
 pub fn composite(
     rgba: &mut [u8],
     width: u32,
@@ -521,4 +757,84 @@ mod tests {
         assert!(parse_page_targets("1, abc", 5, None).is_err());
         assert!(parse_page_targets("1,,2", 5, None).is_err());
     }
+
+    #[test]
+    fn page_numbers_format_and_place_cleanly_in_all_six_positions() {
+        assert_eq!(format_page_number(PageNumberFormat::NumberOnly, 3, 12), "3");
+        assert_eq!(
+            format_page_number(PageNumberFormat::SlashTotal, 3, 12),
+            "3 / 12"
+        );
+        assert_eq!(
+            format_page_number(PageNumberFormat::IndonesianFull, 3, 12),
+            "Halaman 3 dari 12"
+        );
+
+        let positions = [
+            PageNumberPosition::TopLeft,
+            PageNumberPosition::TopCenter,
+            PageNumberPosition::TopRight,
+            PageNumberPosition::BottomLeft,
+            PageNumberPosition::BottomCenter,
+            PageNumberPosition::BottomRight,
+        ];
+        for pos in positions {
+            let Some([a, b]) = page_number_rect("Halaman 3 dari 12", 12., 595., 842., pos) else {
+                panic!("rect should be computed");
+            };
+            assert!(a[0] >= 0.01 && a[1] >= 0.01 && b[0] <= 0.999 && b[1] <= 0.999);
+            assert!(a[0] < b[0] && a[1] < b[1]);
+        }
+        let Some([tl_a, _]) =
+            page_number_rect("1 / 5", 12., 595., 842., PageNumberPosition::TopLeft)
+        else {
+            panic!("top-left");
+        };
+        let Some([br_a, _]) =
+            page_number_rect("1 / 5", 12., 595., 842., PageNumberPosition::BottomRight)
+        else {
+            panic!("bottom-right");
+        };
+        assert!(tl_a[0] < br_a[0] && tl_a[1] < br_a[1]);
+    }
+
+    #[test]
+    fn diagonal_watermark_rasterizes_bounded_transparent_stamp() {
+        for angle in [-45, 0, 45] {
+            let Some(wm) = rasterize_watermark("RAHASIA", [185, 28, 28], 25, angle) else {
+                panic!("watermark should rasterize at angle {angle}");
+            };
+            assert!(wm.valid());
+            assert!(wm.width <= SignatureImage::MAX_SIDE);
+            assert!(wm.height <= SignatureImage::MAX_SIDE);
+            let max_alpha = wm
+                .rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| p[3])
+                .max()
+                .unwrap_or(0);
+            assert!(
+                (40..=75).contains(&max_alpha),
+                "25% opacity should cap alpha near 64, got {max_alpha}"
+            );
+            assert!(
+                wm.rgba
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .all(|p| p[..3] == [185, 28, 28])
+            );
+            let Some([a, b]) = watermark_rect(wm.width, wm.height, 595., 842., 0.62) else {
+                panic!("watermark rect");
+            };
+            assert!(a[0] < b[0] && a[1] < b[1]);
+            assert!(((a[0] + b[0]) * 0.5 - 0.5).abs() < 0.01);
+            assert!(((a[1] + b[1]) * 0.5 - 0.5).abs() < 0.01);
+        }
+        assert!(rasterize_watermark("   ", [0, 0, 0], 25, -45).is_none());
+        assert!(rasterize_watermark(&"X".repeat(MAX_WATERMARK_CHARS + 1), [0, 0, 0], 25, -45).is_none());
+    }
 }
+

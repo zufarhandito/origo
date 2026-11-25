@@ -26,6 +26,8 @@ impl DocumentSession {
             "printDialog": self.print_dialog.is_some(),
             "splitDialog": self.split_dialog.is_some(),
             "pngDialog": self.png_dialog.is_some(),
+            "pageNumbersDialog": self.page_numbers_dialog.is_some(),
+            "watermarkDialog": self.watermark_dialog.is_some(),
             "signaturePanel": self.annotation.signature.open,
             "signaturePlacing": self.annotation.signature.placing,
             "signatureGhost": self.annotation.signature.signature_ghost_rect.is_some(),

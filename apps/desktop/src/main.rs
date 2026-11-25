@@ -27,7 +27,9 @@ mod ipc;
 mod local_state;
 mod ocr;
 mod outline;
+mod pdf_security;
 mod pdf_shell_actions;
+mod pdf_stamps;
 mod png_export;
 mod printing;
 mod reading_position;
@@ -130,6 +132,8 @@ struct DocumentSession {
     split_dialog: Option<splitting::SplitDialog>,
     png_dialog: Option<png_export::PngDialog>,
     print_dialog: Option<printing::PrintDialog>,
+    page_numbers_dialog: Option<pdf_stamps::PageNumbersDialog>,
+    watermark_dialog: Option<pdf_stamps::WatermarkDialog>,
     transition: transitions::Transition,
     error_popup: bool,
     export: exporting::ExportState,
@@ -641,6 +645,8 @@ impl DocumentSession {
                 split_dialog: None,
                 png_dialog: None,
                 print_dialog: None,
+                page_numbers_dialog: None,
+                watermark_dialog: None,
                 transition: transitions::Transition::default(),
                 error_popup: false,
                 export: exporting::ExportState::default(),

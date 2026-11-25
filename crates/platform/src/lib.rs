@@ -189,6 +189,87 @@ impl OutputTransaction for SafeOutput {
         Ok(self.destination)
     }
 }
+
+/// Atomic, no-clobber single-PDF staging transaction on the destination volume.
+pub struct StagedPdfOutput {
+    dir: TempDir,
+    output: TempPath,
+    destination: PathBuf,
+}
+
+impl StagedPdfOutput {
+    pub fn stage(destination: &Path, control: &ExportControl) -> Result<Self, ExportError> {
+        control.checkpoint()?;
+        if !destination
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+        {
+            return Err(ExportError::Destination);
+        }
+        let name = destination.file_name().ok_or(ExportError::Destination)?;
+        let parent = dunce::canonicalize(destination.parent().ok_or(ExportError::Destination)?)
+            .map_err(|_| ExportError::Destination)?;
+        if !parent.is_dir() {
+            return Err(ExportError::Destination);
+        }
+        let destination = parent.join(name);
+        match fs::symlink_metadata(&destination) {
+            Ok(_) => return Err(ExportError::DestinationExists),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(ExportError::Destination),
+        }
+        let dir = tempfile::Builder::new()
+            .prefix(".pdf-studio-work-")
+            .tempdir_in(&parent)
+            .map_err(|_| ExportError::Io)?;
+        let output = tempfile::Builder::new()
+            .prefix("result-")
+            .suffix(".pdf")
+            .tempfile_in(dir.path())
+            .map_err(|_| ExportError::Io)?
+            .into_temp_path();
+        Ok(Self {
+            dir,
+            output,
+            destination,
+        })
+    }
+
+    pub fn work_dir(&self) -> &Path {
+        self.dir.path()
+    }
+
+    pub fn output_path(&self) -> &Path {
+        self.output.as_ref()
+    }
+
+    pub fn commit(self, control: &ExportControl) -> Result<(PathBuf, u64), ExportError> {
+        control.checkpoint()?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&self.output)
+            .map_err(|_| ExportError::Io)?;
+        let bytes = file.metadata().map_err(|_| ExportError::Io)?.len();
+        if bytes == 0 {
+            return Err(ExportError::Validation);
+        }
+        file.sync_all().map_err(|_| ExportError::Io)?;
+        drop(file);
+        control.checkpoint()?;
+        self.output
+            .persist_noclobber(&self.destination)
+            .map_err(|e| {
+                if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+                    ExportError::DestinationExists
+                } else {
+                    ExportError::Io
+                }
+            })?;
+        Ok((self.destination, bytes))
+    }
+}
+
 pub struct ProcessOutput {
     pub code: Option<i32>,
     pub stdout: Vec<u8>,

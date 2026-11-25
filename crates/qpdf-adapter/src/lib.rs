@@ -12,8 +12,12 @@ mod annotations;
 mod export;
 mod ocr_layer;
 mod preflight;
+mod security;
 mod structure;
 pub use export::{QpdfExporter, SearchableExporter};
+pub use security::{
+    EncryptOptions, EncryptPermissions, QpdfSecurity, SecurityError, SecurityReport,
+};
 
 pub struct QpdfProbe {
     executable: PathBuf,

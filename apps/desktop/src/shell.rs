@@ -104,6 +104,7 @@ pub(super) struct WindowShell {
     tab_picker_pairing: bool,
     pub(super) images_pdf: images_to_pdf::ImagesPdfState,
     pub(super) pdf_merge: pdf_shell_actions::PdfMergeState,
+    pub(super) security: pdf_security::SecurityState,
     pub(super) pending_pdf_action: Option<ipc::PdfShellAction>,
     #[cfg(windows)]
     pub(super) shell_ext_dialog: Option<pdf_shell_actions::ShellExtDialog>,
@@ -212,6 +213,7 @@ impl WindowShell {
                 tab_picker_pairing: false,
                 images_pdf: images_to_pdf::ImagesPdfState::default(),
                 pdf_merge: pdf_shell_actions::PdfMergeState::default(),
+                security: pdf_security::SecurityState::default(),
                 pending_pdf_action: None,
                 #[cfg(windows)]
                 shell_ext_dialog: None,
@@ -334,11 +336,11 @@ impl WindowShell {
             }
         }
     }
+    pub(super) fn active_tab(&self) -> Option<&Tab> {
+        self.tabs.iter().find(|t| Some(t.id) == self.active)
+    }
     pub(super) fn session(&self) -> Option<Entity<DocumentSession>> {
-        self.tabs
-            .iter()
-            .find(|t| Some(t.id) == self.active)
-            .and_then(Tab::preferred_session)
+        self.active_tab().and_then(Tab::preferred_session)
     }
     pub(super) fn report(&self, cx: &mut Context<Self>) {
         let Some(path) = self.metrics.clone() else {
@@ -460,6 +462,10 @@ impl WindowShell {
         json["pdfMergeCompleted"] = serde_json::json!(self.pdf_merge.completed);
         json["pdfMergeSuccess"] = serde_json::json!(self.pdf_merge.success);
         json["pdfMergePages"] = serde_json::json!(self.pdf_merge.pages);
+        json["securityDialog"] = serde_json::json!(self.security.dialog.is_some());
+        json["securityRunning"] = serde_json::json!(self.security.job.is_some());
+        json["securityCompleted"] = serde_json::json!(self.security.completed);
+        json["securitySuccess"] = serde_json::json!(self.security.success);
         json["sessions"] = serde_json::json!(sessions);
         let sequence = self.resources.metrics_sequence.clone();
         let number = sequence.fetch_add(1, Ordering::SeqCst) + 1;
@@ -476,9 +482,14 @@ impl WindowShell {
     }
     pub(super) fn modal(&self, cx: &App) -> bool {
         self.resources.modal_owner.load(Ordering::SeqCst) != 0
+            || self.security.dialog.is_some()
             || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
-                s.error_popup || s.split_dialog.is_some() || s.transition.active()
+                s.error_popup
+                    || s.split_dialog.is_some()
+                    || s.page_numbers_dialog.is_some()
+                    || s.watermark_dialog.is_some()
+                    || s.transition.active()
             })
     }
     pub(super) fn choose_open(&mut self, cx: &mut Context<Self>) {
@@ -1072,6 +1083,10 @@ enum MenuAction {
     Png,
     ImagesToPdf,
     Optimize,
+    PageNumbers,
+    Watermark,
+    EncryptPdf,
+    DecryptPdf,
     #[cfg(windows)]
     ShellIntegration,
     Help,
@@ -1129,6 +1144,8 @@ impl WindowShell {
             DuplicateView => self.duplicate_view(window, cx),
             Open => self.choose_open(cx),
             ImagesToPdf => self.show_images_to_pdf(window, cx),
+            EncryptPdf => self.show_encrypt_pdf(window, cx),
+            DecryptPdf => self.show_decrypt_pdf(window, cx),
             Close => {
                 self.begin_close(false, cx);
             }
@@ -1207,6 +1224,8 @@ impl WindowShell {
                         Optimize => {
                             s.start_export(pdf_application::export::ExportScope::Optimized, cx)
                         }
+                        PageNumbers => s.show_page_numbers(window, cx),
+                        Watermark => s.show_watermark(window, cx),
                         FitPage | FitWidth => s.set_zoom(
                             if matches!(action, FitPage) {
                                 Zoom::FitPage
@@ -1235,6 +1254,11 @@ impl WindowShell {
         }
         if matches!(action, ImagesToPdf) {
             return self.can_start_images_to_pdf(cx);
+        }
+        if matches!(action, EncryptPdf | DecryptPdf) {
+            return !self.opening
+                && self.security.job.is_none()
+                && self.resources.export_owner.load(Ordering::SeqCst) == 0;
         }
         #[cfg(windows)]
         if matches!(action, ShellIntegration) {
@@ -1300,6 +1324,7 @@ impl WindowShell {
                     && !s.selected_ids().is_empty()
                     && self.resources.export_owner.load(Ordering::SeqCst) == 0
             }
+            PageNumbers | Watermark => content && s.navigation.count > 0 && !s.edits_locked(),
             _ => content,
         }
     }
@@ -1573,6 +1598,10 @@ impl Render for WindowShell {
                     ("Ekspor PNG…", Png),
                     ("Gambar ke PDF…", ImagesToPdf),
                     ("Optimize PDF (lossless)…", Optimize),
+                    ("Nomor Halaman…", PageNumbers),
+                    ("Watermark…", Watermark),
+                    ("Lindungi PDF (Password)…", EncryptPdf),
+                    ("Buka Kunci PDF…", DecryptPdf),
                     #[cfg(windows)]
                     ("Integrasi Menu Explorer…", ShellIntegration),
                 ],
@@ -1849,6 +1878,24 @@ impl Render for WindowShell {
                                 .label("Batal ekspor")
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.cancel_quick_combine_pdfs(cx);
+                                })),
+                        ),
+                )
+            })
+            .when(self.security.job.is_some(), |el| {
+                let text = self.security.status_label();
+                el.child(
+                    div()
+                        .flex()
+                        .px_3()
+                        .items_center()
+                        .child(div().flex_1().text_sm().child(text))
+                        .child(
+                            Button::new("cancel-security-job")
+                                .ghost()
+                                .label("Batal")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.cancel_security_job(cx);
                                 })),
                         ),
                 )
