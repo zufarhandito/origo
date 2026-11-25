@@ -14,7 +14,7 @@ use gpui::component::{
 use gpui::{AnyElement, Render, div};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-const MAX_TABS: usize = 8;
+pub(super) const MAX_TABS: usize = 8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct TabId(pub u64);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,14 +35,14 @@ pub(super) struct WindowResources {
     pub gpu_releases: Arc<AtomicU64>,
     pub gpu_release_errors: Arc<AtomicU64>,
 }
-struct Tab {
+pub(super) struct Tab {
     id: TabId,
     path: PathBuf,
     session: Option<Entity<DocumentSession>>,
     secondary: Option<Entity<DocumentSession>>,
     preferred_secondary: bool,
 }
-struct CloseBatch {
+pub(super) struct CloseBatch {
     ids: Vec<TabId>,
     index: usize,
     waiting: bool,
@@ -53,27 +53,27 @@ struct CloseBatch {
     previous_split: Option<split_view::SplitView>,
 }
 pub(super) struct WindowShell {
-    tabs: Vec<Tab>,
+    pub(super) tabs: Vec<Tab>,
     active: Option<TabId>,
     next_id: u64,
     sidecars: PathBuf,
-    renderer: PdfiumRenderer,
+    pub(super) renderer: PdfiumRenderer,
     ocr: Entity<ocr::OcrJobs>,
     #[cfg(windows)]
     ocr_tray: Option<ocr_tray::OcrTray>,
     #[cfg(windows)]
     updater: Option<Entity<updates::Updater>>,
-    resources: Arc<WindowResources>,
+    pub(super) resources: Arc<WindowResources>,
     page_budget: usize,
     thumbnail_budget: usize,
     version: String,
     metrics: Option<PathBuf>,
     focus: FocusHandle,
     tab_scroll: ScrollHandle,
-    handle: gpui::AnyWindowHandle,
-    opening: bool,
-    close: Option<CloseBatch>,
-    notice: Option<String>,
+    pub(super) handle: gpui::AnyWindowHandle,
+    pub(super) opening: bool,
+    pub(super) close: Option<CloseBatch>,
+    pub(super) notice: Option<String>,
     favorites: std::collections::BTreeSet<String>,
     favorites_ready: bool,
     recents: Vec<PathBuf>,
@@ -88,7 +88,7 @@ pub(super) struct WindowShell {
     state_dir: Option<PathBuf>,
     closed_tabs: std::collections::VecDeque<ClosedTab>,
     reopening_tab: Option<ClosedTab>,
-    tab_picker_open: bool,
+    pub(super) tab_picker_open: bool,
     tab_picker_input: Entity<InputState>,
     tab_picker_selected: usize,
     tab_picker_scroll: ScrollHandle,
@@ -102,6 +102,7 @@ pub(super) struct WindowShell {
     session_cleared: bool,
     split_view: Option<split_view::SplitView>,
     tab_picker_pairing: bool,
+    pub(super) images_pdf: images_to_pdf::ImagesPdfState,
 }
 
 fn path_key(path: &std::path::Path) -> String {
@@ -202,6 +203,7 @@ impl WindowShell {
                 session_cleared: false,
                 split_view: None,
                 tab_picker_pairing: false,
+                images_pdf: images_to_pdf::ImagesPdfState::default(),
             };
             cx.subscribe(&shell.tab_picker_input, |this, _, event, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -342,6 +344,19 @@ impl WindowShell {
         );
         json["nativeActiveDocuments"] =
             serde_json::json!(self.renderer.session_stats().active_documents);
+        json["imagesPdfDialog"] = serde_json::json!(self.images_pdf.dialog.is_some());
+        json["imagesPdfRunning"] = serde_json::json!(self.images_pdf.job.is_some());
+        json["imagesPdfTotal"] =
+            serde_json::json!(self.images_pdf.job.as_ref().map_or(0, |j| j.total));
+        json["imagesPdfDone"] = serde_json::json!(
+            self.images_pdf
+                .job
+                .as_ref()
+                .map_or(0, |j| j.done.load(Ordering::SeqCst))
+        );
+        json["imagesPdfCompleted"] = serde_json::json!(self.images_pdf.completed);
+        json["imagesPdfSuccess"] = serde_json::json!(self.images_pdf.success);
+        json["imagesPdfPages"] = serde_json::json!(self.images_pdf.pages);
         json["sessions"] = serde_json::json!(sessions);
         let sequence = self.resources.metrics_sequence.clone();
         let number = sequence.fetch_add(1, Ordering::SeqCst) + 1;
@@ -356,7 +371,7 @@ impl WindowShell {
             })
             .detach();
     }
-    fn modal(&self, cx: &App) -> bool {
+    pub(super) fn modal(&self, cx: &App) -> bool {
         self.resources.modal_owner.load(Ordering::SeqCst) != 0
             || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
@@ -392,7 +407,7 @@ impl WindowShell {
         })
         .detach();
     }
-    fn open_paths(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+    pub(super) fn open_paths(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
         if self.opening || self.close.is_some() {
             return;
         }
@@ -720,7 +735,7 @@ impl WindowShell {
         }
         cx.notify();
     }
-    fn advance_close(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn advance_close(&mut self, cx: &mut Context<Self>) {
         loop {
             let Some(batch) = &self.close else {
                 return;
@@ -731,6 +746,13 @@ impl WindowShell {
                     self.persist_session(snapshot, cx);
                 }
                 if self.pending_preferences != 0 {
+                    return;
+                }
+                if self.close.as_ref().is_some_and(|b| b.window) && self.images_pdf.job.is_some() {
+                    self.notice = Some(
+                        "Menunggu konversi Gambar ke PDF selesai sebelum menutup jendela. Gunakan Batal ekspor atau Tetap di aplikasi.".into(),
+                    );
+                    cx.notify();
                     return;
                 }
                 if let Some(batch) = &self.close
@@ -936,6 +958,7 @@ enum MenuAction {
     Extract,
     Split,
     Png,
+    ImagesToPdf,
     Optimize,
     Help,
     #[cfg(windows)]
@@ -989,6 +1012,7 @@ impl WindowShell {
             ExitCompare => self.exit_comparison(cx),
             DuplicateView => self.duplicate_view(window, cx),
             Open => self.choose_open(cx),
+            ImagesToPdf => self.show_images_to_pdf(window, cx),
             Close => {
                 self.begin_close(false, cx);
             }
@@ -1092,6 +1116,9 @@ impl WindowShell {
         }
         if matches!(action, Open) {
             return !self.opening;
+        }
+        if matches!(action, ImagesToPdf) {
+            return self.can_start_images_to_pdf(cx);
         }
         if matches!(action, Reopen) {
             return !self.opening && !self.closed_tabs.is_empty() && self.tabs.len() < MAX_TABS;
@@ -1424,6 +1451,7 @@ impl Render for WindowShell {
                     ("Ekstrak…", Extract),
                     ("Split PDF…", Split),
                     ("Ekspor PNG…", Png),
+                    ("Gambar ke PDF…", ImagesToPdf),
                     ("Optimize PDF (lossless)…", Optimize),
                 ],
             ),
@@ -1667,6 +1695,24 @@ impl Render for WindowShell {
                         ),
                 )
             })
+            .when(self.images_pdf.job.is_some(), |el| {
+                let text = format!("Gambar ke PDF — {}", self.images_pdf.phase_label());
+                el.child(
+                    div()
+                        .flex()
+                        .px_3()
+                        .items_center()
+                        .child(div().flex_1().text_sm().child(text))
+                        .child(
+                            Button::new("cancel-images-pdf-export")
+                                .ghost()
+                                .label("Batal ekspor")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.cancel_images_to_pdf(cx);
+                                })),
+                        ),
+                )
+            })
             .when(self.split_view.is_some(), |el| {
                 el.child(self.render_comparison(window, cx))
             })
@@ -1675,6 +1721,7 @@ impl Render for WindowShell {
                 |el, s| el.child(div().flex_1().min_h_0().child(s)),
             )
             .when(session.is_none(), |el| {
+                let can_img_pdf = self.can_start_images_to_pdf(cx);
                 el.child(
                     div()
                         .id("welcome-scroll")
@@ -1705,13 +1752,30 @@ impl Render for WindowShell {
                                     EmptyContent::new()
                                         .max_w(gpui::rems(40.))
                                         .child(
-                                            Button::new("open-empty")
-                                                .primary()
-                                                .label("Buka PDF")
-                                                .disabled(self.opening)
-                                                .on_click(cx.listener(|this, _, _, cx| {
-                                                    this.choose_open(cx)
-                                                })),
+                                            div()
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .gap_2()
+                                                .child(
+                                                    Button::new("open-empty")
+                                                        .primary()
+                                                        .label("Buka PDF")
+                                                        .disabled(self.opening)
+                                                        .on_click(cx.listener(|this, _, _, cx| {
+                                                            this.choose_open(cx)
+                                                        })),
+                                                )
+                                                .child(
+                                                    Button::new("images-to-pdf-empty")
+                                                        .label("Gambar ke PDF")
+                                                        .disabled(!can_img_pdf)
+                                                        .on_click(cx.listener(
+                                                            |this, _, window, cx| {
+                                                                this.show_images_to_pdf(window, cx);
+                                                            },
+                                                        )),
+                                                ),
                                         )
                                         .child(self.recent_list(cx)),
                                 ),

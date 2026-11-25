@@ -15,6 +15,7 @@ use std::{
     time::{Duration, Instant, UNIX_EPOCH},
 };
 use tempfile::{TempDir, TempPath};
+pub mod images_to_pdf;
 pub mod png;
 pub mod printing;
 pub mod split;

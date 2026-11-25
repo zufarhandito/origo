@@ -8,6 +8,7 @@ use std::path::PathBuf;
 mod annotations;
 mod books;
 mod exporting;
+mod images_to_pdf;
 mod ocr;
 mod ocr_export;
 mod optimizing;
@@ -247,6 +248,9 @@ fn main() -> Result<()> {
     if std::env::args().nth(1).as_deref() == Some("--png-smoke") {
         return png::run(&root, &PdfiumRenderer::new(&sidecars));
     }
+    if std::env::args().nth(1).as_deref() == Some("--images-to-pdf-smoke") {
+        return images_to_pdf::run(&root, &PdfiumRenderer::new(&sidecars));
+    }
     let fixture = root.join("tests/fixtures/two-pages.pdf");
     let before =
         std::fs::read(&fixture).context("Generate fixture with scripts/new-fixture.ps1")?;
@@ -295,5 +299,6 @@ fn main() -> Result<()> {
     splitting::run(&root, &renderer)?;
     optimizing::run(&root, &renderer)?;
     png::run(&root, &renderer)?;
+    images_to_pdf::run(&root, &renderer)?;
     Ok(())
 }

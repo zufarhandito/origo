@@ -1,14 +1,14 @@
-﻿# Conversion roadmap and extension boundaries
+# Conversion roadmap and extension boundaries
 
-Current slice: **PDF → PNG only** through Alat → Ekspor PNG. All/selected workspace
-pages, 150/300 DPI, exact bounded raster and new-folder publication are implemented;
-see [PNG](png.md). JPEG and TXT are explicitly deferred by the owner. The old Akan
-datang catalog remains excluded from primary navigation.
+Current slices implemented: **PDF → PNG** through Alat → Ekspor PNG (see [PNG](png.md))
+and **PNG/JPEG → PDF** through Alat → Gambar ke PDF… and the welcome screen (see
+[Images to PDF](images-to-pdf.md)). JPEG and TXT export from PDF remain deferred by the
+owner. The old Akan datang catalog remains excluded from primary navigation.
 
 The original future design dates from 11 November 2026. The owner requested an
-Akan datang catalog, later replaced by the desktop navigation. PNG is now the first
-implemented converter; other format engines below remain planned. M3 PDF Save As/
-Extract is implemented separately.
+Akan datang catalog, later replaced by the desktop navigation. PNG export (C1) and
+PNG/JPEG to PDF (C2) are implemented; Office/OCR format engines below remain planned.
+M3 PDF Save As/Extract is implemented separately.
 
 ## Product categories and order
 
@@ -22,7 +22,7 @@ not a promise to reproduce their engines, quality, accounts or hosted services.
 | M3 (implemented) | PDF Save As + selected-page Extract | QPDF page plan + safe output | Conservative preflight, validation and no-clobber commit |
 | C1 | PDF pages to PNG implemented; JPEG/TXT deferred | PDFium exact owned raster + pinned PNG encoder | Bounded batch export, dimensions/order and safe folder publication |
 | M4 | Split and lossless Optimize implemented; release hardening remains | Existing blueprint; see split.md and optimize.md | Cancellation/process/packaging gates |
-| C2 | PNG/JPEG to PDF | Dedicated image-to-PDF writer/adapter | EXIF, DPI/page fit, colors, large inputs |
+| C2 (implemented) | PNG/JPEG to PDF | Dedicated offline streaming PDF 1.4 writer (`image` + `flate2`) | EXIF, DPI/page fit, alpha compositing, JPEG passthrough, PDFium validation, no-clobber |
 | C3 | DOCX/XLSX/PPTX to PDF | Benchmark a local Office engine such as headless LibreOffice | Fonts, pagination, profiles/process cleanup, redistribution |
 | C4 | OCR + editable PDF to DOCX | Layout reconstruction pipeline and DOCX writer, or evaluated SDK | Indonesian/English text and layout quality corpus |
 | C5 | PDF to XLSX/PPTX; later formats | Table/slide-specific reconstruction | Format-specific fidelity and editability gates |

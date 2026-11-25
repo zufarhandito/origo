@@ -22,6 +22,7 @@ mod document_actions;
 mod document_model;
 mod exporting;
 mod feedback;
+mod images_to_pdf;
 mod local_state;
 mod ocr;
 mod outline;

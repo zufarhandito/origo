@@ -1,5 +1,25 @@
 # Pengujian Origo
 
+## Gambar (PNG/JPEG) ke PDF — Stage C2 (dev mode)
+
+Verifikasi dijalankan dalam mode pengembangan (`--locked --offline`, tanpa build release/installer):
+
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked --offline -- -D warnings`
+  (0 warning), dan `cargo test --workspace --locked --offline` lulus (**105 unit test**, termasuk
+  4 unit test baru di `pdf-application::images_to_pdf` dan 4 unit test baru di
+  `pdf-platform::images_to_pdf`), tanpa tambahan crate eksternal baru (memakai `image` +
+  `flate2` yang sudah terkunci di `Cargo.lock`).
+- `cargo run --locked --offline -p pdf-smoke -- --images-to-pdf-smoke` lulus
+  (`PNG alpha+150DPI`, JPEG `/DCTDecode` passthrough, koreksi orientasi EXIF 90° CW, preflight
+  QPDF `--check`, mode `Sesuai gambar`, penolakan no-clobber, serta pembersihan staging saat
+  masukan korup).
+- `scripts/images-to-pdf-ui-smoke.ps1 -Profile debug` lulus seluruh 5 skenario UI Windows
+  (buka dari layar awal kosong + tombol simpan nonaktif saat daftar kosong, buka lewat menu
+  **Alat → Gambar ke PDF…** dengan 0 tab + tambah 2 gambar + ubah urutan, konversi & buka
+  otomatis di tab baru, mode **Sesuai gambar** + penolakan no-clobber pada PDF yang sudah ada,
+  serta verifikasi hash berkas sumber identik dan tidak ada staging tersisa). Bukti lokal ada di
+  `.research/images-to-pdf-ui-2d38fb8ff7e84e9cafc5dcb6358e616c`.
+
 ## Anotasi teks pasif dan terapkan ke banyak halaman (dev mode)
 
 Verifikasi dijalankan dalam mode pengembangan (`--locked --offline`, tanpa build release/installer):
