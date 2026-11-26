@@ -127,6 +127,136 @@ fn encode_rgba_as_jpeg(
     Ok(jpeg)
 }
 
+/// Write a standalone single-page clean PDF containing only the rasterized image (no text,
+/// no annotations, no metadata). Used by True Redaction, Flatten PDF, and page standardization.
+#[allow(clippy::too_many_arguments)]
+pub fn write_single_page_raster_pdf(
+    path: &Path,
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    page_w: f32,
+    page_h: f32,
+    quality: u8,
+    control: &ExportControl,
+) -> Result<(), ExportError> {
+    write_single_page_raster_pdf_placed(
+        path,
+        rgba,
+        width,
+        height,
+        page_w,
+        page_h,
+        [0.0, 0.0, page_w, page_h],
+        quality,
+        control,
+    )
+}
+
+/// Write a single-page clean PDF placing the raster inside `draw_rect = [x, y, w, h]` (points)
+/// on a canvas of `(page_w, page_h)` points. Enables both full-page replacement and centered
+/// paper-size standardization (A4/Letter/F4/Legal).
+#[allow(clippy::too_many_arguments)]
+pub fn write_single_page_raster_pdf_placed(
+    path: &Path,
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    page_w: f32,
+    page_h: f32,
+    draw_rect: [f32; 4],
+    quality: u8,
+    control: &ExportControl,
+) -> Result<(), ExportError> {
+    control.checkpoint()?;
+    let jpeg = encode_rgba_as_jpeg(rgba, width, height, quality, false).map_err(|e| match e {
+        CompressError::Cancelled => ExportError::Cancelled,
+        _ => ExportError::Engine,
+    })?;
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .map_err(|_| ExportError::Io)?;
+    let mut writer = BoundedWriter::new(file, control, 128 * 1024 * 1024);
+    let mut offsets: Vec<u64> = Vec::with_capacity(5);
+    let map_err = |e: CompressError| match e {
+        CompressError::Cancelled => ExportError::Cancelled,
+        CompressError::OutputLimit => ExportError::ResourceLimit,
+        _ => ExportError::Io,
+    };
+
+    writer
+        .write_bytes(b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n")
+        .map_err(map_err)?;
+    offsets.push(writer.offset());
+    writer
+        .write_bytes(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+        .map_err(map_err)?;
+    offsets.push(writer.offset());
+    writer
+        .write_bytes(b"2 0 obj\n<< /Type /Pages /Kids [5 0 R] /Count 1 >>\nendobj\n")
+        .map_err(map_err)?;
+    offsets.push(writer.offset());
+    let img_header = format!(
+        "3 0 obj\n<< /Type /XObject /Subtype /Image /Width {width} /Height {height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Interpolate true /Length {} >>\nstream\n",
+        jpeg.len()
+    );
+    writer
+        .write_bytes(img_header.as_bytes())
+        .map_err(map_err)?;
+    writer.write_bytes(&jpeg).map_err(map_err)?;
+    writer
+        .write_bytes(b"\nendstream\nendobj\n")
+        .map_err(map_err)?;
+    let [dx, dy, dw, dh] = draw_rect;
+    let content = format!("q\n{dw:.3} 0 0 {dh:.3} {dx:.3} {dy:.3} cm\n/Im0 Do\nQ\n");
+    offsets.push(writer.offset());
+    writer
+        .write_bytes(
+            format!(
+                "4 0 obj\n<< /Length {} >>\nstream\n{content}endstream\nendobj\n",
+                content.len()
+            )
+            .as_bytes(),
+        )
+        .map_err(map_err)?;
+    offsets.push(writer.offset());
+    writer
+        .write_bytes(
+            format!(
+                "5 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w:.3} {page_h:.3}] /Resources << /XObject << /Im0 3 0 R >> >> /Contents 4 0 R >>\nendobj\n"
+            )
+            .as_bytes(),
+        )
+        .map_err(map_err)?;
+
+    let xref_offset = writer.offset();
+    let total_entries = offsets.len() + 1;
+    writer
+        .write_bytes(format!("xref\n0 {total_entries}\n0000000000 65535 f \n").as_bytes())
+        .map_err(map_err)?;
+    for offset in &offsets {
+        writer
+            .write_bytes(format!("{offset:010} 00000 n \n").as_bytes())
+            .map_err(map_err)?;
+    }
+    writer
+        .write_bytes(
+            format!(
+                "trailer\n<< /Size {total_entries} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n"
+            )
+            .as_bytes(),
+        )
+        .map_err(map_err)?;
+    let written = writer.finish().map_err(map_err)?;
+    if written == 0 {
+        return Err(ExportError::Validation);
+    }
+    Ok(())
+}
+
 fn verify_plan_sources(plan: &CompressPlan) -> Result<(), CompressError> {
     for source in plan.snapshot().sources() {
         let actual = fingerprint(&source.path).map_err(map_export_err)?;

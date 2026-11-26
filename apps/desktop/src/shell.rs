@@ -106,6 +106,7 @@ pub(super) struct WindowShell {
     pub(super) pdf_merge: pdf_shell_actions::PdfMergeState,
     pub(super) security: pdf_security::SecurityState,
     pub(super) compress: pdf_compress::CompressState,
+    pub(super) redact: pdf_redact::RedactState,
     pub(super) pending_pdf_action: Option<ipc::PdfShellAction>,
     #[cfg(windows)]
     pub(super) shell_ext_dialog: Option<pdf_shell_actions::ShellExtDialog>,
@@ -216,6 +217,7 @@ impl WindowShell {
                 pdf_merge: pdf_shell_actions::PdfMergeState::default(),
                 security: pdf_security::SecurityState::default(),
                 compress: pdf_compress::CompressState::default(),
+                redact: pdf_redact::RedactState::default(),
                 pending_pdf_action: None,
                 #[cfg(windows)]
                 shell_ext_dialog: None,
@@ -500,6 +502,7 @@ impl WindowShell {
             || self.security.dialog.is_some()
             || self.security.password_prompt.is_some()
             || self.compress.dialog.is_some()
+            || self.redact.dialog.is_some()
             || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
                 s.error_popup
@@ -924,6 +927,13 @@ impl WindowShell {
                     cx.notify();
                     return;
                 }
+                if self.close.as_ref().is_some_and(|b| b.window) && self.redact.job.is_some() {
+                    self.notice = Some(
+                        "Menunggu sensor permanen PDF selesai sebelum menutup jendela. Gunakan Batal atau Tetap di aplikasi.".into(),
+                    );
+                    cx.notify();
+                    return;
+                }
                 if let Some(batch) = &self.close
                     && self.ocr.update(cx, |ocr, cx| ocr.stop_tabs(&batch.ids, cx))
                 {
@@ -1133,6 +1143,7 @@ enum MenuAction {
     ImagesToPdf,
     Optimize,
     CompressPdf,
+    RedactPdf,
     PageNumbers,
     Watermark,
     EncryptPdf,
@@ -1195,6 +1206,7 @@ impl WindowShell {
             Open => self.choose_open(cx),
             ImagesToPdf => self.show_images_to_pdf(window, cx),
             CompressPdf => self.show_compress_pdf(window, cx),
+            RedactPdf => self.show_redact_pdf(window, cx),
             EncryptPdf => self.show_encrypt_pdf(window, cx),
             DecryptPdf => self.show_decrypt_pdf(window, cx),
             Close => {
@@ -1365,10 +1377,11 @@ impl WindowShell {
             Copy => s.text.selection.is_some(),
             OcrBatch => content && s.navigation.count > 0 && !self.ocr.read(cx).has_batch(),
             Select | Clear => content && s.mode == ViewerMode::Organize,
-            Save | OcrExport | Optimize | CompressPdf | Split | Png => {
+            Save | OcrExport | Optimize | CompressPdf | RedactPdf | Split | Png => {
                 content
                     && s.navigation.count > 0
                     && self.compress.job.is_none()
+                    && self.redact.job.is_none()
                     && self.resources.export_owner.load(Ordering::SeqCst) == 0
             }
             Extract => {
@@ -1653,6 +1666,7 @@ impl Render for WindowShell {
                     ("Kompres PDF (Ukuran)…", CompressPdf),
                     ("Nomor Halaman…", PageNumbers),
                     ("Watermark…", Watermark),
+                    ("Sensor Permanen (Redaction)…", RedactPdf),
                     ("Lindungi PDF (Password)…", EncryptPdf),
                     ("Buka Kunci PDF…", DecryptPdf),
                     #[cfg(windows)]
@@ -1967,6 +1981,24 @@ impl Render for WindowShell {
                                 .label("Batal")
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.cancel_compress_job(cx);
+                                })),
+                        ),
+                )
+            })
+            .when(self.redact.job.is_some(), |el| {
+                let text = self.redact.status_label();
+                el.child(
+                    div()
+                        .flex()
+                        .px_3()
+                        .items_center()
+                        .child(div().flex_1().text_sm().child(text))
+                        .child(
+                            Button::new("cancel-redact-job")
+                                .ghost()
+                                .label("Batal")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.cancel_redact_job(cx);
                                 })),
                         ),
                 )

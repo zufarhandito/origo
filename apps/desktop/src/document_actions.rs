@@ -54,6 +54,10 @@ impl DocumentSession {
                 if this.edits_locked() {
                     return;
                 }
+                if this.redaction.draft.take().is_some() || this.redaction.active {
+                    this.exit_redaction_mode(cx);
+                    return;
+                }
                 if this.annotation.signature.placing
                     || this.annotation.text.placing.is_some()
                     || this.annotation.tools.placing_symbol.is_some()

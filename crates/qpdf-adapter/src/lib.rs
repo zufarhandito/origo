@@ -12,9 +12,14 @@ mod annotations;
 mod export;
 mod ocr_layer;
 mod preflight;
+mod redact;
 mod security;
 mod structure;
 pub use export::{QpdfExporter, SearchableExporter};
+pub use redact::{
+    QpdfRedactor, RedactDpi, RedactOptions, RedactRect, RedactReport, burn_redaction_boxes,
+    raster_dimensions, sanitize_metadata_patch,
+};
 pub use security::{
     EncryptOptions, EncryptPermissions, QpdfSecurity, SecurityError, SecurityReport,
 };

@@ -327,6 +327,17 @@ impl DocumentSession {
             } else {
                 Vec::new()
             };
+            let redact_boxes: Vec<qpdf_adapter::RedactRect> = self
+                .redaction
+                .boxes
+                .get(&page_id)
+                .cloned()
+                .unwrap_or_default();
+            let redact_draft: Option<qpdf_adapter::RedactRect> = self
+                .redaction
+                .draft
+                .filter(|(pid, _, _)| *pid == page_id)
+                .and_then(|(_, a, b)| qpdf_adapter::RedactRect::from_corners(a, b));
             let weak = cx.weak_entity();
             let track_ghost = self.active && self.annotation.signature.placement_ghost.is_some();
             let resize_cursor = if geometry.quarter_turns.is_multiple_of(2) {
@@ -405,6 +416,15 @@ impl DocumentSession {
                     }
                     if let Some(a) = &selected_annotation {
                         annotations::paint_selection(a, geometry.quarter_turns, bounds, window);
+                    }
+                    if !redact_boxes.is_empty() || redact_draft.is_some() {
+                        pdf_redact::paint_redaction_overlays(
+                            &redact_boxes,
+                            redact_draft,
+                            geometry.quarter_turns,
+                            bounds,
+                            window,
+                        );
                     }
                     for (rect, active) in &search_highlights {
                         let highlight = Bounds::new(
@@ -492,6 +512,16 @@ impl DocumentSession {
                                     if !this.document_input_allowed(event.position, window) {
                                         return false;
                                     }
+                                    if this.redaction_pointer(
+                                        index,
+                                        bounds,
+                                        event.position,
+                                        true,
+                                        window,
+                                        cx,
+                                    ) {
+                                        return true;
+                                    }
                                     if this.annotation_pointer(
                                         index,
                                         bounds,
@@ -525,6 +555,19 @@ impl DocumentSession {
                                 && input_clip.contains(&event.position)
                             {
                                 let _ = weak.update(cx, |this, cx| {
+                                    if event.pressed_button == Some(MouseButton::Left)
+                                        && this.document_input_allowed(event.position, window)
+                                        && this.redaction_pointer(
+                                            index,
+                                            bounds,
+                                            event.position,
+                                            false,
+                                            window,
+                                            cx,
+                                        )
+                                    {
+                                        return;
+                                    }
                                     if event.pressed_button == Some(MouseButton::Left)
                                         && this.document_input_allowed(event.position, window)
                                         && this.annotation_pointer(
@@ -569,8 +612,10 @@ impl DocumentSession {
         };
         let placing_signature =
             !thumbnail && self.active && self.annotation.signature.placement_ghost.is_some();
+        let redacting = !thumbnail && self.active && self.redaction.active;
         let selectable = !thumbnail
             && !placing_signature
+            && !redacting
             && self
                 .text
                 .pages
@@ -582,7 +627,7 @@ impl DocumentSession {
                 this.role(gpui::Role::Document)
                     .aria_label(format!("Isi halaman {}", index + 1))
             })
-            .when(placing_signature, |this| this.cursor_crosshair())
+            .when(placing_signature || redacting, |this| this.cursor_crosshair())
             .when(selectable, |this| this.cursor_text())
             .w(px(width))
             .h(px(height))
@@ -703,6 +748,7 @@ impl Render for DocumentSession {
         let annotation_bar =
             (has_document && self.mode == ViewerMode::Read && self.annotation.open)
                 .then(|| self.annotation_bar(cx));
+        let redaction_banner = self.redaction_banner(cx);
         let search_bar = (has_document && self.search.open && self.mode != ViewerMode::Convert)
             .then(|| self.search_bar(cx));
         let ocr_chip = self.ocr_chip(cx);
@@ -830,6 +876,7 @@ impl Render for DocumentSession {
                                 if this.annotation.signature.gesture_bounds.take().is_some() {
                                     cx.notify();
                                 }
+                                this.finish_redaction_drag(cx);
                                 this.finish_annotation(cx);
                                 this.text.dragging = false;
                                 this.text.pending = None;
@@ -1063,6 +1110,7 @@ impl Render for DocumentSession {
             .children(search_bar)
             .children(ocr_batch)
             .children(annotation_bar)
+            .children(redaction_banner)
 
             .child(body)
             .child(

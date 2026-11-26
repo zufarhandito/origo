@@ -247,6 +247,22 @@ impl DocumentSession {
                 .child(self.note_tool_button(cx))
                 .child(self.symbol_tool_button(cx))
                 .child(
+                    Button::new("annotation-redact-mode")
+                        .ghost()
+                        .icon(
+                            gpui::component::Icon::new(IconName::EyeOff)
+                                .text_color(gpui::rgb(0xdc2626)),
+                        )
+                        .tooltip("Mode Sensor Permanen (Redaction)")
+                        .accessibility_label("Mode Sensor Permanen (Redaction)")
+                        .selected(self.redaction.active)
+                        .disabled(self.edits_locked())
+                        .on_click(cx.listener(|s, _, window, cx| {
+                            s.toggle_redaction_mode(cx);
+                            s.focus.focus(window, cx);
+                        })),
+                )
+                .child(
                     Button::new("annotation-delete")
                         .ghost()
                         .icon(IconName::Trash)

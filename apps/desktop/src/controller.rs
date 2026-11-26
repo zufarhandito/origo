@@ -130,6 +130,7 @@ impl DocumentSession {
         }
         self.outline = outline::OutlineState::default();
         self.annotation = annotations::AnnotationState::default();
+        self.redaction = pdf_redact::RedactionMarksState::default();
         self.mode = ViewerMode::Read;
         self.page_dragging = false;
         self.gesture_zoom.reset();

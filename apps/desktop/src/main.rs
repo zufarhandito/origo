@@ -29,6 +29,7 @@ mod local_state;
 mod ocr;
 mod outline;
 mod pdf_compress;
+mod pdf_redact;
 mod pdf_security;
 mod pdf_shell_actions;
 mod pdf_stamps;
@@ -119,6 +120,7 @@ struct RenderStats {
 }
 struct DocumentSession {
     annotation: annotations::AnnotationState,
+    redaction: pdf_redact::RedactionMarksState,
     tab_id: shell::TabId,
     view_id: shell::ViewId,
     document_owner: Option<gpui::WeakEntity<DocumentSession>>,
@@ -657,6 +659,7 @@ impl DocumentSession {
                 mode: ViewerMode::Read,
                 page_dragging: false,
                 annotation: annotations::AnnotationState::default(),
+                redaction: pdf_redact::RedactionMarksState::default(),
                 text: text_selection::TextState::default(),
                 ocr,
                 ocr_revision: 0,
