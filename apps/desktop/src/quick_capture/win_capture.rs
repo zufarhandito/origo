@@ -305,6 +305,42 @@ mod platform {
         }
     }
 
+    /// Screen-space floating window drag controller (zero feedback jitter, works on frameless PopUp windows).
+    pub struct WindowDrag {
+        hwnd: HWND,
+        start_cursor: POINT,
+        start_window: POINT,
+        _capture: winsafe::guard::ReleaseCaptureGuard,
+    }
+
+    impl WindowDrag {
+        pub fn begin(window: &Window) -> Option<Self> {
+            let hwnd = window_hwnd(window)?;
+            let start_cursor = winsafe::GetCursorPos().ok()?;
+            let rect = hwnd.GetWindowRect().ok()?;
+            let capture = hwnd.SetCapture();
+            Some(Self {
+                hwnd,
+                start_cursor,
+                start_window: POINT::with(rect.left, rect.top),
+                _capture: capture,
+            })
+        }
+
+        pub fn update(&self) {
+            if let Ok(cursor) = winsafe::GetCursorPos() {
+                let new_x = self.start_window.x + (cursor.x - self.start_cursor.x);
+                let new_y = self.start_window.y + (cursor.y - self.start_cursor.y);
+                let _ = self.hwnd.SetWindowPos(
+                    HwndPlace::Place(co::HWND_PLACE::TOPMOST),
+                    POINT::with(new_x, new_y),
+                    SIZE::default(),
+                    co::SWP::NOSIZE | co::SWP::NOACTIVATE,
+                );
+            }
+        }
+    }
+
     pub struct GlobalHotkeyListener {
         stop: Arc<AtomicBool>,
         rx: mpsc::Receiver<HotkeyAction>,
@@ -412,6 +448,17 @@ mod platform {
     pub fn configure_overlay_hwnd(_window: &Window) {}
     pub fn restore_window_from_minimized(_window: &Window) {}
 
+    pub struct WindowDrag;
+
+    impl WindowDrag {
+        pub fn begin(window: &Window) -> Option<Self> {
+            window.start_window_move();
+            None
+        }
+
+        pub fn update(&self) {}
+    }
+
     pub struct GlobalHotkeyListener;
 
     impl GlobalHotkeyListener {
@@ -430,8 +477,8 @@ mod platform {
 }
 
 pub use platform::{
-    GlobalHotkeyListener, capture_monitor_rgba, configure_floating_hwnd, configure_overlay_hwnd,
-    monitor_count, restore_window_from_minimized,
+    GlobalHotkeyListener, WindowDrag, capture_monitor_rgba, configure_floating_hwnd,
+    configure_overlay_hwnd, monitor_count, restore_window_from_minimized,
 };
 
 #[cfg(test)]

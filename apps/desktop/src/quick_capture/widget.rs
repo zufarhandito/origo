@@ -7,15 +7,16 @@ use super::{
         export_session_to_images, export_session_to_pdf,
     },
     win_capture::{
-        CaptureRegion, CapturedFrame, GlobalHotkeyListener, HotkeyAction, capture_monitor_rgba,
-        configure_floating_hwnd, crop_rgba, monitor_count, restore_window_from_minimized,
-        rgba_to_render_image,
+        CaptureRegion, CapturedFrame, GlobalHotkeyListener, HotkeyAction, WindowDrag,
+        capture_monitor_rgba, configure_floating_hwnd, crop_rgba, monitor_count,
+        restore_window_from_minimized, rgba_to_render_image,
     },
 };
 use crate::shell::WindowShell;
 use gpui::{
-    AnyWindowHandle, App, Bounds, Context, FocusHandle, MouseButton, PathPromptOptions, Render,
-    RenderImage, WeakEntity, Window, WindowBounds, WindowDecorations, WindowKind, WindowOptions,
+    AnyWindowHandle, App, Bounds, Context, FocusHandle, MouseButton, MouseMoveEvent,
+    PathPromptOptions, Render, RenderImage, WeakEntity, Window, WindowBounds, WindowDecorations,
+    WindowKind, WindowOptions,
     component::{
         ActiveTheme, Disableable, Selectable, Sizable,
         button::{Button, ButtonVariants},
@@ -122,6 +123,7 @@ pub struct QuickCaptureWidget {
     ocr_headers: bool,
     active_export: Option<ActiveExport>,
     last_window_height: f32,
+    drag: Option<WindowDrag>,
 }
 
 impl QuickCaptureWidget {
@@ -224,6 +226,7 @@ impl QuickCaptureWidget {
                         ocr_headers: true,
                         active_export: None,
                         last_window_height: PILL_HEIGHT_COMPACT,
+                        drag: None,
                     };
                     widget.sync_window_size(window);
                     widget.start_hotkey_poller(widget_window, cx);
@@ -1608,6 +1611,8 @@ impl Render for QuickCaptureWidget {
         let monitors = monitor_count();
         let hotkey_label = self.data.hotkey.label();
 
+        let dragging = self.drag.is_some();
+
         div()
             .id("quick-capture-floating")
             .track_focus(&self.focus)
@@ -1619,6 +1624,32 @@ impl Render for QuickCaptureWidget {
             .border_color(colors.border)
             .bg(colors.background)
             .overflow_hidden()
+            .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
+                if let Some(drag) = &this.drag {
+                    if event.pressed_button != Some(MouseButton::Left) {
+                        this.drag = None;
+                        cx.notify();
+                    } else {
+                        drag.update();
+                    }
+                }
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    if this.drag.take().is_some() {
+                        cx.notify();
+                    }
+                }),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    if this.drag.take().is_some() {
+                        cx.notify();
+                    }
+                }),
+            )
             // Top Pill Bar (always visible)
             .child(
                 div()
@@ -1641,16 +1672,25 @@ impl Render for QuickCaptureWidget {
                     .child(
                         div()
                             .id("qc-drag-handle")
-                            .px_1p5()
-                            .py_1()
+                            .w(px(26.))
+                            .h(px(34.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
                             .rounded_sm()
-                            .cursor_grab()
-                            .text_xs()
+                            .when(dragging, |el| el.cursor_grabbing().bg(colors.secondary))
+                            .when(!dragging, |el| el.cursor_grab())
+                            .text_sm()
                             .text_color(colors.muted_foreground)
                             .child("⋮⋮")
-                            .on_mouse_down(MouseButton::Left, |_, window, _| {
-                                window.start_window_move();
-                            }),
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, window, cx| {
+                                    this.drag = WindowDrag::begin(window);
+                                    cx.stop_propagation();
+                                    cx.notify();
+                                }),
+                            ),
                     )
                     // Primary Capture Button
                     .child(
@@ -1710,7 +1750,22 @@ impl Render for QuickCaptureWidget {
                                 this.toggle_drawer(Some(DrawerTab::Export), window, cx);
                             })),
                     )
-                    .child(div().flex_1())
+                    .child(
+                        div()
+                            .id("qc-drag-spacer")
+                            .flex_1()
+                            .h_full()
+                            .when(dragging, |el| el.cursor_grabbing())
+                            .when(!dragging, |el| el.cursor_grab())
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, window, cx| {
+                                    this.drag = WindowDrag::begin(window);
+                                    cx.stop_propagation();
+                                    cx.notify();
+                                }),
+                            ),
+                    )
                     // Restore Origo button
                     .child(
                         Button::new("qc-restore-origo")
