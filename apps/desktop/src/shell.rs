@@ -108,6 +108,7 @@ pub(super) struct WindowShell {
     pub(super) compress: pdf_compress::CompressState,
     pub(super) redact: pdf_redact::RedactState,
     pub(super) page_box: pdf_crop::PageBoxState,
+    pub(super) meta_flatten: pdf_metadata_flatten::MetaFlattenState,
     pub(super) pending_pdf_action: Option<ipc::PdfShellAction>,
     #[cfg(windows)]
     pub(super) shell_ext_dialog: Option<pdf_shell_actions::ShellExtDialog>,
@@ -220,6 +221,7 @@ impl WindowShell {
                 compress: pdf_compress::CompressState::default(),
                 redact: pdf_redact::RedactState::default(),
                 page_box: pdf_crop::PageBoxState::default(),
+                meta_flatten: pdf_metadata_flatten::MetaFlattenState::default(),
                 pending_pdf_action: None,
                 #[cfg(windows)]
                 shell_ext_dialog: None,
@@ -506,6 +508,7 @@ impl WindowShell {
             || self.compress.dialog.is_some()
             || self.redact.dialog.is_some()
             || self.page_box.dialog.is_some()
+            || self.meta_flatten.has_dialog()
             || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
                 s.error_popup
@@ -944,6 +947,13 @@ impl WindowShell {
                     cx.notify();
                     return;
                 }
+                if self.close.as_ref().is_some_and(|b| b.window) && self.meta_flatten.job.is_some() {
+                    self.notice = Some(
+                        "Menunggu proses Flatten / Metadata PDF selesai sebelum menutup jendela. Gunakan Batal atau Tetap di aplikasi.".into(),
+                    );
+                    cx.notify();
+                    return;
+                }
                 if let Some(batch) = &self.close
                     && self.ocr.update(cx, |ocr, cx| ocr.stop_tabs(&batch.ids, cx))
                 {
@@ -1155,6 +1165,8 @@ enum MenuAction {
     CompressPdf,
     RedactPdf,
     CropPaper,
+    FlattenPdf,
+    EditMetadata,
     PageNumbers,
     Watermark,
     EncryptPdf,
@@ -1219,6 +1231,8 @@ impl WindowShell {
             CompressPdf => self.show_compress_pdf(window, cx),
             RedactPdf => self.show_redact_pdf(window, cx),
             CropPaper => self.show_crop_paper_dialog(window, cx),
+            FlattenPdf => self.show_flatten_pdf(window, cx),
+            EditMetadata => self.show_metadata_editor(window, cx),
             EncryptPdf => self.show_encrypt_pdf(window, cx),
             DecryptPdf => self.show_decrypt_pdf(window, cx),
             Close => {
@@ -1389,12 +1403,14 @@ impl WindowShell {
             Copy => s.text.selection.is_some(),
             OcrBatch => content && s.navigation.count > 0 && !self.ocr.read(cx).has_batch(),
             Select | Clear => content && s.mode == ViewerMode::Organize,
-            Save | OcrExport | Optimize | CompressPdf | RedactPdf | CropPaper | Split | Png => {
+            Save | OcrExport | Optimize | CompressPdf | RedactPdf | CropPaper | FlattenPdf
+            | EditMetadata | Split | Png => {
                 content
                     && s.navigation.count > 0
                     && self.compress.job.is_none()
                     && self.redact.job.is_none()
                     && self.page_box.job.is_none()
+                    && self.meta_flatten.job.is_none()
                     && self.resources.export_owner.load(Ordering::SeqCst) == 0
             }
             Extract => {
@@ -1681,6 +1697,8 @@ impl Render for WindowShell {
                     ("Watermark…", Watermark),
                     ("Sensor Permanen (Redaction)…", RedactPdf),
                     ("Crop & Ukuran Kertas…", CropPaper),
+                    ("Flatten PDF…", FlattenPdf),
+                    ("Properti & Metadata PDF…", EditMetadata),
                     ("Lindungi PDF (Password)…", EncryptPdf),
                     ("Buka Kunci PDF…", DecryptPdf),
                     #[cfg(windows)]
@@ -2031,6 +2049,24 @@ impl Render for WindowShell {
                                 .label("Batal")
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.cancel_page_box_job(cx);
+                                })),
+                        ),
+                )
+            })
+            .when(self.meta_flatten.job.is_some(), |el| {
+                let text = self.meta_flatten.status_label();
+                el.child(
+                    div()
+                        .flex()
+                        .px_3()
+                        .items_center()
+                        .child(div().flex_1().text_sm().child(text))
+                        .child(
+                            Button::new("cancel-meta-flatten-job")
+                                .ghost()
+                                .label("Batal")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.cancel_meta_flatten_job(cx);
                                 })),
                         ),
                 )
