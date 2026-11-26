@@ -1050,7 +1050,7 @@ impl Render for DocumentSession {
             })
             .when(self.export.running && self.export.png, |el| {
                 el.child(div().id("png-progress").px_4().py_2().text_sm().child(format!(
-                    "PNG: {} dari {} halaman selesai divalidasi. Folder diterbitkan setelah seluruh batch berhasil.",
+                    "Gambar (PNG/JPEG): {} dari {} halaman selesai divalidasi. Folder diterbitkan setelah seluruh batch berhasil.",
                     self.export.png_done.load(std::sync::atomic::Ordering::SeqCst), self.export.png_total)))
             })
             .when(

@@ -109,6 +109,7 @@ pub(super) struct WindowShell {
     pub(super) redact: pdf_redact::RedactState,
     pub(super) page_box: pdf_crop::PageBoxState,
     pub(super) meta_flatten: pdf_metadata_flatten::MetaFlattenState,
+    pub(super) quick_export: pdf_quick_export::QuickExportState,
     pub(super) pending_pdf_action: Option<ipc::PdfShellAction>,
     #[cfg(windows)]
     pub(super) shell_ext_dialog: Option<pdf_shell_actions::ShellExtDialog>,
@@ -222,6 +223,7 @@ impl WindowShell {
                 redact: pdf_redact::RedactState::default(),
                 page_box: pdf_crop::PageBoxState::default(),
                 meta_flatten: pdf_metadata_flatten::MetaFlattenState::default(),
+                quick_export: pdf_quick_export::QuickExportState::default(),
                 pending_pdf_action: None,
                 #[cfg(windows)]
                 shell_ext_dialog: None,
@@ -509,6 +511,7 @@ impl WindowShell {
             || self.redact.dialog.is_some()
             || self.page_box.dialog.is_some()
             || self.meta_flatten.has_dialog()
+            || self.quick_export.has_dialog()
             || self.tabs.iter().flat_map(Tab::views).any(|s| {
                 let s = s.read(cx);
                 s.error_popup
@@ -954,6 +957,13 @@ impl WindowShell {
                     cx.notify();
                     return;
                 }
+                if self.close.as_ref().is_some_and(|b| b.window) && self.quick_export.job.is_some() {
+                    self.notice = Some(
+                        "Menunggu ekspor teks / ekstraksi gambar selesai sebelum menutup jendela. Gunakan Batal atau Tetap di aplikasi.".into(),
+                    );
+                    cx.notify();
+                    return;
+                }
                 if let Some(batch) = &self.close
                     && self.ocr.update(cx, |ocr, cx| ocr.stop_tabs(&batch.ids, cx))
                 {
@@ -1160,6 +1170,8 @@ enum MenuAction {
     Extract,
     Split,
     Png,
+    ExportTxt,
+    ExtractImages,
     ImagesToPdf,
     Optimize,
     CompressPdf,
@@ -1233,6 +1245,8 @@ impl WindowShell {
             CropPaper => self.show_crop_paper_dialog(window, cx),
             FlattenPdf => self.show_flatten_pdf(window, cx),
             EditMetadata => self.show_metadata_editor(window, cx),
+            ExportTxt => self.show_txt_export_dialog(window, cx),
+            ExtractImages => self.show_extract_images_dialog(window, cx),
             EncryptPdf => self.show_encrypt_pdf(window, cx),
             DecryptPdf => self.show_decrypt_pdf(window, cx),
             Close => {
@@ -1404,13 +1418,14 @@ impl WindowShell {
             OcrBatch => content && s.navigation.count > 0 && !self.ocr.read(cx).has_batch(),
             Select | Clear => content && s.mode == ViewerMode::Organize,
             Save | OcrExport | Optimize | CompressPdf | RedactPdf | CropPaper | FlattenPdf
-            | EditMetadata | Split | Png => {
+            | EditMetadata | Split | Png | ExportTxt | ExtractImages => {
                 content
                     && s.navigation.count > 0
                     && self.compress.job.is_none()
                     && self.redact.job.is_none()
                     && self.page_box.job.is_none()
                     && self.meta_flatten.job.is_none()
+                    && self.quick_export.job.is_none()
                     && self.resources.export_owner.load(Ordering::SeqCst) == 0
             }
             Extract => {
@@ -1689,7 +1704,9 @@ impl Render for WindowShell {
                     ("Impor PDF…", Import),
                     ("Ekstrak…", Extract),
                     ("Split PDF…", Split),
-                    ("Ekspor PNG…", Png),
+                    ("Ekspor Gambar (PNG / JPEG)…", Png),
+                    ("Ekspor Teks (TXT)…", ExportTxt),
+                    ("Ekstrak Gambar Asli…", ExtractImages),
                     ("Gambar ke PDF…", ImagesToPdf),
                     ("Optimize PDF (lossless)…", Optimize),
                     ("Kompres PDF (Ukuran)…", CompressPdf),
@@ -2067,6 +2084,24 @@ impl Render for WindowShell {
                                 .label("Batal")
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.cancel_meta_flatten_job(cx);
+                                })),
+                        ),
+                )
+            })
+            .when(self.quick_export.job.is_some(), |el| {
+                let text = self.quick_export.status_label();
+                el.child(
+                    div()
+                        .flex()
+                        .px_3()
+                        .items_center()
+                        .child(div().flex_1().text_sm().child(text))
+                        .child(
+                            Button::new("cancel-quick-export-job")
+                                .ghost()
+                                .label("Batal")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.cancel_quick_export_job(cx);
                                 })),
                         ),
                 )

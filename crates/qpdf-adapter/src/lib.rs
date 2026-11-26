@@ -10,6 +10,7 @@ use std::{
 
 mod annotations;
 mod export;
+mod extract_images;
 mod metadata;
 mod ocr_layer;
 mod page_box;
@@ -18,6 +19,10 @@ mod redact;
 mod security;
 mod structure;
 pub use export::{QpdfExporter, SearchableExporter};
+pub use extract_images::{
+    ExtractImagesError, ExtractImagesOptions, ExtractImagesReport, QpdfImageExtractor,
+    undo_png_predictor,
+};
 pub use metadata::{FlattenOptions, FlattenReport, MetadataReport, PdfMetadata, QpdfMetadata};
 pub use page_box::{
     CropMargins, PageBoxOperation, PageBoxReport, PaperOrientation, PaperSize, QpdfPageBox,

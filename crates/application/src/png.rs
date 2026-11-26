@@ -26,6 +26,37 @@ impl PngDpi {
         }
     }
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ImageExportFormat {
+    #[default]
+    Png,
+    Jpeg {
+        quality: u8,
+    },
+}
+impl ImageExportFormat {
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Png => "png",
+            Self::Jpeg { .. } => "jpg",
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Png => "PNG",
+            Self::Jpeg { .. } => "JPEG",
+        }
+    }
+    pub fn detail_label(self) -> String {
+        match self {
+            Self::Png => "PNG".into(),
+            Self::Jpeg { quality } => format!("JPEG {}%", quality.clamp(10, 100)),
+        }
+    }
+    pub fn filename(self, index: usize) -> String {
+        format!("page-{:04}.{}", index + 1, self.extension())
+    }
+}
 #[derive(Debug, thiserror::Error)]
 pub enum PngError {
     #[error(
@@ -33,10 +64,10 @@ pub enum PngError {
     )]
     Dimensions,
     #[error(
-        "Total PNG melebihi batas output 1 GiB. Ekspor lebih sedikit halaman atau pilih DPI lebih rendah."
+        "Total gambar melebihi batas output 1 GiB. Ekspor lebih sedikit halaman atau pilih DPI lebih rendah."
     )]
     OutputLimit,
-    #[error("PNG gagal ditulis atau divalidasi. Folder hasil tidak diterbitkan.")]
+    #[error("Gambar gagal ditulis atau divalidasi. Folder hasil tidak diterbitkan.")]
     Encoding,
     #[error(transparent)]
     Batch(#[from] SplitError),
@@ -65,6 +96,7 @@ pub fn dimensions(geometry: PageGeometry, dpi: PngDpi) -> Result<(u32, u32), Png
 pub struct PngPlan {
     snapshot: ExportPlan,
     dpi: PngDpi,
+    format: ImageExportFormat,
     sizes: Vec<(u32, u32)>,
     output_limit: u64,
 }
@@ -78,9 +110,19 @@ impl PngPlan {
         Ok(Self {
             snapshot,
             dpi,
+            format: ImageExportFormat::Png,
             sizes,
             output_limit: MAX_PNG_BYTES,
         })
+    }
+    pub fn with_format(mut self, format: ImageExportFormat) -> Self {
+        self.format = match format {
+            ImageExportFormat::Png => ImageExportFormat::Png,
+            ImageExportFormat::Jpeg { quality } => ImageExportFormat::Jpeg {
+                quality: quality.clamp(10, 100),
+            },
+        };
+        self
     }
     /// Allows tighter quotas in integrations/tests, never a higher production limit.
     pub fn with_output_limit(mut self, bytes: u64) -> Result<Self, PngError> {
@@ -96,11 +138,17 @@ impl PngPlan {
     pub fn dpi(&self) -> PngDpi {
         self.dpi
     }
+    pub fn format(&self) -> ImageExportFormat {
+        self.format
+    }
     pub fn snapshot(&self) -> &ExportPlan {
         &self.snapshot
     }
     pub fn filename(index: usize) -> String {
-        format!("page-{:04}.png", index + 1)
+        ImageExportFormat::Png.filename(index)
+    }
+    pub fn output_filename(&self, index: usize) -> String {
+        self.format.filename(index)
     }
 }
 /// Encoder owns bounded streaming writes and complete decode validation of each file.
@@ -112,6 +160,19 @@ pub trait PngWriter {
         remaining: u64,
         control: &ExportControl,
     ) -> Result<u64, PngError>;
+    fn write_image(
+        &self,
+        raster: &RenderedPage,
+        path: &Path,
+        format: ImageExportFormat,
+        remaining: u64,
+        control: &ExportControl,
+    ) -> Result<u64, PngError> {
+        match format {
+            ImageExportFormat::Png => self.write_png(raster, path, remaining, control),
+            ImageExportFormat::Jpeg { .. } => Err(PngError::Encoding),
+        }
+    }
 }
 pub struct PreparedPng<T> {
     plan: PngPlan,
@@ -124,6 +185,7 @@ pub struct PngReceipt {
     pub pages: usize,
     pub bytes: u64,
     pub dpi: PngDpi,
+    pub format: ImageExportFormat,
 }
 pub fn prepare_png<O: BatchOutput>(
     plan: PngPlan,
@@ -185,9 +247,15 @@ pub fn finish_png<T: BatchTransaction>(
         control.checkpoint()?;
         let path = transaction
             .output_directory()
-            .join(PngPlan::filename(index));
+            .join(plan.output_filename(index));
         let started = Instant::now();
-        let result = writer.write_png(&raster, &path, plan.output_limit - bytes, control);
+        let result = writer.write_image(
+            &raster,
+            &path,
+            plan.format,
+            plan.output_limit - bytes,
+            control,
+        );
         control.charge(started.elapsed());
         control.remaining()?;
         let written = result?;
@@ -212,6 +280,7 @@ pub fn finish_png<T: BatchTransaction>(
         pages: plan.page_count(),
         bytes,
         dpi: plan.dpi,
+        format: plan.format,
     })
 }
 

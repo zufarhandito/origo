@@ -25,7 +25,7 @@ serta daftar backlog **Tier 2** dan **Tier 3** untuk fase berikutnya setelah Tie
 | **2** | **Sensor Permanen (True Redaction) + Sanitize Metadata** | Tandai area sensor pada halaman/rentang, terapkan redaction secara permanen (menghancurkan teks & grafis asli di bawah kotak sensor sehingga tidak bisa di-copy/diekstrak ulang) + opsi bersihkan seluruh metadata Info/XMP tersembunyi. | ✅ Done |
 | **3** | **Crop Halaman & Standardisasi Ukuran Kertas** | Potong margin halaman (preset / custom mm/pt, halaman aktif / rentang / semua) serta standardisasi ukuran kertas (A4, Letter, F4, Legal) dengan fit proporsional. | ✅ Done |
 | **4** | **Flatten PDF & Editor Properti/Metadata PDF** | Flatten anotasi/TTD/form menjadi konten halaman statis (tidak bisa digeser/dihapus penerima) + dialog lihat/edit/hapus Properti & Metadata PDF (Title, Author, Subject, Keywords, Creator, Producer). | ✅ Done |
-| **5** | **Ekspor Cepat Tambahan: PDF → JPEG, PDF → TXT, & Ekstrak Gambar Asli** | Ekspor halaman ke JPEG (DPI + kualitas), ekspor teks satu dokumen ke UTF-8 TXT sesuai urutan page plan, dan ekstrak gambar embedded asli dari PDF ke folder tujuan. | ⏳ In Progress |
+| **5** | **Ekspor Cepat Tambahan: PDF → JPEG, PDF → TXT, & Ekstrak Gambar Asli** | Ekspor halaman ke JPEG (DPI + kualitas), ekspor teks satu dokumen ke UTF-8 TXT sesuai urutan page plan, dan ekstrak gambar embedded asli dari PDF ke folder tujuan. | ✅ Done |
 
 ---
 

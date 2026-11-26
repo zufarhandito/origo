@@ -271,6 +271,57 @@ impl StagedPdfOutput {
     }
 }
 
+/// Atomically write UTF-8 text to a `.txt` destination without replacing existing files.
+pub fn write_text_file_no_clobber(
+    destination: &Path,
+    content: &str,
+    control: &ExportControl,
+) -> Result<(PathBuf, u64), ExportError> {
+    control.checkpoint()?;
+    if !destination
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("txt"))
+    {
+        return Err(ExportError::Destination);
+    }
+    let name = destination.file_name().ok_or(ExportError::Destination)?;
+    let parent = dunce::canonicalize(destination.parent().ok_or(ExportError::Destination)?)
+        .map_err(|_| ExportError::Destination)?;
+    if !parent.is_dir() {
+        return Err(ExportError::Destination);
+    }
+    let destination = parent.join(name);
+    match fs::symlink_metadata(&destination) {
+        Ok(_) => return Err(ExportError::DestinationExists),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(ExportError::Destination),
+    }
+    let dir = tempfile::Builder::new()
+        .prefix(".pdf-studio-txt-")
+        .tempdir_in(&parent)
+        .map_err(|_| ExportError::Io)?;
+    let mut tmp = tempfile::Builder::new()
+        .prefix("export-")
+        .suffix(".txt")
+        .tempfile_in(dir.path())
+        .map_err(|_| ExportError::Io)?;
+    tmp.write_all(content.as_bytes())
+        .map_err(|_| ExportError::Io)?;
+    tmp.as_file().sync_all().map_err(|_| ExportError::Io)?;
+    let bytes = content.len() as u64;
+    control.checkpoint()?;
+    tmp.into_temp_path()
+        .persist_noclobber(&destination)
+        .map_err(|e| {
+            if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+                ExportError::DestinationExists
+            } else {
+                ExportError::Io
+            }
+        })?;
+    Ok((destination, bytes))
+}
+
 pub struct ProcessOutput {
     pub code: Option<i32>,
     pub stdout: Vec<u8>,

@@ -99,6 +99,11 @@ impl SplitTransaction for SafeSplit {
         Ok(self.destination.clone())
     }
 }
+/// Publish a staged directory to a non-existent destination without replacing existing entries.
+pub fn publish_directory_no_clobber(source: &Path, destination: &Path) -> Result<(), SplitError> {
+    require_absent(destination)?;
+    publish(source, destination)
+}
 // Do not use std::fs::rename: it can replace an empty destination directory.
 // The pinned safe wrapper calls MoveFileExW without REPLACE_EXISTING on Windows.
 // Other platforms require their own validated no-replace directory primitive.

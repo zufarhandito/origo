@@ -11,6 +11,10 @@ pdf-application.workspace = true
 pdf-platform.workspace = true
 pdf-ocr.workspace = true
 serde_json.workspace = true
+flate2.workspace = true
+image.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
 [lints]
 workspace = true
 

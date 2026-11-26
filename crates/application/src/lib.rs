@@ -13,6 +13,7 @@ pub mod png;
 pub mod search;
 pub mod split;
 pub mod text;
+pub mod text_export;
 pub mod viewer;
 
 #[derive(Debug, thiserror::Error)]
