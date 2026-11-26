@@ -38,6 +38,7 @@ mod pdf_shell_actions;
 mod pdf_stamps;
 mod png_export;
 mod printing;
+mod quick_capture;
 mod reading_position;
 mod search;
 mod shared_workspace;

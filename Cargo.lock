@@ -4754,6 +4754,7 @@ dependencies = [
  "tiny-skia",
  "tray-icon",
  "velopack",
+ "windows-capture",
  "winsafe",
 ]
 

@@ -85,7 +85,7 @@ pub(super) struct WindowShell {
     favorites_revision: u64,
     favorites_writer: Arc<std::sync::Mutex<u64>>,
     pending_preferences: usize,
-    state_dir: Option<PathBuf>,
+    pub(super) state_dir: Option<PathBuf>,
     closed_tabs: std::collections::VecDeque<ClosedTab>,
     reopening_tab: Option<ClosedTab>,
     pub(super) tab_picker_open: bool,
@@ -110,6 +110,7 @@ pub(super) struct WindowShell {
     pub(super) page_box: pdf_crop::PageBoxState,
     pub(super) meta_flatten: pdf_metadata_flatten::MetaFlattenState,
     pub(super) quick_export: pdf_quick_export::QuickExportState,
+    pub(super) quick_capture_window: Option<gpui::AnyWindowHandle>,
     pub(super) pending_pdf_action: Option<ipc::PdfShellAction>,
     #[cfg(windows)]
     pub(super) shell_ext_dialog: Option<pdf_shell_actions::ShellExtDialog>,
@@ -224,6 +225,7 @@ impl WindowShell {
                 page_box: pdf_crop::PageBoxState::default(),
                 meta_flatten: pdf_metadata_flatten::MetaFlattenState::default(),
                 quick_export: pdf_quick_export::QuickExportState::default(),
+                quick_capture_window: None,
                 pending_pdf_action: None,
                 #[cfg(windows)]
                 shell_ext_dialog: None,
@@ -1009,6 +1011,7 @@ impl WindowShell {
                     self.checkpoint_session(cx);
                 }
                 if batch.window {
+                    self.close_quick_capture_window(cx);
                     let handle = self.handle;
                     cx.defer(move |cx| {
                         let _ = handle.update(cx, |_, w, _| w.remove_window());
@@ -1173,6 +1176,7 @@ enum MenuAction {
     ExportTxt,
     ExtractImages,
     ImagesToPdf,
+    QuickCapture,
     Optimize,
     CompressPdf,
     RedactPdf,
@@ -1240,6 +1244,7 @@ impl WindowShell {
             DuplicateView => self.duplicate_view(window, cx),
             Open => self.choose_open(cx),
             ImagesToPdf => self.show_images_to_pdf(window, cx),
+            QuickCapture => self.open_quick_capture(window, cx),
             CompressPdf => self.show_compress_pdf(window, cx),
             RedactPdf => self.show_redact_pdf(window, cx),
             CropPaper => self.show_crop_paper_dialog(window, cx),
@@ -1357,6 +1362,9 @@ impl WindowShell {
         }
         if matches!(action, ImagesToPdf) {
             return self.can_start_images_to_pdf(cx);
+        }
+        if matches!(action, QuickCapture) {
+            return !self.opening;
         }
         if matches!(action, EncryptPdf | DecryptPdf) {
             return !self.opening
@@ -1708,6 +1716,7 @@ impl Render for WindowShell {
                     ("Ekspor Teks (TXT)…", ExportTxt),
                     ("Ekstrak Gambar Asli…", ExtractImages),
                     ("Gambar ke PDF…", ImagesToPdf),
+                    ("Capture Soal Cepat (Floating Widget)…", QuickCapture),
                     ("Optimize PDF (lossless)…", Optimize),
                     ("Kompres PDF (Ukuran)…", CompressPdf),
                     ("Nomor Halaman…", PageNumbers),
@@ -2166,6 +2175,16 @@ impl Render for WindowShell {
                                                         .on_click(cx.listener(
                                                             |this, _, window, cx| {
                                                                 this.show_images_to_pdf(window, cx);
+                                                            },
+                                                        )),
+                                                )
+                                                .child(
+                                                    Button::new("quick-capture-empty")
+                                                        .label("Capture Soal Cepat")
+                                                        .disabled(self.opening)
+                                                        .on_click(cx.listener(
+                                                            |this, _, window, cx| {
+                                                                this.open_quick_capture(window, cx);
                                                             },
                                                         )),
                                                 ),
