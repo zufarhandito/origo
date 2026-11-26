@@ -542,6 +542,7 @@ mod tests {
             rectangles: false,
             signature: None,
             text: None,
+            extra: None,
         };
         w.execute(Command::AnnotateMany(vec![
             (first, vec![a.clone()]),

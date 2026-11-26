@@ -533,6 +533,7 @@ impl DocumentSession {
                     content: label,
                     font_size: ui.font_size,
                 }),
+                extra: None,
             });
             changes.push((page_id, all));
         }
@@ -1011,6 +1012,7 @@ impl DocumentSession {
             rectangles: false,
             signature: Some(shared.clone()),
             text: None,
+            extra: None,
         };
         let simulated = w
             .pages()
@@ -1053,6 +1055,7 @@ impl DocumentSession {
                 rectangles: false,
                 signature: Some(shared.clone()),
                 text: None,
+                extra: None,
             });
             changes.push((page_id, all));
         }

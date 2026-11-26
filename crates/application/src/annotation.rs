@@ -4,7 +4,8 @@ use fontdue::{
     layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle},
 };
 use pdf_domain::annotation::{
-    Annotation, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, SignatureImage, rotate,
+    Annotation, AnnotationExtra, FillSymbol, MAX_NOTE_CHARS, MAX_TEXT_CHARS, MAX_TEXT_SIZE,
+    MIN_TEXT_SIZE, ShapeKind, SignatureImage, rotate,
 };
 use std::sync::OnceLock;
 
@@ -18,6 +19,64 @@ fn text_font() -> Result<&'static Font, String> {
         })
         .as_ref()
         .map_err(Clone::clone)
+}
+
+/// Validates multi-line sticky note text content.
+pub fn validate_note(content: &str) -> Result<(), String> {
+    let trimmed = content.trim();
+    if trimmed.is_empty()
+        || content.chars().count() > MAX_NOTE_CHARS
+        || content.chars().any(|c| c.is_control() && c != '\n')
+    {
+        return Err(format!(
+            "Isi catatan 1-{MAX_NOTE_CHARS} karakter (boleh beberapa baris)."
+        ));
+    }
+    Ok(())
+}
+
+/// Rasterizes a crisp RGBA preview image for a Fill & Sign vector symbol (`✓`, `✗`, `●`).
+pub fn rasterize_fill_symbol_preview(symbol: FillSymbol, color: [u8; 3]) -> SignatureImage {
+    let size = 96u32;
+    let mut rgba = vec![0u8; size as usize * size as usize * 4];
+    let mut mask = vec![false; size as usize * size as usize];
+    let w = size as usize;
+    let h = size as usize;
+    let s = size as f32;
+    let radius = (s * 0.085).max(2.0);
+    match symbol {
+        FillSymbol::Check => {
+            let pts = [
+                [0.16 * s, 0.54 * s],
+                [0.40 * s, 0.80 * s],
+                [0.85 * s, 0.22 * s],
+            ];
+            for pair in pts.windows(2) {
+                stamp_segment(&mut mask, w, h, pair[0], pair[1], radius);
+            }
+        }
+        FillSymbol::Cross => {
+            stamp_segment(&mut mask, w, h, [0.20 * s, 0.20 * s], [0.80 * s, 0.80 * s], radius);
+            stamp_segment(&mut mask, w, h, [0.80 * s, 0.20 * s], [0.20 * s, 0.80 * s], radius);
+        }
+        FillSymbol::Dot => {
+            stamp_disc(&mut mask, w, h, [0.5 * s, 0.5 * s], 0.34 * s);
+        }
+    }
+    for (idx, on) in mask.into_iter().enumerate() {
+        if on {
+            let offset = idx * 4;
+            rgba[offset] = color[0];
+            rgba[offset + 1] = color[1];
+            rgba[offset + 2] = color[2];
+            rgba[offset + 3] = 255;
+        }
+    }
+    SignatureImage {
+        width: size,
+        height: size,
+        rgba,
+    }
 }
 
 /// Validates single-line passive text content and verifies bundled font glyph coverage.
@@ -509,6 +568,19 @@ pub fn composite(
             }
             continue;
         }
+        if let Some(extra) = &a.extra {
+            composite_extra(
+                rgba,
+                &mut mask,
+                width,
+                height,
+                page_width,
+                turns,
+                a,
+                extra,
+            );
+            continue;
+        }
         let points: Vec<_> = a
             .points
             .iter()
@@ -536,30 +608,7 @@ pub fn composite(
         } else {
             let radius = (a.width * width as f32 / page_width / 2.).max(0.5);
             for pair in points.windows(2) {
-                let [p, q] = [pair[0], pair[1]];
-                let dx = q[0] - p[0];
-                let dy = q[1] - p[1];
-                let length = dx * dx + dy * dy;
-                let x0 = (p[0].min(q[0]) - radius).max(0.) as usize;
-                let x1 = ((p[0].max(q[0]) + radius).ceil() as usize).min(w);
-                let y0 = (p[1].min(q[1]) - radius).max(0.) as usize;
-                let y1 = ((p[1].max(q[1]) + radius).ceil() as usize).min(h);
-                for y in y0..y1 {
-                    for x in x0..x1 {
-                        let u = if length > 0. {
-                            (((x as f32 + 0.5 - p[0]) * dx + (y as f32 + 0.5 - p[1]) * dy) / length)
-                                .clamp(0., 1.)
-                        } else {
-                            0.
-                        };
-                        if (x as f32 + 0.5 - p[0] - u * dx).powi(2)
-                            + (y as f32 + 0.5 - p[1] - u * dy).powi(2)
-                            <= radius * radius
-                        {
-                            mask[y * w + x] = true;
-                        }
-                    }
-                }
+                stamp_segment(&mut mask, w, h, pair[0], pair[1], radius);
             }
         }
         let radius = (a.width * width as f32 / page_width / 2.).max(1.);
@@ -581,19 +630,316 @@ pub fn composite(
             + radius)
             .ceil() as usize)
             .min(h);
-        for y in min_y..max_y {
-            for x in min_x..max_x {
-                let offset = y * w + x;
-                if mask[offset] {
-                    mask[offset] = false;
-                    let pixel = &mut rgba[offset * 4..offset * 4 + 4];
-                    for (i, channel) in pixel.iter_mut().enumerate().take(3) {
-                        *channel = if a.highlight {
-                            ((u32::from(*channel) * (255 + u32::from(a.color[i]))) / 510) as u8
-                        } else {
-                            a.color[i]
-                        };
+        flush_mask(rgba, &mut mask, w, min_x, max_x, min_y, max_y, a.color, a.highlight);
+    }
+}
+
+fn stamp_segment(mask: &mut [bool], w: usize, h: usize, p: [f32; 2], q: [f32; 2], radius: f32) {
+    let dx = q[0] - p[0];
+    let dy = q[1] - p[1];
+    let length = dx * dx + dy * dy;
+    let x0 = (p[0].min(q[0]) - radius).max(0.) as usize;
+    let x1 = ((p[0].max(q[0]) + radius).ceil() as usize).min(w);
+    let y0 = (p[1].min(q[1]) - radius).max(0.) as usize;
+    let y1 = ((p[1].max(q[1]) + radius).ceil() as usize).min(h);
+    let r2 = radius * radius;
+    for y in y0..y1 {
+        let py = y as f32 + 0.5;
+        for x in x0..x1 {
+            let px = x as f32 + 0.5;
+            let u = if length > 0. {
+                (((px - p[0]) * dx + (py - p[1]) * dy) / length).clamp(0., 1.)
+            } else {
+                0.
+            };
+            if (px - p[0] - u * dx).powi(2) + (py - p[1] - u * dy).powi(2) <= r2 {
+                mask[y * w + x] = true;
+            }
+        }
+    }
+}
+
+fn stamp_disc(mask: &mut [bool], w: usize, h: usize, center: [f32; 2], radius: f32) {
+    let x0 = (center[0] - radius).max(0.) as usize;
+    let x1 = ((center[0] + radius).ceil() as usize).min(w);
+    let y0 = (center[1] - radius).max(0.) as usize;
+    let y1 = ((center[1] + radius).ceil() as usize).min(h);
+    let r2 = radius * radius;
+    for y in y0..y1 {
+        let dy = y as f32 + 0.5 - center[1];
+        for x in x0..x1 {
+            let dx = x as f32 + 0.5 - center[0];
+            if dx * dx + dy * dy <= r2 {
+                mask[y * w + x] = true;
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn flush_mask(
+    rgba: &mut [u8],
+    mask: &mut [bool],
+    w: usize,
+    min_x: usize,
+    max_x: usize,
+    min_y: usize,
+    max_y: usize,
+    color: [u8; 3],
+    highlight: bool,
+) {
+    for y in min_y..max_y {
+        for x in min_x..max_x {
+            let offset = y * w + x;
+            if mask[offset] {
+                mask[offset] = false;
+                let pixel = &mut rgba[offset * 4..offset * 4 + 4];
+                for (i, channel) in pixel.iter_mut().enumerate().take(3) {
+                    *channel = if highlight {
+                        ((u32::from(*channel) * (255 + u32::from(color[i]))) / 510) as u8
+                    } else {
+                        color[i]
+                    };
+                }
+            }
+        }
+    }
+}
+
+/// Computes the two arrowhead wing endpoints in the same coordinate space as `start -> end`.
+pub fn arrow_head_wings(start: [f32; 2], end: [f32; 2], head_len: f32) -> Option<[[f32; 2]; 2]> {
+    let dx = end[0] - start[0];
+    let dy = end[1] - start[1];
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist < 1e-3 {
+        return None;
+    }
+    let len = head_len.min(dist * 0.45);
+    let angle = dy.atan2(dx);
+    let spread = std::f32::consts::FRAC_PI_6; // 30 degrees
+    let left = [
+        end[0] - len * (angle - spread).cos(),
+        end[1] - len * (angle - spread).sin(),
+    ];
+    let right = [
+        end[0] - len * (angle + spread).cos(),
+        end[1] - len * (angle + spread).sin(),
+    ];
+    Some([left, right])
+}
+
+#[allow(clippy::too_many_arguments)]
+fn composite_extra(
+    rgba: &mut [u8],
+    mask: &mut [bool],
+    width: u32,
+    height: u32,
+    page_width: f32,
+    turns: u8,
+    a: &Annotation,
+    extra: &AnnotationExtra,
+) {
+    let (w, h) = (width as usize, height as usize);
+    let to_px = |p: [f32; 2]| -> [f32; 2] {
+        let r = rotate(p, turns);
+        [r[0] * width as f32, r[1] * height as f32]
+    };
+    let pt_scale = (width as f32 / page_width.max(1.0)).max(0.1);
+    let stroke_radius = (a.width * pt_scale / 2.0).max(0.75);
+
+    let mut min_x = w;
+    let mut max_x = 0usize;
+    let mut min_y = h;
+    let mut max_y = 0usize;
+    let mut touch = |p: [f32; 2], rad: f32| {
+        min_x = min_x.min((p[0] - rad).max(0.0) as usize);
+        max_x = max_x.max(((p[0] + rad).ceil() as usize).min(w));
+        min_y = min_y.min((p[1] - rad).max(0.0) as usize);
+        max_y = max_y.max(((p[1] + rad).ceil() as usize).min(h));
+    };
+
+    match extra {
+        AnnotationExtra::Underline | AnnotationExtra::StrikeOut => {
+            let strike = matches!(extra, AnnotationExtra::StrikeOut);
+            for pair in a.points.as_chunks::<2>().0.iter() {
+                let left = pair[0][0].min(pair[1][0]);
+                let right = pair[0][0].max(pair[1][0]);
+                let top = pair[0][1].min(pair[1][1]);
+                let bottom = pair[0][1].max(pair[1][1]);
+                let y = if strike {
+                    (top + bottom) * 0.5
+                } else {
+                    bottom - (bottom - top) * 0.08
+                };
+                let p0 = to_px([left, y]);
+                let p1 = to_px([right, y]);
+                let box_h_px = ((bottom - top) * if turns.is_multiple_of(2) { height } else { width } as f32).abs();
+                let rad = (box_h_px * 0.055).max(stroke_radius).max(0.8);
+                stamp_segment(mask, w, h, p0, p1, rad);
+                touch(p0, rad + 1.0);
+                touch(p1, rad + 1.0);
+            }
+            if min_x < max_x && min_y < max_y {
+                flush_mask(rgba, mask, w, min_x, max_x, min_y, max_y, a.color, false);
+            }
+        }
+        AnnotationExtra::Shape(ShapeKind::Rectangle) => {
+            let [p0, p1] = [a.points[0], a.points[1]];
+            let corners = [
+                to_px([p0[0], p0[1]]),
+                to_px([p1[0], p0[1]]),
+                to_px([p1[0], p1[1]]),
+                to_px([p0[0], p1[1]]),
+            ];
+            for i in 0..4 {
+                let start = corners[i];
+                let end = corners[(i + 1) % 4];
+                stamp_segment(mask, w, h, start, end, stroke_radius);
+                touch(start, stroke_radius + 1.0);
+            }
+            if min_x < max_x && min_y < max_y {
+                flush_mask(rgba, mask, w, min_x, max_x, min_y, max_y, a.color, false);
+            }
+        }
+        AnnotationExtra::Shape(ShapeKind::Ellipse) => {
+            let [p0, p1] = [a.points[0], a.points[1]];
+            let cx = (p0[0] + p1[0]) * 0.5;
+            let cy = (p0[1] + p1[1]) * 0.5;
+            let rx = (p1[0] - p0[0]) * 0.5;
+            let ry = (p1[1] - p0[1]) * 0.5;
+            const SEGMENTS: usize = 64;
+            let mut prev = to_px([cx + rx, cy]);
+            touch(prev, stroke_radius + 1.0);
+            for i in 1..=SEGMENTS {
+                let theta = std::f32::consts::TAU * (i as f32 / SEGMENTS as f32);
+                let curr = to_px([cx + rx * theta.cos(), cy + ry * theta.sin()]);
+                stamp_segment(mask, w, h, prev, curr, stroke_radius);
+                touch(curr, stroke_radius + 1.0);
+                prev = curr;
+            }
+            if min_x < max_x && min_y < max_y {
+                flush_mask(rgba, mask, w, min_x, max_x, min_y, max_y, a.color, false);
+            }
+        }
+        AnnotationExtra::Shape(ShapeKind::Line | ShapeKind::Arrow) => {
+            let start = to_px(a.points[0]);
+            let end = to_px(a.points[1]);
+            stamp_segment(mask, w, h, start, end, stroke_radius);
+            touch(start, stroke_radius + 1.0);
+            touch(end, stroke_radius + 1.0);
+            if matches!(extra, AnnotationExtra::Shape(ShapeKind::Arrow)) {
+                let head_len = (a.width * pt_scale * 4.5).max(10.0 * pt_scale.max(0.5));
+                if let Some([left, right]) = arrow_head_wings(start, end, head_len) {
+                    stamp_segment(mask, w, h, end, left, stroke_radius);
+                    stamp_segment(mask, w, h, end, right, stroke_radius);
+                    touch(left, stroke_radius + 1.0);
+                    touch(right, stroke_radius + 1.0);
+                }
+            }
+            if min_x < max_x && min_y < max_y {
+                flush_mask(rgba, mask, w, min_x, max_x, min_y, max_y, a.color, false);
+            }
+        }
+        AnnotationExtra::Symbol(symbol) => {
+            let [p0, p1] = [a.points[0], a.points[1]];
+            let map = |u: f32, v: f32| -> [f32; 2] {
+                to_px([p0[0] + (p1[0] - p0[0]) * u, p0[1] + (p1[1] - p0[1]) * v])
+            };
+            let top_left = map(0.0, 0.0);
+            let top_right = map(1.0, 0.0);
+            let bot_left = map(0.0, 1.0);
+            let side_w = ((top_right[0] - top_left[0]).powi(2) + (top_right[1] - top_left[1]).powi(2)).sqrt();
+            let side_h = ((bot_left[0] - top_left[0]).powi(2) + (bot_left[1] - top_left[1]).powi(2)).sqrt();
+            let min_side = side_w.min(side_h);
+            let rad = (min_side * 0.085).max(1.2);
+            match symbol {
+                FillSymbol::Check => {
+                    let pts = [map(0.16, 0.54), map(0.40, 0.80), map(0.85, 0.22)];
+                    for pair in pts.windows(2) {
+                        stamp_segment(mask, w, h, pair[0], pair[1], rad);
+                        touch(pair[0], rad + 1.0);
+                        touch(pair[1], rad + 1.0);
                     }
+                }
+                FillSymbol::Cross => {
+                    let s0 = map(0.20, 0.20);
+                    let e0 = map(0.80, 0.80);
+                    let s1 = map(0.80, 0.20);
+                    let e1 = map(0.20, 0.80);
+                    stamp_segment(mask, w, h, s0, e0, rad);
+                    stamp_segment(mask, w, h, s1, e1, rad);
+                    for p in [s0, e0, s1, e1] {
+                        touch(p, rad + 1.0);
+                    }
+                }
+                FillSymbol::Dot => {
+                    let center = map(0.50, 0.50);
+                    let disc_r = (min_side * 0.34).max(1.5);
+                    stamp_disc(mask, w, h, center, disc_r);
+                    touch(center, disc_r + 1.0);
+                }
+            }
+            if min_x < max_x && min_y < max_y {
+                flush_mask(rgba, mask, w, min_x, max_x, min_y, max_y, a.color, false);
+            }
+        }
+        AnnotationExtra::Note(_) => {
+            let [p0, p1] = [a.points[0], a.points[1]];
+            let corners = [rotate(p0, turns), rotate(p1, turns)];
+            let bx0 = (corners[0][0].min(corners[1][0]) * width as f32).floor().max(0.0) as usize;
+            let bx1 = ((corners[0][0].max(corners[1][0]) * width as f32).ceil() as usize).min(w);
+            let by0 = (corners[0][1].min(corners[1][1]) * height as f32).floor().max(0.0) as usize;
+            let by1 = ((corners[0][1].max(corners[1][1]) * height as f32).ceil() as usize).min(h);
+            let fold_color = [
+                (u16::from(a.color[0]) * 70 / 100) as u8,
+                (u16::from(a.color[1]) * 70 / 100) as u8,
+                (u16::from(a.color[2]) * 70 / 100) as u8,
+            ];
+            let border_color = [
+                (u16::from(a.color[0]) * 38 / 100) as u8,
+                (u16::from(a.color[1]) * 38 / 100) as u8,
+                (u16::from(a.color[2]) * 38 / 100) as u8,
+            ];
+            for y in by0..by1 {
+                for x in bx0..bx1 {
+                    let p = rotate(
+                        [
+                            (x as f32 + 0.5) / width as f32,
+                            (y as f32 + 0.5) / height as f32,
+                        ],
+                        (4 - turns) % 4,
+                    );
+                    let u = (p[0] - p0[0]) / (p1[0] - p0[0]);
+                    let v = (p[1] - p0[1]) / (p1[1] - p0[1]);
+                    if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
+                        continue;
+                    }
+                    // Cut bottom-right corner diagonal (u + v > 1.74)
+                    if u + v > 1.74 {
+                        continue;
+                    }
+                    let on_border = u < 0.08
+                        || v < 0.08
+                        || (u > 0.92 && v <= 0.74)
+                        || (v > 0.92 && u <= 0.74)
+                        || (u + v > 1.66);
+                    let in_fold = u >= 0.74 && v >= 0.74;
+                    let on_line = (0.20..=0.78).contains(&u)
+                        && ((0.27..=0.34).contains(&v)
+                            || (0.46..=0.53).contains(&v)
+                            || ((0.20..=0.60).contains(&u) && (0.65..=0.72).contains(&v)));
+                    let color = if on_border || on_line {
+                        border_color
+                    } else if in_fold {
+                        fold_color
+                    } else {
+                        a.color
+                    };
+                    let offset = (y * w + x) * 4;
+                    rgba[offset] = color[0];
+                    rgba[offset + 1] = color[1];
+                    rgba[offset + 2] = color[2];
+                    rgba[offset + 3] = 255;
                 }
             }
         }
@@ -648,6 +994,7 @@ mod tests {
                 rgba: [0, 0, 255, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 255, 0].to_vec(),
             })),
             text: None,
+            extra: None,
         };
         let mut narrow = [255; 8];
         composite(&mut narrow, 1, 2, 1., 1, std::slice::from_ref(&signature));
@@ -669,6 +1016,7 @@ mod tests {
             rectangles: false,
             signature: None,
             text: None,
+            extra: None,
         };
         let mut raster = vec![255; 40 * 40 * 4];
         let offset = (20 * 40 + 20) * 4;
@@ -725,6 +1073,7 @@ mod tests {
                 content: "24 November 2026".into(),
                 font_size: 14.,
             }),
+            extra: None,
         };
         for turns in 0..4 {
             let mut canvas = vec![255; 120 * 120 * 4];
@@ -740,6 +1089,110 @@ mod tests {
                 canvas.as_chunks::<4>().0.iter().any(|p| p[0] < 240),
                 "text must paint visible pixels at rotation {turns}"
             );
+        }
+    }
+
+    #[test]
+    fn extra_annotations_composite_cleanly_at_all_rotations() {
+        assert!(validate_note("Catatan revisi\nBaris kedua").is_ok());
+        assert!(validate_note("  ").is_err());
+
+        for sym in [FillSymbol::Check, FillSymbol::Cross, FillSymbol::Dot] {
+            let preview = rasterize_fill_symbol_preview(sym, [30, 170, 95]);
+            assert!(preview.valid());
+            assert!(preview.rgba.as_chunks::<4>().0.iter().any(|p| p[3] == 255));
+        }
+
+        let items = [
+            Annotation {
+                id: 11,
+                highlight: false,
+                color: [40, 110, 220],
+                width: 2.,
+                points: vec![[0.1, 0.2], [0.8, 0.28]],
+                rectangles: true,
+                signature: None,
+                text: None,
+                extra: Some(AnnotationExtra::Underline),
+            },
+            Annotation {
+                id: 12,
+                highlight: false,
+                color: [230, 65, 75],
+                width: 2.,
+                points: vec![[0.1, 0.4], [0.8, 0.48]],
+                rectangles: true,
+                signature: None,
+                text: None,
+                extra: Some(AnnotationExtra::StrikeOut),
+            },
+            Annotation {
+                id: 13,
+                highlight: false,
+                color: [230, 65, 75],
+                width: 2.,
+                points: vec![[0.2, 0.2], [0.7, 0.6]],
+                rectangles: false,
+                signature: None,
+                text: None,
+                extra: Some(AnnotationExtra::Shape(ShapeKind::Rectangle)),
+            },
+            Annotation {
+                id: 14,
+                highlight: false,
+                color: [30, 170, 95],
+                width: 2.,
+                points: vec![[0.2, 0.2], [0.7, 0.6]],
+                rectangles: false,
+                signature: None,
+                text: None,
+                extra: Some(AnnotationExtra::Shape(ShapeKind::Ellipse)),
+            },
+            Annotation {
+                id: 15,
+                highlight: false,
+                color: [25, 25, 25],
+                width: 2.,
+                points: vec![[0.15, 0.2], [0.85, 0.8]],
+                rectangles: false,
+                signature: None,
+                text: None,
+                extra: Some(AnnotationExtra::Shape(ShapeKind::Arrow)),
+            },
+            Annotation {
+                id: 16,
+                highlight: false,
+                color: [255, 210, 0],
+                width: 2.,
+                points: vec![[0.2, 0.2], [0.35, 0.35]],
+                rectangles: false,
+                signature: None,
+                text: None,
+                extra: Some(AnnotationExtra::Note("Periksa tanda tangan".into())),
+            },
+            Annotation {
+                id: 17,
+                highlight: false,
+                color: [30, 170, 95],
+                width: 2.,
+                points: vec![[0.3, 0.3], [0.5, 0.5]],
+                rectangles: false,
+                signature: None,
+                text: None,
+                extra: Some(AnnotationExtra::Symbol(FillSymbol::Check)),
+            },
+        ];
+
+        for item in &items {
+            for turns in 0..4 {
+                let mut canvas = vec![255; 100 * 100 * 4];
+                composite(&mut canvas, 100, 100, 500., turns, std::slice::from_ref(item));
+                assert!(
+                    canvas.as_chunks::<4>().0.iter().any(|p| p[..3] != [255, 255, 255]),
+                    "{:?} must paint visible pixels at rotation {turns}",
+                    item.extra
+                );
+            }
         }
     }
 

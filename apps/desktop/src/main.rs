@@ -1,5 +1,5 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
-#![recursion_limit = "256"]
+#![recursion_limit = "512"]
 
 extern crate gpui_kit as gpui;
 use gpui_kit::component::input::{InputEvent, InputState};
@@ -13,6 +13,7 @@ use pdf_application::{
 };
 use pdf_engine::PdfiumRenderer;
 use std::{collections::HashMap, ops::Range, path::PathBuf, sync::Arc};
+mod annotation_tools;
 mod annotations;
 mod chrome;
 mod controller;

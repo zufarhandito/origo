@@ -507,6 +507,7 @@ mod tests {
             rectangles: false,
             signature: None,
             text: None,
+            extra: None,
         };
         let annotation = serde_json::json!({"/Type":"/Annot","/Subtype":"/Ink","/NM":format!("u:{}",a.name()),"/Rect":[0,0,100,100],"/C":[0,0,0],"/CA":1,"/F":4,"/InkList":[[10,20,30,40]]});
         for indirect in [false, true] {
@@ -544,6 +545,7 @@ mod tests {
                 rgba: vec![0, 0, 0, 255],
             })),
             text: None,
+            extra: None,
         };
         let annotation = serde_json::json!({"/Type":"/Annot","/Subtype":"/Stamp","/NM":format!("u:{}",a.name()),"/Rect":[0,0,100,100],"/C":[0,0,0],"/CA":1,"/F":4});
         let mut v = json();
@@ -581,6 +583,7 @@ mod tests {
                 content: "24 November 2026".into(),
                 font_size: 12.,
             }),
+            extra: None,
         };
         let annotation = serde_json::json!({
             "/Type": "/Annot",
@@ -621,6 +624,144 @@ mod tests {
         assert!(inspect_json(&widget, 1).is_err());
     }
     #[test]
+    fn extra_annotations_pass_preflight_and_reject_active_or_tampered() {
+        use pdf_domain::annotation::{AnnotationExtra, FillSymbol, ShapeKind};
+        let cases = [
+            (
+                "/Underline",
+                Annotation {
+                    id: 11,
+                    highlight: false,
+                    color: [40, 110, 220],
+                    width: 1.5,
+                    points: vec![[0.1, 0.2], [0.4, 0.23]],
+                    rectangles: true,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Underline),
+                },
+                serde_json::json!({"/QuadPoints": [10, 20, 40, 20, 10, 15, 40, 15]}),
+            ),
+            (
+                "/StrikeOut",
+                Annotation {
+                    id: 12,
+                    highlight: false,
+                    color: [230, 65, 75],
+                    width: 1.5,
+                    points: vec![[0.1, 0.3], [0.4, 0.33]],
+                    rectangles: true,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::StrikeOut),
+                },
+                serde_json::json!({"/QuadPoints": [10, 30, 40, 30, 10, 25, 40, 25]}),
+            ),
+            (
+                "/Square",
+                Annotation {
+                    id: 13,
+                    highlight: false,
+                    color: [230, 65, 75],
+                    width: 2.5,
+                    points: vec![[0.1, 0.1], [0.5, 0.4]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Shape(ShapeKind::Rectangle)),
+                },
+                serde_json::json!({"/BS": {"/W": 2.5}}),
+            ),
+            (
+                "/Circle",
+                Annotation {
+                    id: 14,
+                    highlight: false,
+                    color: [30, 170, 95],
+                    width: 2.0,
+                    points: vec![[0.2, 0.2], [0.6, 0.5]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Shape(ShapeKind::Ellipse)),
+                },
+                serde_json::json!({"/BS": {"/W": 2.0}}),
+            ),
+            (
+                "/Line",
+                Annotation {
+                    id: 15,
+                    highlight: false,
+                    color: [25, 25, 25],
+                    width: 2.0,
+                    points: vec![[0.1, 0.1], [0.6, 0.6]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Shape(ShapeKind::Arrow)),
+                },
+                serde_json::json!({"/L": [10, 90, 60, 40], "/LE": ["/None", "/OpenArrow"]}),
+            ),
+            (
+                "/Text",
+                Annotation {
+                    id: 16,
+                    highlight: false,
+                    color: [255, 210, 0],
+                    width: 1.0,
+                    points: vec![[0.2, 0.2], [0.25, 0.25]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Note("Periksa lampiran".into())),
+                },
+                serde_json::json!({"/Contents": "u:Periksa lampiran", "/Name": "/Comment", "/Open": false}),
+            ),
+            (
+                "/Stamp",
+                Annotation {
+                    id: 17,
+                    highlight: false,
+                    color: [25, 25, 25],
+                    width: 2.0,
+                    points: vec![[0.5, 0.5], [0.54, 0.54]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Symbol(FillSymbol::Check)),
+                },
+                serde_json::json!({}),
+            ),
+        ];
+        for (subtype, a, extra_fields) in cases {
+            let mut obj = serde_json::json!({
+                "/Type": "/Annot",
+                "/Subtype": subtype,
+                "/NM": format!("u:{}", a.name()),
+                "/Rect": [0, 0, 100, 100],
+                "/C": [
+                    f64::from(a.color[0]) / 255.,
+                    f64::from(a.color[1]) / 255.,
+                    f64::from(a.color[2]) / 255.,
+                ],
+                "/CA": 1.0,
+                "/F": 4,
+            });
+            if let (Some(dst), Some(src)) = (obj.as_object_mut(), extra_fields.as_object()) {
+                for (k, v) in src {
+                    dst.insert(k.clone(), v.clone());
+                }
+            }
+            let mut v = json();
+            v["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"] = serde_json::json!([obj]);
+            assert!(inspect_json(&v, 1).is_ok(), "failed for {subtype}");
+            let mut active = v.clone();
+            active["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/A"] =
+                serde_json::json!({"/S": "/JavaScript", "/JS": "u:alert(1)"});
+            assert!(inspect_json(&active, 1).is_err(), "active should fail for {subtype}");
+        }
+    }
+    #[test]
     fn signature_refs_allow_many_placements_and_reject_dangling_refs() -> Result<(), ExportError> {
         let image = std::sync::Arc::new(SignatureImage {
             width: 2,
@@ -636,6 +777,7 @@ mod tests {
             rectangles: false,
             signature: Some(image.clone()),
             text: None,
+            extra: None,
         };
         let mut annots = vec![serde_json::json!({
             "/Type": "/Annot",

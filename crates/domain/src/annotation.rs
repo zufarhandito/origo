@@ -8,6 +8,7 @@ pub const MAX_PAGE_ANNOTATIONS: usize = 256;
 pub const MAX_SIGNATURES: usize = 8;
 pub const MAX_SIGNATURE_PLACEMENTS: usize = 1024;
 pub const MAX_TEXT_CHARS: usize = 240;
+pub const MAX_NOTE_CHARS: usize = 1000;
 pub const MIN_TEXT_SIZE: f32 = 8.;
 pub const MAX_TEXT_SIZE: f32 = 48.;
 pub const PREFIX: &str = "pdf-studio-annotation-v1:";
@@ -18,8 +19,89 @@ const MAX_NAME_BYTES: usize = MAX_SIGNATURE_BYTES.div_ceil(3) * 4 + 256;
 pub enum AnnotationKind {
     Ink,
     Highlight,
+    Underline,
+    StrikeOut,
+    Square,
+    Circle,
+    Line,
+    Text,
     Stamp,
     FreeText,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShapeKind {
+    Rectangle,
+    Ellipse,
+    Line,
+    Arrow,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FillSymbol {
+    Check,
+    Cross,
+    Dot,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AnnotationExtra {
+    Underline,
+    StrikeOut,
+    Shape(ShapeKind),
+    Note(String),
+    Symbol(FillSymbol),
+}
+
+impl AnnotationExtra {
+    pub fn kind(&self) -> AnnotationKind {
+        match self {
+            Self::Underline => AnnotationKind::Underline,
+            Self::StrikeOut => AnnotationKind::StrikeOut,
+            Self::Shape(ShapeKind::Rectangle) => AnnotationKind::Square,
+            Self::Shape(ShapeKind::Ellipse) => AnnotationKind::Circle,
+            Self::Shape(ShapeKind::Line | ShapeKind::Arrow) => AnnotationKind::Line,
+            Self::Note(_) => AnnotationKind::Text,
+            Self::Symbol(_) => AnnotationKind::Stamp,
+        }
+    }
+
+    fn to_json(&self) -> Value {
+        match self {
+            Self::Underline => json!("underline"),
+            Self::StrikeOut => json!("strikeout"),
+            Self::Shape(ShapeKind::Rectangle) => json!("rect"),
+            Self::Shape(ShapeKind::Ellipse) => json!("ellipse"),
+            Self::Shape(ShapeKind::Line) => json!("line"),
+            Self::Shape(ShapeKind::Arrow) => json!("arrow"),
+            Self::Note(content) => json!(["note", content]),
+            Self::Symbol(FillSymbol::Check) => json!("check"),
+            Self::Symbol(FillSymbol::Cross) => json!("cross"),
+            Self::Symbol(FillSymbol::Dot) => json!("dot"),
+        }
+    }
+
+    fn from_json(value: &Value) -> Option<Self> {
+        if let Some(tag) = value.as_str() {
+            return match tag {
+                "underline" => Some(Self::Underline),
+                "strikeout" => Some(Self::StrikeOut),
+                "rect" => Some(Self::Shape(ShapeKind::Rectangle)),
+                "ellipse" => Some(Self::Shape(ShapeKind::Ellipse)),
+                "line" => Some(Self::Shape(ShapeKind::Line)),
+                "arrow" => Some(Self::Shape(ShapeKind::Arrow)),
+                "check" => Some(Self::Symbol(FillSymbol::Check)),
+                "cross" => Some(Self::Symbol(FillSymbol::Cross)),
+                "dot" => Some(Self::Symbol(FillSymbol::Dot)),
+                _ => None,
+            };
+        }
+        let arr = value.as_array()?;
+        if arr.len() == 2 && arr[0].as_str() == Some("note") {
+            return Some(Self::Note(arr[1].as_str()?.to_owned()));
+        }
+        None
+    }
 }
 
 /// Passive, single-line text annotation (free text, date, or name — not an interactive form field).
@@ -52,6 +134,7 @@ pub struct Annotation {
     pub rectangles: bool,
     pub signature: Option<std::sync::Arc<SignatureImage>>,
     pub text: Option<TextAnnotation>,
+    pub extra: Option<AnnotationExtra>,
 }
 
 /// Result of parsing an owned `/NM` annotation name, supporting deduplicated signature refs.
@@ -101,6 +184,7 @@ impl ParsedName {
                     rectangles: false,
                     signature: Some(image),
                     text: None,
+                    extra: None,
                 };
                 annotation.valid().then_some(annotation)
             }
@@ -114,6 +198,8 @@ impl Annotation {
             AnnotationKind::Stamp
         } else if self.text.is_some() {
             AnnotationKind::FreeText
+        } else if let Some(extra) = &self.extra {
+            extra.kind()
         } else if self.rectangles {
             AnnotationKind::Highlight
         } else {
@@ -122,36 +208,59 @@ impl Annotation {
     }
 
     pub fn is_box_object(&self) -> bool {
-        self.signature.is_some() || self.text.is_some()
+        self.signature.is_some()
+            || self.text.is_some()
+            || matches!(
+                self.extra,
+                Some(
+                    AnnotationExtra::Symbol(_)
+                        | AnnotationExtra::Note(_)
+                        | AnnotationExtra::Shape(ShapeKind::Rectangle | ShapeKind::Ellipse)
+                )
+            )
     }
 
     pub fn valid(&self) -> bool {
-        if self.signature.is_some() && self.text.is_some() {
+        let variant_count = usize::from(self.signature.is_some())
+            + usize::from(self.text.is_some())
+            + usize::from(self.extra.is_some());
+        if variant_count > 1 {
             return false;
         }
-        let box_valid = if let Some(signature) = &self.signature {
-            signature.valid()
-                && !self.highlight
-                && !self.rectangles
-                && self.points.len() == 2
-                && self.points[0][0] < self.points[1][0]
-                && self.points[0][1] < self.points[1][1]
+        let sorted_box = self.points.len() == 2
+            && self.points[0][0] < self.points[1][0]
+            && self.points[0][1] < self.points[1][1];
+        let payload_valid = if let Some(signature) = &self.signature {
+            signature.valid() && !self.highlight && !self.rectangles && sorted_box
         } else if let Some(text) = &self.text {
-            text.valid()
-                && !self.highlight
-                && !self.rectangles
-                && self.points.len() == 2
-                && self.points[0][0] < self.points[1][0]
-                && self.points[0][1] < self.points[1][1]
+            text.valid() && !self.highlight && !self.rectangles && sorted_box
+        } else if let Some(extra) = &self.extra {
+            match extra {
+                AnnotationExtra::Underline | AnnotationExtra::StrikeOut => {
+                    !self.highlight && self.rectangles && self.points.len().is_multiple_of(2)
+                }
+                AnnotationExtra::Shape(ShapeKind::Rectangle | ShapeKind::Ellipse)
+                | AnnotationExtra::Symbol(_) => !self.highlight && !self.rectangles && sorted_box,
+                AnnotationExtra::Shape(ShapeKind::Line | ShapeKind::Arrow) => {
+                    !self.highlight && !self.rectangles && self.points.len() == 2
+                }
+                AnnotationExtra::Note(content) => {
+                    !self.highlight
+                        && !self.rectangles
+                        && sorted_box
+                        && !content.trim().is_empty()
+                        && content.chars().count() <= MAX_NOTE_CHARS
+                        && !content.chars().any(|c| c.is_control() && c != '\n')
+                }
+            }
         } else {
-            true
+            !self.rectangles || (self.highlight && self.points.len().is_multiple_of(2))
         };
-        box_valid
+        payload_valid
             && self.id > 0
             && self.width.is_finite()
             && (0.5..=40.).contains(&self.width)
             && (2..=MAX_POINTS).contains(&self.points.len())
-            && (!self.rectangles || (self.highlight && self.points.len().is_multiple_of(2)))
             && self
                 .points
                 .iter()
@@ -160,7 +269,22 @@ impl Annotation {
     }
 
     pub fn name(&self) -> String {
-        if let Some(text) = &self.text {
+        if let Some(extra) = &self.extra {
+            format!(
+                "{PREFIX}{}",
+                json!([
+                    self.id,
+                    self.highlight,
+                    self.color,
+                    self.width,
+                    self.points,
+                    self.rectangles,
+                    Value::Null,
+                    Value::Null,
+                    extra.to_json()
+                ])
+            )
+        } else if let Some(text) = &self.text {
             format!(
                 "{PREFIX}{}",
                 json!([
@@ -232,14 +356,22 @@ impl Annotation {
         }
         let v: Value = serde_json::from_str(name.strip_prefix(PREFIX)?).ok()?;
         let array = v.as_array()?;
-        if array.len() != 7 && array.len() != 8 {
+        if !(7..=9).contains(&array.len()) {
             return None;
         }
         let signature_val = v.get(6).filter(|v| !v.is_null());
         let text_val = v.get(7).filter(|v| !v.is_null());
-        if signature_val.is_some() && text_val.is_some() {
+        let extra_val = v.get(8).filter(|v| !v.is_null());
+        let variant_count = usize::from(signature_val.is_some())
+            + usize::from(text_val.is_some())
+            + usize::from(extra_val.is_some());
+        if variant_count > 1 {
             return None;
         }
+        let extra = match extra_val {
+            Some(ev) => Some(AnnotationExtra::from_json(ev)?),
+            None => None,
+        };
         let id = v.get(0)?.as_u64()?;
         let highlight = v.get(1)?.as_bool()?;
         let color = [
@@ -259,6 +391,8 @@ impl Annotation {
             AnnotationKind::Stamp
         } else if text_val.is_some() {
             AnnotationKind::FreeText
+        } else if let Some(extra) = &extra {
+            extra.kind()
         } else if rectangles {
             AnnotationKind::Highlight
         } else {
@@ -314,6 +448,7 @@ impl Annotation {
                 rectangles,
                 signature: Some(std::sync::Arc::new(image)),
                 text: None,
+                extra: None,
             };
             return a.valid().then_some(ParsedName::Complete(a));
         }
@@ -339,6 +474,7 @@ impl Annotation {
             rectangles,
             signature: None,
             text,
+            extra,
         };
         a.valid().then_some(ParsedName::Complete(a))
     }
@@ -488,6 +624,7 @@ mod tests {
                 rgba: vec![0, 0, 0, 0, 20, 40, 60, 128],
             })),
             text: None,
+            extra: None,
         };
         assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
         let legacy = format!(
@@ -563,6 +700,7 @@ mod tests {
             rectangles: false,
             signature: None,
             text: None,
+            extra: None,
         };
         assert_eq!(Annotation::from_name(&a.name()), Some(a.clone()));
         let mut bad = a;
@@ -591,6 +729,7 @@ mod tests {
                 content: "24 November 2026".into(),
                 font_size: 12.,
             }),
+            extra: None,
         };
         assert!(text.valid());
         assert_eq!(text.kind(), AnnotationKind::FreeText);
@@ -642,6 +781,139 @@ mod tests {
     }
 
     #[test]
+    fn extra_annotations_roundtrip_and_validation() {
+        let cases = [
+            (
+                Annotation {
+                    id: 101,
+                    highlight: false,
+                    color: [40, 110, 220],
+                    width: 1.5,
+                    points: vec![[0.1, 0.2], [0.5, 0.23]],
+                    rectangles: true,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Underline),
+                },
+                AnnotationKind::Underline,
+            ),
+            (
+                Annotation {
+                    id: 102,
+                    highlight: false,
+                    color: [230, 65, 75],
+                    width: 1.5,
+                    points: vec![[0.1, 0.3], [0.5, 0.33]],
+                    rectangles: true,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::StrikeOut),
+                },
+                AnnotationKind::StrikeOut,
+            ),
+            (
+                Annotation {
+                    id: 103,
+                    highlight: false,
+                    color: [230, 65, 75],
+                    width: 2.,
+                    points: vec![[0.1, 0.1], [0.4, 0.3]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Shape(ShapeKind::Rectangle)),
+                },
+                AnnotationKind::Square,
+            ),
+            (
+                Annotation {
+                    id: 104,
+                    highlight: false,
+                    color: [30, 170, 95],
+                    width: 2.,
+                    points: vec![[0.2, 0.2], [0.6, 0.5]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Shape(ShapeKind::Ellipse)),
+                },
+                AnnotationKind::Circle,
+            ),
+            (
+                Annotation {
+                    id: 105,
+                    highlight: false,
+                    color: [25, 25, 25],
+                    width: 2.,
+                    points: vec![[0.7, 0.6], [0.2, 0.2]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Shape(ShapeKind::Arrow)),
+                },
+                AnnotationKind::Line,
+            ),
+            (
+                Annotation {
+                    id: 106,
+                    highlight: false,
+                    color: [255, 210, 0],
+                    width: 1.5,
+                    points: vec![[0.15, 0.15], [0.21, 0.21]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Note("Periksa pasal 3.\nRevisi nominal.".into())),
+                },
+                AnnotationKind::Text,
+            ),
+            (
+                Annotation {
+                    id: 107,
+                    highlight: false,
+                    color: [30, 170, 95],
+                    width: 2.,
+                    points: vec![[0.3, 0.3], [0.35, 0.35]],
+                    rectangles: false,
+                    signature: None,
+                    text: None,
+                    extra: Some(AnnotationExtra::Symbol(FillSymbol::Check)),
+                },
+                AnnotationKind::Stamp,
+            ),
+        ];
+
+        for (item, expected_kind) in cases {
+            assert!(item.valid(), "expected valid for {:?}", item.extra);
+            assert_eq!(item.kind(), expected_kind);
+            assert_eq!(
+                Annotation::parse_with_kind(&item.name(), Some(expected_kind)),
+                Some(ParsedName::Complete(item.clone()))
+            );
+            let wrong_kind = if expected_kind == AnnotationKind::Ink {
+                AnnotationKind::Highlight
+            } else {
+                AnnotationKind::Ink
+            };
+            assert!(Annotation::parse_with_kind(&item.name(), Some(wrong_kind)).is_none());
+        }
+
+        // Empty sticky note or control char (other than \n) must fail validation.
+        let bad_note = Annotation {
+            id: 108,
+            highlight: false,
+            color: [255, 210, 0],
+            width: 1.5,
+            points: vec![[0.1, 0.1], [0.15, 0.15]],
+            rectangles: false,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::Note("   ".into())),
+        };
+        assert!(!bad_note.valid());
+    }
+
+    #[test]
     fn signature_ref_roundtrip_and_budget_limits() {
         let asset = std::sync::Arc::new(SignatureImage {
             width: 2,
@@ -657,6 +929,7 @@ mod tests {
             rectangles: false,
             signature: Some(asset.clone()),
             text: None,
+            extra: None,
         };
         let Some(encoded) = second.name_with_signature_ref(3) else {
             panic!("signature ref name");
@@ -697,6 +970,7 @@ mod tests {
                 rectangles: false,
                 signature: Some(asset.clone()),
                 text: None,
+                extra: None,
             })
             .collect();
         assert!(within_signature_budget(many_same.iter()));
@@ -716,6 +990,7 @@ mod tests {
                     rgba: vec![i, 0, 0, 255],
                 })),
                 text: None,
+                extra: None,
             })
             .collect();
         assert!(within_signature_budget(distinct[..8].iter()));

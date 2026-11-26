@@ -56,9 +56,12 @@ Batas: 256 objek/halaman, 4096 titik/objek, 8192 titik/halaman, 65536 titik/work
 history maksimal 128 langkah dengan tambahan batas satu juta titik. Highlight panjang
 yang melampaui batas ditolak sebagai satu transaksi. Model tidak menyimpan isi teks.
 
+- **Garis bawah (`Underline`) & Coret (`StrikeOut`)**: seret teks pada halaman untuk memberi garis bawah atau coretan langsung mengikuti kotak teks PDF, disimpan sebagai objek standar `/Underline` dan `/StrikeOut`.
+- **Bentuk (`Bentuk`)**: popover dengan pilihan **Persegi** (`/Square`), **Elips** (`/Circle`), **Garis** (`/Line`), dan **Panah** (`/Line` dengan `/LE [/None /OpenArrow]`), lengkap dengan warna dan ketebalan garis (`1.5–6.0 pt`). Persegi dan Elips dapat dipindah, di-resize bebas, diduplikat (`Ctrl+D`), dan diterapkan ke banyak halaman.
+- **Catatan tempel (`Catatan`)**: menempatkan ikon Sticky Note (`/Text` dengan `/Contents` hingga 1000 karakter). Klik catatan pada mode **Pilih** untuk membaca cuplikan, mengedit isi/warna, memindahkan, atau menghapus.
+- **Simbol Fill & Sign (`Simbol`)**: penempatan cepat **Centang (`✓`)**, **Silang (`✗`)**, dan **Titik (`●`)** sebagai stempel vektor ringan dengan live ghost preview, geser/resize, duplikat, dan terapkan ke halaman.
+
 ## Belum tersedia
 
-Komentar/sticky notes, kotak teks, shape, underline/strikethrough, pindah/resize anotasi,
-partial eraser, OCR, import edit anotasi pihak lain, dan dukungan sertifikat digital. Tanda tangan visual tersedia terpisah.
-Kesesuaian penampilan ekspor telah diuji dengan PDFium; pengujian interaktif di
-Edge/Chrome/Firefox/Acrobat belum dilakukan. Lihat [pengujian](testing.md).
+Partial eraser, import/edit anotasi pihak lain (non-Origo), dan tanda tangan sertifikat digital (PAdES/X.509). Kesesuaian penampilan ekspor telah diuji dengan PDFium dan QPDF; lihat [pengujian](testing.md).
+

@@ -685,6 +685,12 @@ fn annotation_kind(annotation_type: PdfPageAnnotationType) -> Option<AnnotationK
     match annotation_type {
         PdfPageAnnotationType::Ink => Some(AnnotationKind::Ink),
         PdfPageAnnotationType::Highlight => Some(AnnotationKind::Highlight),
+        PdfPageAnnotationType::Underline => Some(AnnotationKind::Underline),
+        PdfPageAnnotationType::Strikeout => Some(AnnotationKind::StrikeOut),
+        PdfPageAnnotationType::Square => Some(AnnotationKind::Square),
+        PdfPageAnnotationType::Circle => Some(AnnotationKind::Circle),
+        PdfPageAnnotationType::Line => Some(AnnotationKind::Line),
+        PdfPageAnnotationType::Text => Some(AnnotationKind::Text),
         PdfPageAnnotationType::Stamp => Some(AnnotationKind::Stamp),
         PdfPageAnnotationType::FreeText => Some(AnnotationKind::FreeText),
         _ => None,
@@ -703,12 +709,16 @@ fn read_parsed_annotation(
     let Some(name) = name.filter(|name| name.starts_with(PREFIX)) else {
         return Ok(None);
     };
-    if kind == AnnotationKind::Stamp {
+    let parsed = Annotation::parse_with_kind(&name, Some(kind));
+    if matches!(
+        &parsed,
+        Some(ParsedName::SignatureRef { .. })
+            | Some(ParsedName::Complete(Annotation { signature: Some(_), .. }))
+    ) {
         *total_stamps_left = total_stamps_left
             .checked_sub(1)
             .ok_or(RenderError::ResourceLimit)?;
     }
-    let parsed = Annotation::parse_with_kind(&name, Some(kind));
     if matches!(&parsed, Some(ParsedName::Complete(a)) if a.signature.is_some()) {
         *full_signatures_left = full_signatures_left
             .checked_sub(1)

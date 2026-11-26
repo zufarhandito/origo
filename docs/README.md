@@ -68,7 +68,7 @@ anotator inti dan tanda tangan visual sudah diotorisasi dan diimplementasikan.
 |---|---|
 | Konteks aktif | [Handoff](handoff/PROJECT_HANDOFF.md), [prompt chat baru](handoff/NEXT_CHAT_PROMPT.md) |
 | Progres proyek | [Tahap selesai, commit dan pekerjaan terbuka](PROGRESS.md) |
-| Alur pengembangan | [Riset kompetitor, commit dan push](feature-development.md), [contoh riset Find](research/text-search.md) |
+| Alur pengembangan | [Riset kompetitor, commit dan push](feature-development.md), [Roadmap fitur kompetitor (Tier 1–3)](research/competitor-feature-roadmap.md), [contoh riset Find](research/text-search.md) |
 | Rencana UI | [Redesain desktop dan multi-tab](plans/UI_REDESIGN_MULTITAB_PLAN.md) |
 | Multi-tab aktif | [Perilaku tab](multitab.md), [hardening dan hasil profil](multitab-hardening.md) |
 | Keputusan multi-tab | [Riset kompetitor, acceptance selesai dan backlog](research/multitab-roadmap.md) |

@@ -56,13 +56,20 @@ impl DocumentSession {
                 }
                 if this.annotation.signature.placing
                     || this.annotation.text.placing.is_some()
+                    || this.annotation.tools.placing_symbol.is_some()
+                    || this.annotation.tools.placing_note.is_some()
                     || this.annotation.signature.gesture.is_some()
                 {
                     this.cancel_signature_placement(cx);
                     cx.notify();
                     return;
                 }
-                if this.annotation.text.open || this.annotation.apply_pages.open {
+                if this.annotation.text.open
+                    || this.annotation.apply_pages.open
+                    || this.annotation.tools.shape_open
+                    || this.annotation.tools.symbol_open
+                    || this.annotation.tools.note_open
+                {
                     this.close_annotation_popups(cx);
                     cx.notify();
                     return;

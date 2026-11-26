@@ -20,6 +20,7 @@ pub fn run(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     run_signature_limit_fixture(root, renderer)?;
     run_text_annotation_fixture(root, renderer)?;
     run_multipage_stamp_fixture(root, renderer)?;
+    run_extra_annotations_fixture(root, renderer)?;
     Ok(())
 }
 
@@ -60,6 +61,7 @@ fn run_text_annotation_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result
             content: "24 November 2026".into(),
             font_size: 14.,
         }),
+        extra: None,
     };
     let name_note = Annotation {
         id: 2,
@@ -73,6 +75,7 @@ fn run_text_annotation_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result
             content: "Budi Santoso".into(),
             font_size: 12.,
         }),
+        extra: None,
     };
     w.execute(Command::Annotate {
         page,
@@ -205,6 +208,7 @@ fn run_text_annotation_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result
             content: "25 November 2026".into(),
             font_size: 18.,
         }),
+        extra: None,
     };
     reopened.execute(Command::Annotate {
         page: reopened_page,
@@ -246,6 +250,123 @@ fn run_text_annotation_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result
     Ok(())
 }
 
+fn run_extra_annotations_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
+    use pdf_domain::annotation::{AnnotationExtra, FillSymbol, ShapeKind};
+    let dir = tempfile::tempdir_in(root.join(".research"))?;
+    let source = dir.path().join("source.pdf");
+    let bytes = crate::synthetic::export_safety_pdf("plain");
+    std::fs::write(&source, &bytes)?;
+    let mut w = open_document(renderer, &source, SourceId(1))?;
+    let page = w.pages()[0].id;
+    let items = vec![
+        Annotation {
+            id: 1,
+            highlight: false,
+            color: [40, 110, 220],
+            width: 1.5,
+            points: vec![[0.1, 0.12], [0.5, 0.15]],
+            rectangles: true,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::Underline),
+        },
+        Annotation {
+            id: 2,
+            highlight: false,
+            color: [230, 65, 75],
+            width: 1.5,
+            points: vec![[0.1, 0.18], [0.5, 0.21]],
+            rectangles: true,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::StrikeOut),
+        },
+        Annotation {
+            id: 3,
+            highlight: false,
+            color: [230, 65, 75],
+            width: 2.5,
+            points: vec![[0.1, 0.28], [0.45, 0.42]],
+            rectangles: false,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::Shape(ShapeKind::Rectangle)),
+        },
+        Annotation {
+            id: 4,
+            highlight: false,
+            color: [30, 170, 95],
+            width: 2.5,
+            points: vec![[0.52, 0.28], [0.85, 0.42]],
+            rectangles: false,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::Shape(ShapeKind::Ellipse)),
+        },
+        Annotation {
+            id: 5,
+            highlight: false,
+            color: [40, 110, 220],
+            width: 2.5,
+            points: vec![[0.1, 0.50], [0.45, 0.62]],
+            rectangles: false,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::Shape(ShapeKind::Arrow)),
+        },
+        Annotation {
+            id: 6,
+            highlight: false,
+            color: [255, 210, 0],
+            width: 1.0,
+            points: vec![[0.55, 0.52], [0.60, 0.56]],
+            rectangles: false,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::Note("Cek pasal 4 ayat 2".into())),
+        },
+        Annotation {
+            id: 7,
+            highlight: false,
+            color: [25, 25, 25],
+            width: 2.0,
+            points: vec![[0.70, 0.52], [0.74, 0.55]],
+            rectangles: false,
+            signature: None,
+            text: None,
+            extra: Some(AnnotationExtra::Symbol(FillSymbol::Check)),
+        },
+    ];
+    w.execute(Command::Annotate {
+        page,
+        annotations: items.clone(),
+    })?;
+    let exporter = QpdfExporter::new(&root.join("sidecars"));
+    let control = ExportControl::default();
+    let output = dir.path().join("extra-annotations.pdf");
+    let prepared = prepare_export(
+        ExportPlan::capture(&w, 1, ExportScope::All)?,
+        &output,
+        &LocalOutput,
+        &exporter,
+        &control,
+    )?;
+    finish_export(prepared, true, &exporter, renderer, &control)?;
+    let reopened = open_document(renderer, &output, SourceId(2))?;
+    ensure!(
+        reopened.annotations(reopened.pages()[0].id) == items,
+        "extra annotations must roundtrip cleanly"
+    );
+    let original = renderer.render(&source, 0)?;
+    let native = renderer.render(&output, 0)?;
+    ensure!(
+        original.rgba != native.rgba,
+        "extra annotations must paint visibly in PDFium"
+    );
+    println!("PASS annotations: underline, strikeout, shapes, sticky note, fill symbol roundtrip");
+    Ok(())
+}
+
 fn run_multipage_stamp_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result<()> {
     let dir = tempfile::tempdir_in(root.join(".research"))?;
     let source = dir.path().join("twelve-pages.pdf");
@@ -282,6 +403,7 @@ fn run_multipage_stamp_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result
         rectangles: false,
         signature: Some(stamp_image.clone()),
         text: None,
+        extra: None,
     };
     w.execute(Command::Annotate {
         page: first_page,
@@ -440,6 +562,7 @@ fn run_signature_limit_fixture(root: &Path, renderer: &PdfiumRenderer) -> Result
             rectangles: false,
             signature: Some(image.clone()),
             text: None,
+            extra: None,
         })
         .collect();
     workspace.execute(Command::Annotate {
@@ -497,6 +620,7 @@ fn run_fixture(root: &Path, renderer: &PdfiumRenderer, feature: &str) -> Result<
         rectangles: true,
         signature: None,
         text: None,
+        extra: None,
     };
     let ink = Annotation {
         id: 2,
@@ -507,6 +631,7 @@ fn run_fixture(root: &Path, renderer: &PdfiumRenderer, feature: &str) -> Result<
         rectangles: false,
         signature: None,
         text: None,
+        extra: None,
     };
     let signature = Annotation {
         id: 3,
@@ -536,6 +661,7 @@ fn run_fixture(root: &Path, renderer: &PdfiumRenderer, feature: &str) -> Result<
             },
         )),
         text: None,
+        extra: None,
     };
     w.execute(Command::Annotate {
         page,

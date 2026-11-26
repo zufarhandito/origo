@@ -5,7 +5,7 @@ use gpui::component::{
 };
 use pdf_domain::{
     Command, PageId,
-    annotation::{Annotation, rotate},
+    annotation::{Annotation, AnnotationExtra, ShapeKind, rotate},
 };
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
@@ -13,8 +13,11 @@ pub(super) enum Tool {
     #[default]
     Select,
     Highlight,
+    Underline,
+    StrikeOut,
     Pen,
     Marker,
+    Shape(ShapeKind),
     Eraser,
 }
 #[derive(Default)]
@@ -22,6 +25,7 @@ pub(super) struct AnnotationState {
     pub open: bool,
     pub signature: crate::signatures::SignatureState,
     pub text: crate::text_annotations::TextAnnotationState,
+    pub tools: crate::annotation_tools::ExtraToolsState,
     pub apply_pages: crate::text_annotations::ApplyPagesState,
     pub tool: Tool,
     pub color: usize,
@@ -84,6 +88,11 @@ impl DocumentSession {
         self.annotation.text.open = false;
         self.annotation.text.editing = None;
         self.annotation.text.error = None;
+        self.annotation.tools.shape_open = false;
+        self.annotation.tools.symbol_open = false;
+        self.annotation.tools.note_open = false;
+        self.annotation.tools.note_editing = None;
+        self.annotation.tools.note_error = None;
         self.annotation.apply_pages.open = false;
         self.cancel_signature_placement(cx);
     }
@@ -143,6 +152,8 @@ impl DocumentSession {
             for (i, (tool, label, icon)) in [
                 (Tool::Select, "Pilih", IconName::MousePointer2),
                 (Tool::Highlight, "Highlighter", IconName::Highlighter),
+                (Tool::Underline, "Garis bawah teks", IconName::Underline),
+                (Tool::StrikeOut, "Coret teks", IconName::Strikethrough),
                 (Tool::Pen, "Pen", IconName::Pencil),
                 (Tool::Eraser, "Penghapus", IconName::Eraser),
             ]
@@ -151,13 +162,17 @@ impl DocumentSession {
             {
                 let selected = self.annotation.tool == tool
                     || (tool == Tool::Highlight && self.annotation.tool == Tool::Marker);
-                let color_index = if tool == Tool::Pen {
-                    self.annotation.pen_color
-                } else {
-                    self.annotation.marker_color
+                let color_index = match tool {
+                    Tool::Pen => self.annotation.pen_color,
+                    Tool::Underline => 2,
+                    Tool::StrikeOut => 1,
+                    _ => self.annotation.marker_color,
                 };
                 let c = COLORS[color_index];
-                let tint = if matches!(tool, Tool::Pen | Tool::Highlight) {
+                let tint = if matches!(
+                    tool,
+                    Tool::Pen | Tool::Highlight | Tool::Underline | Tool::StrikeOut
+                ) {
                     gpui::rgb((u32::from(c[0]) << 16) | (u32::from(c[1]) << 8) | u32::from(c[2]))
                         .into()
                 } else {
@@ -179,13 +194,17 @@ impl DocumentSession {
                                 } else {
                                     tool
                                 };
-                            s.annotation.color = if tool == Tool::Pen {
-                                s.annotation.pen_color
-                            } else {
-                                s.annotation.marker_color
+                            s.annotation.color = match tool {
+                                Tool::Pen => s.annotation.pen_color,
+                                Tool::Underline => 2,
+                                Tool::StrikeOut => 1,
+                                _ => s.annotation.marker_color,
                             };
                             s.annotation.draft = None;
                             s.annotation.selected = None;
+                            if matches!(tool, Tool::Underline | Tool::StrikeOut) {
+                                s.status = format!("Seret teks pada halaman untuk memberi {label}.");
+                            }
                             s.focus.focus(window, cx);
                             cx.notify();
                         })),
@@ -223,31 +242,35 @@ impl DocumentSession {
                     );
                 }
             }
-            bar = bar.child(
-                Button::new("annotation-delete")
-                    .ghost()
-                    .icon(IconName::Trash)
-                    .accessibility_label("Hapus anotasi")
-                    .tooltip("Hapus anotasi")
-                    .disabled(self.annotation.selected.is_none() || self.edits_locked())
-                    .on_click(cx.listener(|s, _, _, cx| s.delete_annotation(cx))),
-            );
+            bar = bar
+                .child(self.shape_tool_button(cx))
+                .child(self.note_tool_button(cx))
+                .child(self.symbol_tool_button(cx))
+                .child(
+                    Button::new("annotation-delete")
+                        .ghost()
+                        .icon(IconName::Trash)
+                        .accessibility_label("Hapus anotasi")
+                        .tooltip("Hapus anotasi")
+                        .disabled(self.annotation.selected.is_none() || self.edits_locked())
+                        .on_click(cx.listener(|s, _, _, cx| s.delete_annotation(cx))),
+                );
         }
         if self.annotation.open {
             use gpui_kit::assets::IconName;
             bar = bar
                 .child(self.signature_button(cx))
                 .child(self.text_annotation_button(cx));
-            let selected_kind = self.annotation.selected.and_then(|(page, id)| {
+            let selected_annot = self.annotation.selected.and_then(|(page, id)| {
                 self.workspace.as_ref().and_then(|w| {
                     w.annotations(page)
                         .iter()
                         .find(|a| a.id == id)
-                        .map(|a| (a.signature.is_some(), a.text.is_some()))
+                        .cloned()
                 })
             });
-            match selected_kind {
-                Some((true, _)) => {
+            if let Some(selected) = selected_annot {
+                if selected.signature.is_some() {
                     bar = bar
                         .child(self.signature_transform_menu(cx))
                         .child(
@@ -261,8 +284,7 @@ impl DocumentSession {
                                 })),
                         )
                         .child(self.apply_pages_button(cx));
-                }
-                Some((_, true)) => {
+                } else if selected.text.is_some() {
                     bar = bar
                         .child(
                             Button::new("edit-text-annotation")
@@ -288,8 +310,59 @@ impl DocumentSession {
                                 })),
                         )
                         .child(self.apply_pages_button(cx));
+                } else if let Some(AnnotationExtra::Note(content)) = &selected.extra {
+                    let snippet = if content.chars().count() > 36 {
+                        format!("{}…", content.chars().take(36).collect::<String>())
+                    } else {
+                        content.clone()
+                    };
+                    bar = bar
+                        .child(
+                            gpui::div()
+                                .px_2()
+                                .py_0p5()
+                                .rounded_md()
+                                .bg(cx.theme().secondary)
+                                .text_xs()
+                                .text_color(cx.theme().foreground)
+                                .child(format!("Catatan: \"{snippet}\"")),
+                        )
+                        .child(
+                            Button::new("edit-note-annotation")
+                                .ghost()
+                                .icon(IconName::Pencil)
+                                .label("Edit catatan")
+                                .disabled(self.edits_locked() || self.opening)
+                                .on_click(cx.listener(|s, _, window, cx| {
+                                    if let Some(selected) = s.annotation.selected {
+                                        s.open_note_panel(Some(selected), window, cx);
+                                    }
+                                })),
+                        )
+                        .child(
+                            Button::new("duplicate-note-annotation")
+                                .ghost()
+                                .label("Duplikat")
+                                .tooltip("Duplikat: Ctrl+D. Geser: Alt+panah.")
+                                .on_click(cx.listener(|s, _, window, cx| {
+                                    s.change_selected_signature(true, [0.02, 0.02], cx);
+                                    s.focus.focus(window, cx);
+                                })),
+                        );
+                } else if selected.is_box_object() {
+                    bar = bar
+                        .child(
+                            Button::new("duplicate-box-annotation")
+                                .ghost()
+                                .label("Duplikat")
+                                .tooltip("Duplikat: Ctrl+D. Geser: Alt+panah.")
+                                .on_click(cx.listener(|s, _, window, cx| {
+                                    s.change_selected_signature(true, [0.02, 0.02], cx);
+                                    s.focus.focus(window, cx);
+                                })),
+                        )
+                        .child(self.apply_pages_button(cx));
                 }
-                _ => {}
             }
         }
         bar.into_any_element()
@@ -461,7 +534,7 @@ impl DocumentSession {
             }
         }
     }
-    fn recolor_annotation(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn recolor_annotation(&mut self, cx: &mut Context<Self>) {
         if let Some((page, id)) = self.annotation.selected {
             let all = self.workspace.as_ref().map(|w| {
                 w.annotations(page)
@@ -495,7 +568,10 @@ impl DocumentSession {
         if self.edits_locked() || self.opening {
             return true;
         }
-        if self.annotation.tool == Tool::Highlight {
+        if matches!(
+            self.annotation.tool,
+            Tool::Highlight | Tool::Underline | Tool::StrikeOut
+        ) {
             return false;
         }
         let Some(w) = self.workspace.as_ref() else {
@@ -541,6 +617,35 @@ impl DocumentSession {
             return true;
         }
         drop(w);
+        if let Tool::Shape(kind) = tool {
+            if start {
+                self.annotation.draft = Some((
+                    id,
+                    Annotation {
+                        id: 1,
+                        highlight: false,
+                        color: crate::annotation_tools::tool_color(
+                            self.annotation.tools.shape_color,
+                        ),
+                        width: self.annotation.tools.shape_width,
+                        points: vec![point, point],
+                        rectangles: false,
+                        signature: None,
+                        text: None,
+                        extra: Some(AnnotationExtra::Shape(kind)),
+                    },
+                ));
+                self.annotation.selected = None;
+                self.focus.focus(window, cx);
+            } else if let Some((page, a)) = &mut self.annotation.draft
+                && *page == id
+                && a.points.len() >= 2
+            {
+                a.points[1] = point;
+            }
+            cx.notify();
+            return true;
+        }
         if start {
             let highlight = tool == Tool::Marker;
             self.annotation.draft = Some((
@@ -564,6 +669,7 @@ impl DocumentSession {
                     rectangles: false,
                     signature: None,
                     text: None,
+                    extra: None,
                 },
             ));
             self.annotation.selected = None;
@@ -586,6 +692,8 @@ impl DocumentSession {
         let gesture = self.annotation.signature.gesture.take();
         if !self.annotation.signature.placing
             && self.annotation.text.placing.is_none()
+            && self.annotation.tools.placing_symbol.is_none()
+            && self.annotation.tools.placing_note.is_none()
             && self.annotation.signature.placement_ghost.is_some()
         {
             self.cancel_signature_placement(cx);
@@ -607,13 +715,42 @@ impl DocumentSession {
             return;
         }
         if let Some((page, mut a)) = self.annotation.draft.take() {
+            if let Some(AnnotationExtra::Shape(kind)) = a.extra {
+                if a.points.len() < 2 {
+                    return;
+                }
+                let dx = (a.points[1][0] - a.points[0][0]).abs();
+                let dy = (a.points[1][1] - a.points[0][1]).abs();
+                if dx < 0.005 && dy < 0.005 {
+                    return;
+                }
+                if matches!(kind, ShapeKind::Rectangle | ShapeKind::Ellipse) {
+                    let x0 = a.points[0][0].min(a.points[1][0]);
+                    let y0 = a.points[0][1].min(a.points[1][1]);
+                    let x1 = a.points[0][0].max(a.points[1][0]);
+                    let y1 = a.points[0][1].max(a.points[1][1]);
+                    if x1 - x0 < 0.004 || y1 - y0 < 0.004 {
+                        return;
+                    }
+                    a.points = vec![[x0, y0], [x1, y1]];
+                }
+                self.add_annotation(page, a, cx);
+                return;
+            }
             if a.points.len() == 1 {
                 a.points.push(a.points[0]);
             }
             self.add_annotation(page, a, cx);
             return;
         }
-        if !self.annotation.open || self.annotation.tool != Tool::Highlight || !self.text.dragging {
+        let markup_tool = self.annotation.tool;
+        if !self.annotation.open
+            || !matches!(
+                markup_tool,
+                Tool::Highlight | Tool::Underline | Tool::StrikeOut
+            )
+            || !self.text.dragging
+        {
             return;
         }
         let Some(selection) = self.text.selection else {
@@ -621,6 +758,11 @@ impl DocumentSession {
         };
         let Some(w) = self.workspace.as_ref() else {
             return;
+        };
+        let (is_highlight, color, extra) = match markup_tool {
+            Tool::Underline => (false, COLORS[2], Some(AnnotationExtra::Underline)),
+            Tool::StrikeOut => (false, COLORS[1], Some(AnnotationExtra::StrikeOut)),
+            _ => (true, COLORS[self.annotation.marker_color], None),
         };
         let mut changes = Vec::new();
         for (index, page) in w.pages().iter().enumerate() {
@@ -645,13 +787,14 @@ impl DocumentSession {
                     page.id,
                     Annotation {
                         id: 1,
-                        highlight: true,
-                        color: COLORS[self.annotation.marker_color],
-                        width: 1.,
+                        highlight: is_highlight,
+                        color,
+                        width: 1.5,
                         points,
                         rectangles: true,
                         signature: None,
                         text: None,
+                        extra: extra.clone(),
                     },
                 ));
             }
@@ -711,6 +854,10 @@ pub(super) fn paint_draft(
     bounds: Bounds<gpui::Pixels>,
     window: &mut Window,
 ) {
+    if a.extra.is_some() {
+        crate::annotation_tools::paint_extra_draft(a, turns, page_width, bounds, window);
+        return;
+    }
     let mut path = gpui::PathBuilder::stroke(bounds.size.width * (a.width / page_width));
     for (i, p) in a.points.iter().enumerate() {
         let p = rotate(*p, turns);
