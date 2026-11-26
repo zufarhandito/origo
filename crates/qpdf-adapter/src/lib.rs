@@ -11,11 +11,16 @@ use std::{
 mod annotations;
 mod export;
 mod ocr_layer;
+mod page_box;
 mod preflight;
 mod redact;
 mod security;
 mod structure;
 pub use export::{QpdfExporter, SearchableExporter};
+pub use page_box::{
+    CropMargins, PageBoxOperation, PageBoxReport, PaperOrientation, PaperSize, QpdfPageBox,
+    centered_fit_rect, crop_pdf_box, parse_page_selection,
+};
 pub use redact::{
     QpdfRedactor, RedactDpi, RedactOptions, RedactRect, RedactReport, burn_redaction_boxes,
     raster_dimensions, sanitize_metadata_patch,
