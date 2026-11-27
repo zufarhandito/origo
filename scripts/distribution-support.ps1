@@ -66,7 +66,7 @@ public static class DistributionPe {
 }
 function Get-DistributionImports([string]$Directory) {
     # Explicit Windows components, not arbitrary DLLs installed on the development PC.
-    $system = @('kernel32.dll','kernelbase.dll','advapi32.dll','oleaut32.dll','user32.dll','gdi32.dll','ole32.dll','dcomp.dll','dwmapi.dll','dwrite.dll','shell32.dll','dxgi.dll','d3d11.dll','combase.dll','imm32.dll','icuuc.dll','ntdll.dll','winmm.dll','comctl32.dll','uiautomationcore.dll','bcryptprimitives.dll','gdiplus.dll','userenv.dll','ws2_32.dll','crypt32.dll','bcrypt.dll','rpcrt4.dll','version.dll','shlwapi.dll','secur32.dll','setupapi.dll','wintrust.dll','normaliz.dll','ucrtbase.dll')
+    $system = @('kernel32.dll','kernelbase.dll','advapi32.dll','oleaut32.dll','user32.dll','gdi32.dll','ole32.dll','dcomp.dll','dwmapi.dll','dwrite.dll','shell32.dll','dxgi.dll','d3d11.dll','combase.dll','imm32.dll','icuuc.dll','ntdll.dll','winmm.dll','comctl32.dll','uiautomationcore.dll','bcryptprimitives.dll','gdiplus.dll','userenv.dll','ws2_32.dll','crypt32.dll','bcrypt.dll','rpcrt4.dll','version.dll','shlwapi.dll','secur32.dll','setupapi.dll','wintrust.dll','normaliz.dll','ucrtbase.dll','coremessaging.dll')
     $base = [IO.Path]::GetFullPath($Directory).TrimEnd('\') + '\'
     @(Get-ChildItem -LiteralPath $Directory -Recurse -Force -File | Where-Object Extension -In @('.exe','.dll') | Sort-Object FullName | ForEach-Object {
         $binary = $_
