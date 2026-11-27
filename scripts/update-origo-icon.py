@@ -15,6 +15,11 @@ sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
 blobs = []
 for size in sizes:
     resized = canvas.resize((size, size), Image.Resampling.LANCZOS)
+    px = resized.load()
+    for y in range(size):
+        for x in range(size):
+            if px[x, y][3] == 0:
+                px[x, y] = (0, 0, 0, 0)
     stream = io.BytesIO()
     resized.save(stream, format="PNG")
     blobs.append(stream.getvalue())

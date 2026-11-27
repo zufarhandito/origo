@@ -1,9 +1,8 @@
-# Origo provisional icon
+# Origo branding icon
 
-Owner-supplied raster mark, approved for installation on 17 November 2026.
-`origo-source.png` preserves the supplied 233x203 image with opaque white background.
-The mark is centered on a square without stretching. No vector master is available;
-256px is an upscale, not additional detail.
+Owner-supplied raster mark (updated 27 November 2026).
+`origo-source.png` stores the centered `1582x1582` RGBA mark (white circle with red "Pdf"
+glyphs on a transparent background) cropped to visual bounds with balanced margin.
 
 - `origo.ico`: 16,20,24,32,40,48,64,128,256 px; Windows icon resource ID 1.
 - `origo-32.png`: embedded title-bar image displayed at 16 logical px.
