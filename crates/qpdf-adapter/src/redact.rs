@@ -638,7 +638,9 @@ mod tests {
             out.extend_from_slice(obj);
         }
         let xref = out.len();
-        out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes());
+        out.extend_from_slice(
+            format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes(),
+        );
         for off in offsets {
             out.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
         }
@@ -724,12 +726,8 @@ mod tests {
         // - PUBLIC_PAGE_TWO on unredacted page 2 is still preserved!
         let json_doc = redactor.read_json(&dest, &control)?;
         assert!(
-            json_doc
-                .pointer("/qpdf/1/trailer/value/Info")
-                .is_none()
-                && json_doc
-                    .pointer("/qpdf/1/trailer/value/~1Info")
-                    .is_none()
+            json_doc.pointer("/qpdf/1/trailer/value/Info").is_none()
+                && json_doc.pointer("/qpdf/1/trailer/value/~1Info").is_none()
         );
         let qdf_out = dir.join("inspect.qdf");
         let qdf_job = json!({

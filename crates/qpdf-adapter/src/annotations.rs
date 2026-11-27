@@ -106,7 +106,10 @@ pub(crate) fn validate(
     if matches!(
         &parsed,
         ParsedName::SignatureRef { .. }
-            | ParsedName::Complete(Annotation { signature: Some(_), .. })
+            | ParsedName::Complete(Annotation {
+                signature: Some(_),
+                ..
+            })
     ) {
         budget.placements_left = budget
             .placements_left
@@ -589,7 +592,8 @@ fn emit_extra_annotation(
     let color_norm = a.color.map(|c| f64::from(c) / 255.);
     let [r, g, b] = color_norm;
     let w = f64::from(a.width);
-    let mut appearance = format!("q {r:.5} {g:.5} {b:.5} RG {r:.5} {g:.5} {b:.5} rg {w:.3} w 1 J 1 j\n");
+    let mut appearance =
+        format!("q {r:.5} {g:.5} {b:.5} RG {r:.5} {g:.5} {b:.5} rg {w:.3} w 1 J 1 j\n");
     let subtype = match extra {
         AnnotationExtra::Underline => "/Underline",
         AnnotationExtra::StrikeOut => "/StrikeOut",
@@ -624,7 +628,9 @@ fn emit_extra_annotation(
                     bottom + (top - bottom) * 0.08
                 };
                 let lw = ((top - bottom) * 0.11).max(w).max(1.0);
-                appearance.push_str(&format!("{lw:.3} w {left:.3} {line_y:.3} m {right:.3} {line_y:.3} l S\n"));
+                appearance.push_str(&format!(
+                    "{lw:.3} w {left:.3} {line_y:.3} m {right:.3} {line_y:.3} l S\n"
+                ));
             }
             let rect = [min_x, min_y, max_x, max_y];
             let annot = json!({
@@ -648,7 +654,11 @@ fn emit_extra_annotation(
             let y1 = points[0][1].max(points[1][1]);
             let pad = w * 0.5 + 1.0;
             let rect = [x0 - pad, y0 - pad, x1 + pad, y1 + pad];
-            appearance.push_str(&format!("{x0:.3} {y0:.3} {:.3} {:.3} re S\n", x1 - x0, y1 - y0));
+            appearance.push_str(&format!(
+                "{x0:.3} {y0:.3} {:.3} {:.3} re S\n",
+                x1 - x0,
+                y1 - y0
+            ));
             let annot = json!({
                 "/Type": "/Annot",
                 "/Subtype": subtype,
@@ -682,11 +692,32 @@ fn emit_extra_annotation(
                  {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} c\n\
                  {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} c\n\
                  {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} c S\n",
-                cx + rx, cy,
-                cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry,
-                cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy,
-                cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry,
-                cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy,
+                cx + rx,
+                cy,
+                cx + rx,
+                cy + ky,
+                cx + kx,
+                cy + ry,
+                cx,
+                cy + ry,
+                cx - kx,
+                cy + ry,
+                cx - rx,
+                cy + ky,
+                cx - rx,
+                cy,
+                cx - rx,
+                cy - ky,
+                cx - kx,
+                cy - ry,
+                cx,
+                cy - ry,
+                cx + kx,
+                cy - ry,
+                cx + rx,
+                cy - ky,
+                cx + rx,
+                cy,
             ));
             let annot = json!({
                 "/Type": "/Annot",
@@ -710,7 +741,10 @@ fn emit_extra_annotation(
             let mut max_x = p0[0].max(p1[0]);
             let mut min_y = p0[1].min(p1[1]);
             let mut max_y = p0[1].max(p1[1]);
-            appearance.push_str(&format!("{:.3} {:.3} m {:.3} {:.3} l S\n", p0[0], p0[1], p1[0], p1[1]));
+            appearance.push_str(&format!(
+                "{:.3} {:.3} m {:.3} {:.3} l S\n",
+                p0[0], p0[1], p1[0], p1[1]
+            ));
             if is_arrow
                 && let Some([left, right]) = pdf_application::annotation::arrow_head_wings(
                     [p0[0] as f32, p0[1] as f32],
@@ -771,13 +805,40 @@ fn emit_extra_annotation(
                  {:.3} {:.3} m {:.3} {:.3} l S\n\
                  {:.3} {:.3} m {:.3} {:.3} l S\n\
                  {:.3} {:.3} m {:.3} {:.3} l S\n",
-                border[0], border[1], border[2],
-                px(0.04), py(0.04), px(0.96), py(0.04), px(0.96), py(0.74), px(0.74), py(0.96), px(0.04), py(0.96),
-                fold[0], fold[1], fold[2],
-                px(0.74), py(0.74), px(0.96), py(0.74), px(0.74), py(0.96),
-                px(0.20), py(0.30), px(0.78), py(0.30),
-                px(0.20), py(0.50), px(0.78), py(0.50),
-                px(0.20), py(0.69), px(0.60), py(0.69),
+                border[0],
+                border[1],
+                border[2],
+                px(0.04),
+                py(0.04),
+                px(0.96),
+                py(0.04),
+                px(0.96),
+                py(0.74),
+                px(0.74),
+                py(0.96),
+                px(0.04),
+                py(0.96),
+                fold[0],
+                fold[1],
+                fold[2],
+                px(0.74),
+                py(0.74),
+                px(0.96),
+                py(0.74),
+                px(0.74),
+                py(0.96),
+                px(0.20),
+                py(0.30),
+                px(0.78),
+                py(0.30),
+                px(0.20),
+                py(0.50),
+                px(0.78),
+                py(0.50),
+                px(0.20),
+                py(0.69),
+                px(0.60),
+                py(0.69),
             ));
             let annot = json!({
                 "/Type": "/Annot",
@@ -809,7 +870,12 @@ fn emit_extra_annotation(
                 FillSymbol::Check => {
                     appearance.push_str(&format!(
                         "{stroke_w:.3} w {:.3} {:.3} m {:.3} {:.3} l {:.3} {:.3} l S\n",
-                        px(0.16), py(0.54), px(0.40), py(0.80), px(0.85), py(0.22),
+                        px(0.16),
+                        py(0.54),
+                        px(0.40),
+                        py(0.80),
+                        px(0.85),
+                        py(0.22),
                     ));
                 }
                 FillSymbol::Cross => {
@@ -830,11 +896,32 @@ fn emit_extra_annotation(
                          {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} c\n\
                          {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} c\n\
                          {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} c f\n",
-                        cx + rad, cy,
-                        cx + rad, cy + k, cx + k, cy + rad, cx, cy + rad,
-                        cx - k, cy + rad, cx - rad, cy + k, cx - rad, cy,
-                        cx - rad, cy - k, cx - k, cy - rad, cx, cy - rad,
-                        cx + k, cy - rad, cx + rad, cy - k, cx + rad, cy,
+                        cx + rad,
+                        cy,
+                        cx + rad,
+                        cy + k,
+                        cx + k,
+                        cy + rad,
+                        cx,
+                        cy + rad,
+                        cx - k,
+                        cy + rad,
+                        cx - rad,
+                        cy + k,
+                        cx - rad,
+                        cy,
+                        cx - rad,
+                        cy - k,
+                        cx - k,
+                        cy - rad,
+                        cx,
+                        cy - rad,
+                        cx + k,
+                        cy - rad,
+                        cx + rad,
+                        cy - k,
+                        cx + rad,
+                        cy,
                     ));
                 }
             }

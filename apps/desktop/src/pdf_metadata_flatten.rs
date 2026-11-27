@@ -432,9 +432,12 @@ impl WindowShell {
             .unwrap_or(0);
 
         let title = cx.new(|cx| InputState::new(window, cx).placeholder("Judul dokumen"));
-        let author = cx.new(|cx| InputState::new(window, cx).placeholder("Nama penulis / instansi"));
-        let subject = cx.new(|cx| InputState::new(window, cx).placeholder("Subjek / deskripsi singkat"));
-        let keywords = cx.new(|cx| InputState::new(window, cx).placeholder("contoh: kontrak, laporan, 2026"));
+        let author =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Nama penulis / instansi"));
+        let subject =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Subjek / deskripsi singkat"));
+        let keywords =
+            cx.new(|cx| InputState::new(window, cx).placeholder("contoh: kontrak, laporan, 2026"));
         let creator = cx.new(|cx| InputState::new(window, cx).placeholder("Aplikasi pembuat"));
         let producer = cx.new(|cx| InputState::new(window, cx).placeholder("Producer PDF"));
 
@@ -488,12 +491,18 @@ impl WindowShell {
                     if let Some(d) = &mut this.meta_flatten.metadata_dialog {
                         d.loading = false;
                         if let Ok(meta) = result {
-                            d.title.update(cx, |s, cx| s.set_value(meta.title, window, cx));
-                            d.author.update(cx, |s, cx| s.set_value(meta.author, window, cx));
-                            d.subject.update(cx, |s, cx| s.set_value(meta.subject, window, cx));
-                            d.keywords.update(cx, |s, cx| s.set_value(meta.keywords, window, cx));
-                            d.creator.update(cx, |s, cx| s.set_value(meta.creator, window, cx));
-                            d.producer.update(cx, |s, cx| s.set_value(meta.producer, window, cx));
+                            d.title
+                                .update(cx, |s, cx| s.set_value(meta.title, window, cx));
+                            d.author
+                                .update(cx, |s, cx| s.set_value(meta.author, window, cx));
+                            d.subject
+                                .update(cx, |s, cx| s.set_value(meta.subject, window, cx));
+                            d.keywords
+                                .update(cx, |s, cx| s.set_value(meta.keywords, window, cx));
+                            d.creator
+                                .update(cx, |s, cx| s.set_value(meta.creator, window, cx));
+                            d.producer
+                                .update(cx, |s, cx| s.set_value(meta.producer, window, cx));
                         }
                     }
                     window.refresh();
@@ -755,7 +764,10 @@ impl WindowShell {
         }
         d.picking = true;
         let dest = d.destination();
-        let dir = dest.parent().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+        let dir = dest
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
         let name = dest
             .file_name()
             .and_then(|s| s.to_str())
@@ -798,7 +810,10 @@ impl WindowShell {
         }
         d.picking = true;
         let dest = d.destination();
-        let dir = dest.parent().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+        let dir = dest
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
         let name = dest
             .file_name()
             .and_then(|s| s.to_str())
@@ -1008,7 +1023,14 @@ impl WindowShell {
         std::thread::spawn(move || {
             let tool = QpdfMetadata::new(&sidecars);
             let res = tool
-                .write_metadata(&plan, &destination, &metadata, strip_xmp, &inspector, &control)
+                .write_metadata(
+                    &plan,
+                    &destination,
+                    &metadata,
+                    strip_xmp,
+                    &inspector,
+                    &control,
+                )
                 .map_err(|err| err.to_string());
             let _ = tx.send(res);
         });

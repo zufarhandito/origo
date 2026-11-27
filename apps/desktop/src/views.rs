@@ -627,7 +627,9 @@ impl DocumentSession {
                 this.role(gpui::Role::Document)
                     .aria_label(format!("Isi halaman {}", index + 1))
             })
-            .when(placing_signature || redacting, |this| this.cursor_crosshair())
+            .when(placing_signature || redacting, |this| {
+                this.cursor_crosshair()
+            })
             .when(selectable, |this| this.cursor_text())
             .w(px(width))
             .h(px(height))

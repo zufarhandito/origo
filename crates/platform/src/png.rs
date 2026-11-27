@@ -131,7 +131,8 @@ impl PngWriter for LocalPngWriter {
             ImageExportFormat::Jpeg { quality } => {
                 control.checkpoint()?;
                 validate_raster(raster)?;
-                let mut rgb = Vec::with_capacity(raster.width as usize * raster.height as usize * 3);
+                let mut rgb =
+                    Vec::with_capacity(raster.width as usize * raster.height as usize * 3);
                 for px in raster.rgba.as_chunks::<4>().0 {
                     rgb.push(px[0]);
                     rgb.push(px[1]);
@@ -195,7 +196,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn jpeg_writer_encodes_validates_and_enforces_limit() -> Result<(), Box<dyn std::error::Error>> {
+    fn jpeg_writer_encodes_validates_and_enforces_limit() -> Result<(), Box<dyn std::error::Error>>
+    {
         let dir = tempfile::tempdir()?;
         let out = dir.path().join("page-0001.jpg");
         let raster = RenderedPage {

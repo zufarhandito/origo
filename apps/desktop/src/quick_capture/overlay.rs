@@ -86,11 +86,7 @@ impl RegionPickerOverlay {
         Ok(handle)
     }
 
-    fn finish(
-        &mut self,
-        result: Option<(CaptureRegion, CapturedFrame)>,
-        cx: &mut Context<Self>,
-    ) {
+    fn finish(&mut self, result: Option<(CaptureRegion, CapturedFrame)>, cx: &mut Context<Self>) {
         if self.completed {
             return;
         }

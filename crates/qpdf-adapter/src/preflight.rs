@@ -758,7 +758,10 @@ mod tests {
             let mut active = v.clone();
             active["qpdf"][1]["obj:3 0 R"]["value"]["/Annots"][0]["/A"] =
                 serde_json::json!({"/S": "/JavaScript", "/JS": "u:alert(1)"});
-            assert!(inspect_json(&active, 1).is_err(), "active should fail for {subtype}");
+            assert!(
+                inspect_json(&active, 1).is_err(),
+                "active should fail for {subtype}"
+            );
         }
     }
     #[test]

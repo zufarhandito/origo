@@ -86,8 +86,7 @@ pub(super) fn paint_redaction_overlays(
     let paint_box = |rect: RedactRect, is_draft: bool, window: &mut Window| {
         let [left, top, right, bottom] = rect.visual_bounds(quarter_turns);
         let box_bounds = Bounds::new(
-            bounds.origin
-                + gpui::point(bounds.size.width * left, bounds.size.height * top),
+            bounds.origin + gpui::point(bounds.size.width * left, bounds.size.height * top),
             gpui::size(
                 bounds.size.width * (right - left),
                 bounds.size.height * (bottom - top),
@@ -111,7 +110,9 @@ pub(super) fn paint_redaction_overlays(
         if !is_draft && box_bounds.size.width >= px(10.) && box_bounds.size.height >= px(10.) {
             let mut p1 = gpui::PathBuilder::stroke(px(1.0));
             p1.move_to(box_bounds.origin);
-            p1.line_to(box_bounds.origin + gpui::point(box_bounds.size.width, box_bounds.size.height));
+            p1.line_to(
+                box_bounds.origin + gpui::point(box_bounds.size.width, box_bounds.size.height),
+            );
             if let Ok(path) = p1.build() {
                 window.paint_path(path, gpui::rgba(0xdc2626b0));
             }
@@ -142,7 +143,9 @@ impl DocumentSession {
         self.annotation.selected = None;
         self.annotation.tool = annotations::Tool::Select;
         self.redaction.active = true;
-        self.status = "Mode Sensor Permanen: seret kotak di area sensitif, atau klik kotak untuk menghapus.".into();
+        self.status =
+            "Mode Sensor Permanen: seret kotak di area sensitif, atau klik kotak untuk menghapus."
+                .into();
         cx.notify();
     }
 
@@ -177,7 +180,9 @@ impl DocumentSession {
         let summary = if total == 0 {
             "Seret kotak pada teks/gambar sensitif untuk ditandai. Klik kotak merah untuk menghapus.".to_owned()
         } else {
-            format!("{total} area ditandai di {pages} halaman — klik kotak untuk menghapus, lalu Terapkan.")
+            format!(
+                "{total} area ditandai di {pages} halaman — klik kotak untuk menghapus, lalu Terapkan."
+            )
         };
         let owner = self.owner.clone();
         Some(
@@ -861,7 +866,8 @@ impl WindowShell {
         };
         if ui.total_boxes() == 0 && !ui.sanitize_metadata {
             if let Some(d) = &mut self.redact.dialog {
-                d.error = Some("Tandai minimal 1 area sensor atau aktifkan pembersihan metadata.".into());
+                d.error =
+                    Some("Tandai minimal 1 area sensor atau aktifkan pembersihan metadata.".into());
             }
             window.refresh();
             cx.notify();

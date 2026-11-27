@@ -755,7 +755,8 @@ impl WindowShell {
                     if let Some(id) = first.or(first_existing) {
                         this.activate(id, cx);
                         this.trigger_pending_pdf_action(cx);
-                    } else if password_paths.is_empty() && this.security.pending_passwords.is_empty()
+                    } else if password_paths.is_empty()
+                        && this.security.pending_passwords.is_empty()
                     {
                         this.pending_pdf_action = None;
                     }
@@ -952,14 +953,16 @@ impl WindowShell {
                     cx.notify();
                     return;
                 }
-                if self.close.as_ref().is_some_and(|b| b.window) && self.meta_flatten.job.is_some() {
+                if self.close.as_ref().is_some_and(|b| b.window) && self.meta_flatten.job.is_some()
+                {
                     self.notice = Some(
                         "Menunggu proses Flatten / Metadata PDF selesai sebelum menutup jendela. Gunakan Batal atau Tetap di aplikasi.".into(),
                     );
                     cx.notify();
                     return;
                 }
-                if self.close.as_ref().is_some_and(|b| b.window) && self.quick_export.job.is_some() {
+                if self.close.as_ref().is_some_and(|b| b.window) && self.quick_export.job.is_some()
+                {
                     self.notice = Some(
                         "Menunggu ekspor teks / ekstraksi gambar selesai sebelum menutup jendela. Gunakan Batal atau Tetap di aplikasi.".into(),
                     );

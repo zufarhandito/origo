@@ -56,8 +56,22 @@ pub fn rasterize_fill_symbol_preview(symbol: FillSymbol, color: [u8; 3]) -> Sign
             }
         }
         FillSymbol::Cross => {
-            stamp_segment(&mut mask, w, h, [0.20 * s, 0.20 * s], [0.80 * s, 0.80 * s], radius);
-            stamp_segment(&mut mask, w, h, [0.80 * s, 0.20 * s], [0.20 * s, 0.80 * s], radius);
+            stamp_segment(
+                &mut mask,
+                w,
+                h,
+                [0.20 * s, 0.20 * s],
+                [0.80 * s, 0.80 * s],
+                radius,
+            );
+            stamp_segment(
+                &mut mask,
+                w,
+                h,
+                [0.80 * s, 0.20 * s],
+                [0.20 * s, 0.80 * s],
+                radius,
+            );
         }
         FillSymbol::Dot => {
             stamp_disc(&mut mask, w, h, [0.5 * s, 0.5 * s], 0.34 * s);
@@ -569,16 +583,7 @@ pub fn composite(
             continue;
         }
         if let Some(extra) = &a.extra {
-            composite_extra(
-                rgba,
-                &mut mask,
-                width,
-                height,
-                page_width,
-                turns,
-                a,
-                extra,
-            );
+            composite_extra(rgba, &mut mask, width, height, page_width, turns, a, extra);
             continue;
         }
         let points: Vec<_> = a
@@ -630,7 +635,17 @@ pub fn composite(
             + radius)
             .ceil() as usize)
             .min(h);
-        flush_mask(rgba, &mut mask, w, min_x, max_x, min_y, max_y, a.color, a.highlight);
+        flush_mask(
+            rgba,
+            &mut mask,
+            w,
+            min_x,
+            max_x,
+            min_y,
+            max_y,
+            a.color,
+            a.highlight,
+        );
     }
 }
 
@@ -773,7 +788,13 @@ fn composite_extra(
                 };
                 let p0 = to_px([left, y]);
                 let p1 = to_px([right, y]);
-                let box_h_px = ((bottom - top) * if turns.is_multiple_of(2) { height } else { width } as f32).abs();
+                let box_h_px = ((bottom - top)
+                    * if turns.is_multiple_of(2) {
+                        height
+                    } else {
+                        width
+                    } as f32)
+                    .abs();
                 let rad = (box_h_px * 0.055).max(stroke_radius).max(0.8);
                 stamp_segment(mask, w, h, p0, p1, rad);
                 touch(p0, rad + 1.0);
@@ -848,8 +869,11 @@ fn composite_extra(
             let top_left = map(0.0, 0.0);
             let top_right = map(1.0, 0.0);
             let bot_left = map(0.0, 1.0);
-            let side_w = ((top_right[0] - top_left[0]).powi(2) + (top_right[1] - top_left[1]).powi(2)).sqrt();
-            let side_h = ((bot_left[0] - top_left[0]).powi(2) + (bot_left[1] - top_left[1]).powi(2)).sqrt();
+            let side_w = ((top_right[0] - top_left[0]).powi(2)
+                + (top_right[1] - top_left[1]).powi(2))
+            .sqrt();
+            let side_h =
+                ((bot_left[0] - top_left[0]).powi(2) + (bot_left[1] - top_left[1]).powi(2)).sqrt();
             let min_side = side_w.min(side_h);
             let rad = (min_side * 0.085).max(1.2);
             match symbol {
@@ -886,9 +910,13 @@ fn composite_extra(
         AnnotationExtra::Note(_) => {
             let [p0, p1] = [a.points[0], a.points[1]];
             let corners = [rotate(p0, turns), rotate(p1, turns)];
-            let bx0 = (corners[0][0].min(corners[1][0]) * width as f32).floor().max(0.0) as usize;
+            let bx0 = (corners[0][0].min(corners[1][0]) * width as f32)
+                .floor()
+                .max(0.0) as usize;
             let bx1 = ((corners[0][0].max(corners[1][0]) * width as f32).ceil() as usize).min(w);
-            let by0 = (corners[0][1].min(corners[1][1]) * height as f32).floor().max(0.0) as usize;
+            let by0 = (corners[0][1].min(corners[1][1]) * height as f32)
+                .floor()
+                .max(0.0) as usize;
             let by1 = ((corners[0][1].max(corners[1][1]) * height as f32).ceil() as usize).min(h);
             let fold_color = [
                 (u16::from(a.color[0]) * 70 / 100) as u8,
@@ -1186,9 +1214,20 @@ mod tests {
         for item in &items {
             for turns in 0..4 {
                 let mut canvas = vec![255; 100 * 100 * 4];
-                composite(&mut canvas, 100, 100, 500., turns, std::slice::from_ref(item));
+                composite(
+                    &mut canvas,
+                    100,
+                    100,
+                    500.,
+                    turns,
+                    std::slice::from_ref(item),
+                );
                 assert!(
-                    canvas.as_chunks::<4>().0.iter().any(|p| p[..3] != [255, 255, 255]),
+                    canvas
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .any(|p| p[..3] != [255, 255, 255]),
                     "{:?} must paint visible pixels at rotation {turns}",
                     item.extra
                 );
@@ -1287,7 +1326,8 @@ mod tests {
             assert!(((a[1] + b[1]) * 0.5 - 0.5).abs() < 0.01);
         }
         assert!(rasterize_watermark("   ", [0, 0, 0], 25, -45).is_none());
-        assert!(rasterize_watermark(&"X".repeat(MAX_WATERMARK_CHARS + 1), [0, 0, 0], 25, -45).is_none());
+        assert!(
+            rasterize_watermark(&"X".repeat(MAX_WATERMARK_CHARS + 1), [0, 0, 0], 25, -45).is_none()
+        );
     }
 }
-

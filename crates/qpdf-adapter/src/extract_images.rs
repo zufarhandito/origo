@@ -111,7 +111,8 @@ impl QpdfImageExtractor {
         fs::create_dir(&results_dir).map_err(|_| SplitError::Output)?;
 
         let stream_prefix = work_dir.join("stream");
-        let json_doc = self.dump_pdf_json_with_streams(&canonical_source, &stream_prefix, control)?;
+        let json_doc =
+            self.dump_pdf_json_with_streams(&canonical_source, &stream_prefix, control)?;
         if json_doc
             .pointer("/qpdf/0/jsonversion")
             .and_then(Value::as_u64)
@@ -276,9 +277,12 @@ impl QpdfImageExtractor {
                     let pixels = match predictor {
                         Predictor::None => raw_pixels,
                         Predictor::Png => {
-                            let Some(unfiltered) =
-                                undo_png_predictor(&raw_pixels, width as usize, height as usize, channels)
-                            else {
+                            let Some(unfiltered) = undo_png_predictor(
+                                &raw_pixels,
+                                width as usize,
+                                height as usize,
+                                channels,
+                            ) else {
                                 skipped += 1;
                                 continue;
                             };
@@ -509,11 +513,7 @@ fn parse_decode_parms_predictor(val: Option<&Value>) -> Predictor {
 
 fn resolve_datafile_path(raw: &str, work_dir: &Path) -> PathBuf {
     let p = PathBuf::from(raw);
-    if p.is_absolute() {
-        p
-    } else {
-        work_dir.join(p)
-    }
+    if p.is_absolute() { p } else { work_dir.join(p) }
 }
 
 fn is_valid_jpeg(bytes: &[u8]) -> bool {
@@ -704,12 +704,7 @@ fn write_pixels_as_png(
             let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
             for cmyk in pixels.as_chunks::<4>().0 {
                 let (c, m, y, k) = if inverted {
-                    (
-                        255 - cmyk[0],
-                        255 - cmyk[1],
-                        255 - cmyk[2],
-                        255 - cmyk[3],
-                    )
+                    (255 - cmyk[0], 255 - cmyk[1], 255 - cmyk[2], 255 - cmyk[3])
                 } else {
                     (cmyk[0], cmyk[1], cmyk[2], cmyk[3])
                 };
@@ -768,10 +763,10 @@ mod tests {
     }
 
     #[test]
-    fn extract_embedded_jpeg_and_flate_png_with_real_qpdf()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let sidecars = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../vendor/sidecars/windows-x64");
+    fn extract_embedded_jpeg_and_flate_png_with_real_qpdf() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let sidecars =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../vendor/sidecars/windows-x64");
         if !sidecars.join("qpdf/bin/qpdf.exe").is_file() {
             return Ok(());
         }
@@ -828,7 +823,10 @@ mod tests {
             &control,
             |_, _| {},
         );
-        assert!(matches!(err, Err(ExtractImagesError::Batch(SplitError::Exists))));
+        assert!(matches!(
+            err,
+            Err(ExtractImagesError::Batch(SplitError::Exists))
+        ));
         Ok(())
     }
 
@@ -885,7 +883,9 @@ mod tests {
         push_obj(&mut out, 6, &c_obj);
 
         let xref = out.len();
-        out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", offsets.len()).as_bytes());
+        out.extend_from_slice(
+            format!("xref\n0 {}\n0000000000 65535 f \n", offsets.len()).as_bytes(),
+        );
         for off in &offsets[1..] {
             out.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
         }

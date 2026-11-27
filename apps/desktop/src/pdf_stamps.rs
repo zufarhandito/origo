@@ -1066,9 +1066,8 @@ impl DocumentSession {
         self.close_watermark(cx);
         match result {
             Ok(true) => {
-                self.status = format!(
-                    "Watermark diterapkan ke {applied} halaman. Ctrl+Z untuk membatalkan."
-                );
+                self.status =
+                    format!("Watermark diterapkan ke {applied} halaman. Ctrl+Z untuk membatalkan.");
                 self.edited(cx);
             }
             Err(err) => {

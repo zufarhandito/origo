@@ -713,7 +713,10 @@ fn read_parsed_annotation(
     if matches!(
         &parsed,
         Some(ParsedName::SignatureRef { .. })
-            | Some(ParsedName::Complete(Annotation { signature: Some(_), .. }))
+            | Some(ParsedName::Complete(Annotation {
+                signature: Some(_),
+                ..
+            }))
     ) {
         *total_stamps_left = total_stamps_left
             .checked_sub(1)
@@ -1073,4 +1076,3 @@ mod tests {
         Ok(())
     }
 }
-

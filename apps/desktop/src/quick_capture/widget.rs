@@ -21,7 +21,9 @@ use gpui::{
         ActiveTheme, Disableable, Selectable, Sizable,
         button::{Button, ButtonVariants},
     },
-    div, prelude::*, px, size,
+    div,
+    prelude::*,
+    px, size,
 };
 use pdf_application::export::ExportControl;
 use pdf_engine::PdfiumRenderer;
@@ -311,7 +313,12 @@ impl QuickCaptureWidget {
         self.sync_window_size(window);
     }
 
-    fn toggle_drawer(&mut self, tab: Option<DrawerTab>, window: &mut Window, cx: &mut Context<Self>) {
+    fn toggle_drawer(
+        &mut self,
+        tab: Option<DrawerTab>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         match tab {
             Some(target) => {
                 if self.expanded && self.tab == target {
@@ -433,7 +440,11 @@ impl QuickCaptureWidget {
         self.confirm_clear = false;
         let monitor_index = self.data.monitor_index;
         let widget_window = window.window_handle();
-        self.set_banner(BannerTone::Info, "Membekukan layar untuk pilih area…", window);
+        self.set_banner(
+            BannerTone::Info,
+            "Membekukan layar untuk pilih area…",
+            window,
+        );
         cx.notify();
 
         let task = cx
@@ -596,7 +607,10 @@ impl QuickCaptureWidget {
                 }
                 self.set_banner(
                     BannerTone::Info,
-                    format!("Tangkapan terakhir dihapus (sisa {}).", self.data.items.len()),
+                    format!(
+                        "Tangkapan terakhir dihapus (sisa {}).",
+                        self.data.items.len()
+                    ),
                     window,
                 );
             }
@@ -622,7 +636,11 @@ impl QuickCaptureWidget {
             }
             self.set_banner(
                 BannerTone::Info,
-                format!("Soal #{} dihapus (sisa {}).", index + 1, self.data.items.len()),
+                format!(
+                    "Soal #{} dihapus (sisa {}).",
+                    index + 1,
+                    self.data.items.len()
+                ),
                 window,
             );
         }
@@ -650,7 +668,11 @@ impl QuickCaptureWidget {
         if let Err(err) = self.store.clear_items(&mut self.data) {
             self.set_banner(BannerTone::Error, format!("{err}"), window);
         } else {
-            self.set_banner(BannerTone::Info, "Semua tangkapan sesi dibersihkan.", window);
+            self.set_banner(
+                BannerTone::Info,
+                "Semua tangkapan sesi dibersihkan.",
+                window,
+            );
         }
         cx.notify();
     }
@@ -663,7 +685,10 @@ impl QuickCaptureWidget {
         if status.capture_ok {
             self.set_banner(
                 BannerTone::Success,
-                format!("Hotkey aktif: {} (Area: Alt+Shift+R)", self.data.hotkey.label()),
+                format!(
+                    "Hotkey aktif: {} (Area: Alt+Shift+R)",
+                    self.data.hotkey.label()
+                ),
                 window,
             );
         } else {
@@ -858,7 +883,10 @@ impl QuickCaptureWidget {
                                 .to_string();
                             this.set_banner(
                                 BannerTone::Success,
-                                format!("PDF tersimpan: {name} ({} hal · {mb:.1} MB)", receipt.pages),
+                                format!(
+                                    "PDF tersimpan: {name} ({} hal · {mb:.1} MB)",
+                                    receipt.pages
+                                ),
                                 window,
                             );
                             if open_after {
@@ -963,7 +991,10 @@ impl QuickCaptureWidget {
                                 .to_string();
                             this.set_banner(
                                 BannerTone::Success,
-                                format!("Folder gambar tersimpan: {name} ({} file)", this.data.items.len()),
+                                format!(
+                                    "Folder gambar tersimpan: {name} ({} file)",
+                                    this.data.items.len()
+                                ),
                                 window,
                             );
                         }
@@ -1243,7 +1274,12 @@ impl QuickCaptureWidget {
                                         .tooltip("Naikkan urutan")
                                         .disabled(busy || is_first)
                                         .on_click(cx.listener(move |this, _, window, cx| {
-                                            this.move_item(index, index.saturating_sub(1), window, cx);
+                                            this.move_item(
+                                                index,
+                                                index.saturating_sub(1),
+                                                window,
+                                                cx,
+                                            );
                                         })),
                                 )
                                 .child(
@@ -1296,10 +1332,10 @@ impl QuickCaptureWidget {
                                 .items_center()
                                 .justify_between()
                                 .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(colors.foreground)
-                                        .child(format!("Pratinjau Soal #{:03} ({w}×{h} px)", idx + 1)),
+                                    div().text_xs().text_color(colors.foreground).child(format!(
+                                        "Pratinjau Soal #{:03} ({w}×{h} px)",
+                                        idx + 1
+                                    )),
                                 )
                                 .child(
                                     Button::new("qc-close-preview")
@@ -1322,7 +1358,11 @@ impl QuickCaptureWidget {
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .child(gpui::img(img).size_full().object_fit(gpui::ObjectFit::Contain)),
+                                .child(
+                                    gpui::img(img)
+                                        .size_full()
+                                        .object_fit(gpui::ObjectFit::Contain),
+                                ),
                         ),
                 )
             })

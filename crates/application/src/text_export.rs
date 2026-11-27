@@ -49,7 +49,10 @@ pub fn normalize_page_text(raw: &str) -> String {
 }
 
 /// Join normalized per-page strings into one UTF-8 document string.
-pub fn assemble_document_text(page_texts: &[String], include_page_headers: bool) -> (String, usize) {
+pub fn assemble_document_text(
+    page_texts: &[String],
+    include_page_headers: bool,
+) -> (String, usize) {
     let mut out = String::new();
     let mut pages_with_text = 0usize;
     let total = page_texts.len();

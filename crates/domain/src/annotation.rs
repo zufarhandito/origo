@@ -863,7 +863,9 @@ mod tests {
                     rectangles: false,
                     signature: None,
                     text: None,
-                    extra: Some(AnnotationExtra::Note("Periksa pasal 3.\nRevisi nominal.".into())),
+                    extra: Some(AnnotationExtra::Note(
+                        "Periksa pasal 3.\nRevisi nominal.".into(),
+                    )),
                 },
                 AnnotationKind::Text,
             ),

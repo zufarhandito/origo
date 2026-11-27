@@ -101,9 +101,7 @@ impl ImageFolderFormat {
 #[derive(Clone, Debug)]
 pub enum AddItemOutcome {
     Added(CaptureItemMeta),
-    DuplicateDetected {
-        last_index: usize,
-    },
+    DuplicateDetected { last_index: usize },
     LimitReached,
 }
 
@@ -465,7 +463,10 @@ pub fn export_session_to_pdf(
     control: &ExportControl,
     mut on_progress: impl FnMut(usize, usize),
 ) -> anyhow::Result<ImagesToPdfReceipt> {
-    anyhow::ensure!(!items.is_empty(), "Belum ada tangkapan soal untuk diekspor.");
+    anyhow::ensure!(
+        !items.is_empty(),
+        "Belum ada tangkapan soal untuk diekspor."
+    );
     let total = items.len();
     let temp_dir = tempfile::Builder::new()
         .prefix(".origo-capture-pdf-")
@@ -502,8 +503,7 @@ pub fn export_session_to_pdf(
         orientation: ImageOrientation::Auto,
         margin: ImageMargin::None,
     };
-    let plan = ImagesToPdfPlan::new(image_paths, options)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let plan = ImagesToPdfPlan::new(image_paths, options).map_err(|e| anyhow::anyhow!("{e}"))?;
     let receipt = run_images_to_pdf(
         &plan,
         destination,
@@ -526,7 +526,10 @@ pub fn export_session_to_images(
     control: &ExportControl,
     mut on_progress: impl FnMut(usize, usize),
 ) -> anyhow::Result<PathBuf> {
-    anyhow::ensure!(!items.is_empty(), "Belum ada tangkapan soal untuk diekspor.");
+    anyhow::ensure!(
+        !items.is_empty(),
+        "Belum ada tangkapan soal untuk diekspor."
+    );
     validate_folder(folder_name).map_err(|e| anyhow::anyhow!("{e}"))?;
     let parent = dunce::canonicalize(parent_dir)
         .map_err(|_| anyhow::anyhow!("Folder tujuan tidak ditemukan."))?;
@@ -546,7 +549,10 @@ pub fn export_session_to_images(
         match format {
             ImageFolderFormat::Png => {
                 fs::copy(store.item_path(item.id), &out_path)?;
-                let file = fs::OpenOptions::new().read(true).write(true).open(&out_path)?;
+                let file = fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&out_path)?;
                 file.sync_all()?;
             }
             ImageFolderFormat::Jpeg90 => {
@@ -557,8 +563,7 @@ pub fn export_session_to_images(
         on_progress(idx + 1, total);
     }
     control.checkpoint()?;
-    publish_directory_no_clobber(&ready, &destination)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    publish_directory_no_clobber(&ready, &destination).map_err(|e| anyhow::anyhow!("{e}"))?;
     Ok(destination)
 }
 
@@ -641,7 +646,10 @@ pub fn export_session_ocr_txt(
         }
         if options.include_headers {
             if trimmed.is_empty() {
-                sections.push(format!("=== Soal {} ===\n(Tidak ada teks terdeteksi)", idx + 1));
+                sections.push(format!(
+                    "=== Soal {} ===\n(Tidak ada teks terdeteksi)",
+                    idx + 1
+                ));
             } else {
                 sections.push(format!("=== Soal {} ===\n{trimmed}", idx + 1));
             }
@@ -721,7 +729,10 @@ mod tests {
 
         // Identical frame blocked by duplicate guard unless forced
         let dup = store.add_capture(&mut data, &f1, false)?;
-        assert!(matches!(dup, AddItemOutcome::DuplicateDetected { last_index: 1 }));
+        assert!(matches!(
+            dup,
+            AddItemOutcome::DuplicateDetected { last_index: 1 }
+        ));
 
         let forced = store.add_capture(&mut data, &f1, true)?;
         assert!(matches!(forced, AddItemOutcome::Added(_)));

@@ -155,23 +155,37 @@ fn decode_intent(line: &str, expected_token: &str) -> Option<LaunchIntent> {
         .collect();
     match kind {
         "open_pdf" => paths.into_iter().next().map(LaunchIntent::OpenPdf),
-        "pdf_compress" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
-            path,
-            action: PdfShellAction::Compress,
-        }),
-        "pdf_split" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
-            path,
-            action: PdfShellAction::Split,
-        }),
-        "pdf_png" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
-            path,
-            action: PdfShellAction::Png,
-        }),
-        "pdf_ocr" => paths.into_iter().next().map(|path| LaunchIntent::PdfAction {
-            path,
-            action: PdfShellAction::Ocr,
-        }),
-        "pdf_combine_organize" if !paths.is_empty() => Some(LaunchIntent::PdfCombineOrganize(paths)),
+        "pdf_compress" => paths
+            .into_iter()
+            .next()
+            .map(|path| LaunchIntent::PdfAction {
+                path,
+                action: PdfShellAction::Compress,
+            }),
+        "pdf_split" => paths
+            .into_iter()
+            .next()
+            .map(|path| LaunchIntent::PdfAction {
+                path,
+                action: PdfShellAction::Split,
+            }),
+        "pdf_png" => paths
+            .into_iter()
+            .next()
+            .map(|path| LaunchIntent::PdfAction {
+                path,
+                action: PdfShellAction::Png,
+            }),
+        "pdf_ocr" => paths
+            .into_iter()
+            .next()
+            .map(|path| LaunchIntent::PdfAction {
+                path,
+                action: PdfShellAction::Ocr,
+            }),
+        "pdf_combine_organize" if !paths.is_empty() => {
+            Some(LaunchIntent::PdfCombineOrganize(paths))
+        }
         "pdf_combine_quick" if !paths.is_empty() => Some(LaunchIntent::PdfCombineQuick(paths)),
         "images_dialog" if !paths.is_empty() => Some(LaunchIntent::ImagesToPdfDialog(paths)),
         "images_quick" if !paths.is_empty() => Some(LaunchIntent::ImagesToPdfQuick(paths)),

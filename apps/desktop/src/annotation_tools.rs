@@ -210,8 +210,10 @@ impl DocumentSession {
             }),
         );
 
-        let colors = gpui::div().flex().gap_2().children(
-            TOOL_COLORS.into_iter().enumerate().map(|(i, (label, c))| {
+        let colors = gpui::div()
+            .flex()
+            .gap_2()
+            .children(TOOL_COLORS.into_iter().enumerate().map(|(i, (label, c))| {
                 Button::new(("shape-swatch", i))
                     .ghost()
                     .rounded_full()
@@ -227,11 +229,12 @@ impl DocumentSession {
                         s.recolor_annotation(cx);
                         cx.notify();
                     }))
-            }),
-        );
+            }));
 
-        let widths = gpui::div().flex().gap_1().children(
-            SHAPE_WIDTHS.into_iter().enumerate().map(|(i, w)| {
+        let widths = gpui::div()
+            .flex()
+            .gap_1()
+            .children(SHAPE_WIDTHS.into_iter().enumerate().map(|(i, w)| {
                 Button::new(("shape-width", i))
                     .ghost()
                     .small()
@@ -241,8 +244,7 @@ impl DocumentSession {
                         s.annotation.tools.shape_width = w;
                         cx.notify();
                     }))
-            }),
-        );
+            }));
 
         gpui::div()
             .w(px(268.))
@@ -311,8 +313,10 @@ impl DocumentSession {
             }),
         );
 
-        let colors = gpui::div().flex().gap_2().children(
-            TOOL_COLORS.into_iter().enumerate().map(|(i, (label, c))| {
+        let colors = gpui::div()
+            .flex()
+            .gap_2()
+            .children(TOOL_COLORS.into_iter().enumerate().map(|(i, (label, c))| {
                 Button::new(("symbol-swatch", i))
                     .ghost()
                     .rounded_full()
@@ -326,8 +330,7 @@ impl DocumentSession {
                         s.annotation.tools.symbol_color = i;
                         cx.notify();
                     }))
-            }),
-        );
+            }));
 
         gpui::div()
             .w(px(300.))
@@ -362,8 +365,7 @@ impl DocumentSession {
         self.annotation.signature.placement_ghost = Some(crate::signatures::ghost_images(&preview));
         self.annotation.tools.placing_symbol = Some(PendingSymbol { symbol, color });
         self.annotation.tool = crate::annotations::Tool::Select;
-        self.status =
-            "Klik atau drag di halaman untuk menempatkan simbol. Esc membatalkan.".into();
+        self.status = "Klik atau drag di halaman untuk menempatkan simbol. Esc membatalkan.".into();
         self.focus.focus(window, cx);
         cx.notify();
     }
@@ -408,16 +410,18 @@ impl DocumentSession {
             let input = cx.new(|cx| {
                 InputState::new(window, cx).placeholder("Tulis catatan atau komentar...")
             });
-            cx.subscribe_in(&input, window, |s, _, event: &InputEvent, window, cx| {
-                match event {
+            cx.subscribe_in(
+                &input,
+                window,
+                |s, _, event: &InputEvent, window, cx| match event {
                     InputEvent::Change => {
                         s.annotation.tools.note_error = None;
                         cx.notify();
                     }
                     InputEvent::PressEnter { .. } => s.confirm_note(window, cx),
                     _ => {}
-                }
-            })
+                },
+            )
             .detach();
             self.annotation.tools.note_input = Some(input);
         }
@@ -504,13 +508,19 @@ impl DocumentSession {
         cx.notify();
     }
 
-    fn note_tool_panel(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
+    fn note_tool_panel(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
         let editing = self.annotation.tools.note_editing.is_some();
         let selected_color = self.annotation.tools.note_color;
         let error = self.annotation.tools.note_error.clone();
 
-        let colors = gpui::div().flex().gap_2().children(
-            TOOL_COLORS.into_iter().enumerate().map(|(i, (label, c))| {
+        let colors = gpui::div()
+            .flex()
+            .gap_2()
+            .children(TOOL_COLORS.into_iter().enumerate().map(|(i, (label, c))| {
                 Button::new(("note-swatch", i))
                     .ghost()
                     .rounded_full()
@@ -524,8 +534,7 @@ impl DocumentSession {
                         s.annotation.tools.note_color = i;
                         cx.notify();
                     }))
-            }),
-        );
+            }));
 
         let mut panel = gpui::div()
             .w(px(290.))
@@ -545,7 +554,12 @@ impl DocumentSession {
             .child(gpui::div().text_xs().font_semibold().child("Warna ikon"))
             .child(colors);
         if let Some(err) = error {
-            panel = panel.child(gpui::div().text_xs().text_color(cx.theme().danger).child(err));
+            panel = panel.child(
+                gpui::div()
+                    .text_xs()
+                    .text_color(cx.theme().danger)
+                    .child(err),
+            );
         }
         panel
             .child(
@@ -553,9 +567,12 @@ impl DocumentSession {
                     .flex()
                     .justify_end()
                     .gap_2()
-                    .child(Button::new("note-cancel").small().label("Batal").on_click(
-                        cx.listener(|s, _, _, cx| s.dismiss_note_panel(cx)),
-                    ))
+                    .child(
+                        Button::new("note-cancel")
+                            .small()
+                            .label("Batal")
+                            .on_click(cx.listener(|s, _, _, cx| s.dismiss_note_panel(cx))),
+                    )
                     .child(
                         Button::new("note-confirm")
                             .primary()

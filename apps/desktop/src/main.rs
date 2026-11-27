@@ -265,7 +265,9 @@ fn parse_cli_args(
             Some("--pdf-split-list") => Some((ManifestKind::PdfSplit, "--pdf-split-list")),
             Some("--pdf-png-list") => Some((ManifestKind::PdfPng, "--pdf-png-list")),
             Some("--pdf-ocr-list") => Some((ManifestKind::PdfOcr, "--pdf-ocr-list")),
-            Some("--merge-pdf-list") => Some((ManifestKind::PdfCombineOrganize, "--merge-pdf-list")),
+            Some("--merge-pdf-list") => {
+                Some((ManifestKind::PdfCombineOrganize, "--merge-pdf-list"))
+            }
             Some("--merge-pdf-quick-list") => {
                 Some((ManifestKind::PdfCombineQuick, "--merge-pdf-quick-list"))
             }

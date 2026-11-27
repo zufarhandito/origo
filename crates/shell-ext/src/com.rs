@@ -505,21 +505,40 @@ mod tests {
         }
 
         let one_pdf = SelectionKind::Pdfs(vec![PathBuf::from("C:\\a.pdf")]);
-        let two_pdfs = SelectionKind::Pdfs(vec![PathBuf::from("C:\\a.pdf"), PathBuf::from("C:\\b.pdf")]);
+        let two_pdfs =
+            SelectionKind::Pdfs(vec![PathBuf::from("C:\\a.pdf"), PathBuf::from("C:\\b.pdf")]);
         let imgs = SelectionKind::Images(vec![PathBuf::from("C:\\a.png")]);
 
         assert!(matches_action_selection(ActionMode::PdfOpen, &one_pdf));
         assert!(matches_action_selection(ActionMode::PdfCompress, &one_pdf));
-        assert!(!matches_action_selection(ActionMode::PdfCombineOrganize, &one_pdf));
-        assert!(!matches_action_selection(ActionMode::ImagesDialog, &one_pdf));
+        assert!(!matches_action_selection(
+            ActionMode::PdfCombineOrganize,
+            &one_pdf
+        ));
+        assert!(!matches_action_selection(
+            ActionMode::ImagesDialog,
+            &one_pdf
+        ));
 
-        assert!(matches_action_selection(ActionMode::PdfCombineOrganize, &two_pdfs));
-        assert!(matches_action_selection(ActionMode::PdfCombineQuick, &two_pdfs));
-        assert!(!matches_action_selection(ActionMode::PdfCompress, &two_pdfs));
+        assert!(matches_action_selection(
+            ActionMode::PdfCombineOrganize,
+            &two_pdfs
+        ));
+        assert!(matches_action_selection(
+            ActionMode::PdfCombineQuick,
+            &two_pdfs
+        ));
+        assert!(!matches_action_selection(
+            ActionMode::PdfCompress,
+            &two_pdfs
+        ));
         assert!(!matches_action_selection(ActionMode::PdfOpen, &two_pdfs));
 
         assert!(matches_action_selection(ActionMode::ImagesDialog, &imgs));
-        assert!(matches_action_selection(ActionMode::ImagesQuickConvert, &imgs));
+        assert!(matches_action_selection(
+            ActionMode::ImagesQuickConvert,
+            &imgs
+        ));
         assert!(!matches_action_selection(ActionMode::PdfOpen, &imgs));
 
         assert_eq!(S_OK.0, 0);

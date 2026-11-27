@@ -232,7 +232,11 @@ impl CompressReceipt {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| self.destination.display().to_string());
         let mode = if self.grayscale {
-            format!("{}, {} DPI, Grayscale", self.preset.short_label(), self.preset.dpi())
+            format!(
+                "{}, {} DPI, Grayscale",
+                self.preset.short_label(),
+                self.preset.dpi()
+            )
         } else {
             format!("{}, {} DPI", self.preset.short_label(), self.preset.dpi())
         };
@@ -240,9 +244,7 @@ impl CompressReceipt {
         let after = format_bytes(self.output_bytes);
         let pct = self.saved_percent();
         if self.output_bytes <= self.baseline_bytes {
-            format!(
-                "PDF berhasil dikompres ({mode}): {name} — {before} → {after} (-{pct:.1}%)."
-            )
+            format!("PDF berhasil dikompres ({mode}): {name} — {before} → {after} (-{pct:.1}%).")
         } else {
             let growth = -pct;
             format!(
@@ -283,7 +285,14 @@ pub fn run_compress_pdf(
     control: &ExportControl,
     mut progress: impl FnMut(usize),
 ) -> Result<CompressReceipt, CompressError> {
-    compressor.compress_pdf(plan, destination, renderer, inspector, control, &mut progress)
+    compressor.compress_pdf(
+        plan,
+        destination,
+        renderer,
+        inspector,
+        control,
+        &mut progress,
+    )
 }
 
 #[cfg(test)]

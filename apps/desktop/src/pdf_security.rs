@@ -596,7 +596,8 @@ impl WindowShell {
             .compare_exchange(0, SHELL_EXPORT_OWNER, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
         {
-            self.notice = Some("Tunggu proses ekspor lain selesai sebelum memproses keamanan PDF.".into());
+            self.notice =
+                Some("Tunggu proses ekspor lain selesai sebelum memproses keamanan PDF.".into());
             cx.notify();
             return;
         }
@@ -620,7 +621,10 @@ impl WindowShell {
             let chosen = prompt.await;
             let destination = match chosen {
                 Ok(Ok(Some(path))) => {
-                    if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf")) {
+                    if path
+                        .extension()
+                        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+                    {
                         path
                     } else {
                         path.with_extension("pdf")
@@ -764,8 +768,10 @@ impl WindowShell {
             s.set_masked(true, window, cx);
             s
         });
-        cx.subscribe_in(&password, window, |this, _, event: &InputEvent, window, cx| {
-            match event {
+        cx.subscribe_in(
+            &password,
+            window,
+            |this, _, event: &InputEvent, window, cx| match event {
                 InputEvent::Change => {
                     if let Some(dialog) = &mut this.security.password_prompt {
                         dialog.error = None;
@@ -777,8 +783,8 @@ impl WindowShell {
                     this.submit_password_prompt(window, cx);
                 }
                 _ => {}
-            }
-        })
+            },
+        )
         .detach();
 
         self.security.password_prompt = Some(PasswordPromptDialog {
@@ -1007,9 +1013,8 @@ impl WindowShell {
                         Err(pdf_application::RenderError::PasswordRequired) => {
                             if let Some(d) = &mut this.security.password_prompt {
                                 d.verifying = false;
-                                d.error = Some(
-                                    "Password salah. Periksa kembali lalu coba lagi.".into(),
-                                );
+                                d.error =
+                                    Some("Password salah. Periksa kembali lalu coba lagi.".into());
                             }
                             this.report(cx);
                             input.update(cx, |state, cx| state.focus(window, cx));
@@ -1044,4 +1049,3 @@ impl WindowShell {
         .detach();
     }
 }
-

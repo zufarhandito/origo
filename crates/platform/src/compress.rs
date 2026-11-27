@@ -203,9 +203,7 @@ pub fn write_single_page_raster_pdf_placed(
         "3 0 obj\n<< /Type /XObject /Subtype /Image /Width {width} /Height {height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Interpolate true /Length {} >>\nstream\n",
         jpeg.len()
     );
-    writer
-        .write_bytes(img_header.as_bytes())
-        .map_err(map_err)?;
+    writer.write_bytes(img_header.as_bytes()).map_err(map_err)?;
     writer.write_bytes(&jpeg).map_err(map_err)?;
     writer
         .write_bytes(b"\nendstream\nendobj\n")
@@ -318,12 +316,8 @@ impl PdfCompressor for LocalPdfCompressor {
                 .as_bytes(),
         )?;
 
-        for (index, (page, &(width, height))) in plan
-            .snapshot()
-            .pages()
-            .iter()
-            .zip(plan.sizes())
-            .enumerate()
+        for (index, (page, &(width, height))) in
+            plan.snapshot().pages().iter().zip(plan.sizes()).enumerate()
         {
             control.checkpoint().map_err(map_export_err)?;
             let source = resolve_source(plan.snapshot().sources(), page.entry.source_id)
@@ -505,8 +499,8 @@ mod tests {
     }
 
     #[test]
-    fn compresses_rgb_and_grayscale_and_respects_noclobber() -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn compresses_rgb_and_grayscale_and_respects_noclobber()
+    -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
         let src = dir.path().join("source.pdf");
         // Write a 256 KB synthetic source placeholder to verify baseline/savings math.

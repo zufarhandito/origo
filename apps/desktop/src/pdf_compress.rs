@@ -71,7 +71,11 @@ impl CompressState {
         };
         let done = job.done.load(Ordering::SeqCst);
         let mode = if job.grayscale {
-            format!("{}, {} DPI, Grayscale", job.preset.short_label(), job.preset.dpi())
+            format!(
+                "{}, {} DPI, Grayscale",
+                job.preset.short_label(),
+                job.preset.dpi()
+            )
         } else {
             format!("{}, {} DPI", job.preset.short_label(), job.preset.dpi())
         };
@@ -597,7 +601,12 @@ impl WindowShell {
                         .await;
                     let running = poll_weak
                         .update(cx, |this, cx| {
-                            if this.compress.job.as_ref().is_some_and(|j| j.job_id == job_id) {
+                            if this
+                                .compress
+                                .job
+                                .as_ref()
+                                .is_some_and(|j| j.job_id == job_id)
+                            {
                                 cx.notify();
                                 true
                             } else {

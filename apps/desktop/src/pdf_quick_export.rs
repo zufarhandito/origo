@@ -503,15 +503,10 @@ impl WindowShell {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    let extracted = extract_plan_text(
-                        &plan,
-                        &renderer,
-                        options,
-                        &control,
-                        |count, _total| {
+                    let extracted =
+                        extract_plan_text(&plan, &renderer, options, &control, |count, _total| {
                             progress_counter.store(count, Ordering::SeqCst);
-                        },
-                    )?;
+                        })?;
                     let (final_dest, bytes) =
                         write_text_file_no_clobber(&destination, &extracted.content, &control)?;
                     Ok::<TxtExportReceipt, ExportError>(TxtExportReceipt {
@@ -872,7 +867,10 @@ impl WindowShell {
                 }
                 let detail = detail_parts.join(", ");
                 let skipped_note = if report.skipped > 0 {
-                    format!(" ({} objek mask/kecil/tidak didukung dilewati)", report.skipped)
+                    format!(
+                        " ({} objek mask/kecil/tidak didukung dilewati)",
+                        report.skipped
+                    )
                 } else {
                     String::new()
                 };
@@ -887,8 +885,9 @@ impl WindowShell {
                 ExtractImagesError::Export(ExportError::Cancelled)
                 | ExtractImagesError::Batch(SplitError::Export(ExportError::Cancelled)),
             ) => {
-                self.notice =
-                    Some("Ekstraksi gambar asli dibatalkan. Folder hasil tidak diterbitkan.".into());
+                self.notice = Some(
+                    "Ekstraksi gambar asli dibatalkan. Folder hasil tidak diterbitkan.".into(),
+                );
             }
             Err(error) => {
                 self.notice = Some(format!("Gagal mengekstrak gambar asli: {error}"));

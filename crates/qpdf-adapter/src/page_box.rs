@@ -5,7 +5,9 @@ use pdf_application::{
     ExactPageRenderer, ExactRenderRequest, PdfInspector,
     export::{ExportControl, ExportError, ExportPhase, ExportPlan, resolve_source},
 };
-use pdf_platform::{StagedPdfOutput, compress::write_single_page_raster_pdf_placed, fingerprint, run};
+use pdf_platform::{
+    StagedPdfOutput, compress::write_single_page_raster_pdf_placed, fingerprint, run,
+};
 use serde_json::{Map, Value, json};
 use std::{
     collections::BTreeSet,
@@ -337,7 +339,15 @@ impl QpdfPageBox {
                     return Err(ExportError::InvalidPlan);
                 }
                 let targets = resolve_targets(pages, plan.pages().len())?;
-                self.run_crop(plan, &targets, *margins, work, staged.output_path(), control, progress)?
+                self.run_crop(
+                    plan,
+                    &targets,
+                    *margins,
+                    work,
+                    staged.output_path(),
+                    control,
+                    progress,
+                )?
             }
             PageBoxOperation::StandardizePaper {
                 paper,
@@ -408,7 +418,8 @@ impl QpdfPageBox {
         if !matches!(out.code, Some(0 | 3)) {
             return Err(ExportError::Inspection);
         }
-        let doc: Value = serde_json::from_slice(&out.stdout).map_err(|_| ExportError::Inspection)?;
+        let doc: Value =
+            serde_json::from_slice(&out.stdout).map_err(|_| ExportError::Inspection)?;
         let (patch, modified) = build_crop_patch(&doc, targets, margins, progress)?;
         let patch_path = work.join("crop-patch.json");
         let bytes = serde_json::to_vec(&patch).map_err(|_| ExportError::Engine)?;
@@ -592,7 +603,11 @@ fn parse_box_array(val: &Value) -> Option<[f32; 4]> {
     }
 }
 
-fn inherited_value<'a>(objects: &'a Map<String, Value>, start_id: &str, key: &str) -> Option<&'a Value> {
+fn inherited_value<'a>(
+    objects: &'a Map<String, Value>,
+    start_id: &str,
+    key: &str,
+) -> Option<&'a Value> {
     let mut current = start_id.to_owned();
     for _ in 0..32 {
         let obj_key = if current.starts_with("obj:") {
@@ -679,7 +694,10 @@ fn build_crop_patch(
         progress(index + 1);
     }
 
-    Ok((json!({"qpdf": [document["qpdf"][0].clone(), updates]}), modified))
+    Ok((
+        json!({"qpdf": [document["qpdf"][0].clone(), updates]}),
+        modified,
+    ))
 }
 
 fn round3(v: f32) -> f64 {
@@ -741,9 +759,7 @@ mod tests {
             [40.0, 10.0, 580.0, 770.0]
         );
         // Over-cropping below 36pt fails cleanly.
-        assert!(
-            crop_pdf_box([0.0, 0.0, 100.0, 100.0], 0, CropMargins::uniform_mm(30.0)).is_err()
-        );
+        assert!(crop_pdf_box([0.0, 0.0, 100.0, 100.0], 0, CropMargins::uniform_mm(30.0)).is_err());
         Ok(())
     }
 
@@ -803,7 +819,9 @@ mod tests {
             out.extend_from_slice(obj);
         }
         let xref = out.len();
-        out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes());
+        out.extend_from_slice(
+            format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes(),
+        );
         for off in offsets {
             out.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
         }

@@ -131,9 +131,8 @@ fn build_combined_workspace(
     let Some((first, rest)) = canonical.split_first() else {
         return Err("Tidak ada file PDF untuk digabungkan.".into());
     };
-    let mut workspace =
-        pdf_application::open_document(renderer, first, SourceId(base_source_id))
-            .map_err(|e| format!("{}: {e}", first.display()))?;
+    let mut workspace = pdf_application::open_document(renderer, first, SourceId(base_source_id))
+        .map_err(|e| format!("{}: {e}", first.display()))?;
     let actual_first = pdf_platform::fingerprint(first)
         .map_err(|_| pdf_application::RenderError::SourceChanged.to_string())?;
     if actual_first != workspace.source().fingerprint {
@@ -556,10 +555,7 @@ fn install_shell_extension() -> Result<String, String> {
         ])?;
         return Ok("Menu klik kanan Windows 11 Explorer (mode dev) berhasil diperbarui.".into());
     }
-    Err(
-        "Paket ekstensi shell (OrigoShellExt.msix) tidak ditemukan di folder instalasi ini."
-            .into(),
-    )
+    Err("Paket ekstensi shell (OrigoShellExt.msix) tidak ditemukan di folder instalasi ini.".into())
 }
 
 #[cfg(windows)]

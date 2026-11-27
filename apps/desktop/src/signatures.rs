@@ -1270,14 +1270,17 @@ impl DocumentSession {
     ) -> bool {
         let placing_symbol = self.annotation.tools.placing_symbol.is_some()
             || (self.annotation.signature.placement_ghost.is_some()
-                && self.annotation.signature.gesture.as_ref().is_some_and(
-                    |(_, a, _, _)| {
+                && self
+                    .annotation
+                    .signature
+                    .gesture
+                    .as_ref()
+                    .is_some_and(|(_, a, _, _)| {
                         matches!(
                             a.extra,
                             Some(pdf_domain::annotation::AnnotationExtra::Symbol(_))
                         )
-                    },
-                ));
+                    }));
         if placing_symbol {
             if !start && self.annotation.tools.placing_symbol.is_some() {
                 return true;
@@ -1325,14 +1328,17 @@ impl DocumentSession {
         }
         let placing_note = self.annotation.tools.placing_note.is_some()
             || (self.annotation.signature.placement_ghost.is_some()
-                && self.annotation.signature.gesture.as_ref().is_some_and(
-                    |(_, a, _, _)| {
+                && self
+                    .annotation
+                    .signature
+                    .gesture
+                    .as_ref()
+                    .is_some_and(|(_, a, _, _)| {
                         matches!(
                             a.extra,
                             Some(pdf_domain::annotation::AnnotationExtra::Note(_))
                         )
-                    },
-                ));
+                    }));
         if placing_note {
             if !start && self.annotation.tools.placing_note.is_some() {
                 return true;

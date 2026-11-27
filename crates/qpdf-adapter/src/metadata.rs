@@ -565,7 +565,13 @@ pub fn build_metadata_patch(
         } else {
             let next_id = objects
                 .keys()
-                .filter_map(|k| k.strip_prefix("obj:")?.split_whitespace().next()?.parse::<u64>().ok())
+                .filter_map(|k| {
+                    k.strip_prefix("obj:")?
+                        .split_whitespace()
+                        .next()?
+                        .parse::<u64>()
+                        .ok()
+                })
                 .max()
                 .unwrap_or(0)
                 + 1;
@@ -683,7 +689,9 @@ mod tests {
             out.extend_from_slice(obj);
         }
         let xref = out.len();
-        out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes());
+        out.extend_from_slice(
+            format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes(),
+        );
         for off in offsets {
             out.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
         }
@@ -739,7 +747,8 @@ mod tests {
             producer: "Origo Offline".into(),
         };
         let with_meta = dir.join("doc-meta.pdf");
-        let report = tool.write_metadata(&plan, &with_meta, &meta, true, &StubInspector(1), &control)?;
+        let report =
+            tool.write_metadata(&plan, &with_meta, &meta, true, &StubInspector(1), &control)?;
         assert!(!report.cleared);
         assert_eq!(tool.read_metadata(&with_meta, &control)?, meta);
 
@@ -768,7 +777,10 @@ mod tests {
             &control,
         )?;
         assert!(clear_rep.cleared);
-        assert_eq!(tool.read_metadata(&cleared_pdf, &control)?, PdfMetadata::default());
+        assert_eq!(
+            tool.read_metadata(&cleared_pdf, &control)?,
+            PdfMetadata::default()
+        );
 
         // 3) Flatten PDF removes /Annots completely
         let flattened = dir.join("doc-flattened.pdf");

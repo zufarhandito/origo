@@ -216,8 +216,15 @@ impl QpdfSecurity {
         } else {
             options.owner_password.as_str()
         };
-        let encrypt_job = build_encrypt_job(src_str, out_str, &options.user_password, owner, options.permissions);
-        let code = self.run_ephemeral_job(&encrypt_job, staged.work_dir(), "encrypt.json", control)?;
+        let encrypt_job = build_encrypt_job(
+            src_str,
+            out_str,
+            &options.user_password,
+            owner,
+            options.permissions,
+        );
+        let code =
+            self.run_ephemeral_job(&encrypt_job, staged.work_dir(), "encrypt.json", control)?;
         if !matches!(code, Some(0 | 3)) {
             return Err(SecurityError::Engine);
         }
@@ -293,7 +300,8 @@ impl QpdfSecurity {
             "decrypt": "",
             "outputFile": out_str
         });
-        let code = self.run_ephemeral_job(&decrypt_job, staged.work_dir(), "decrypt.json", control)?;
+        let code =
+            self.run_ephemeral_job(&decrypt_job, staged.work_dir(), "decrypt.json", control)?;
         if !matches!(code, Some(0 | 3)) {
             return Err(SecurityError::Engine);
         }
@@ -397,8 +405,8 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_aes256_and_decrypt_roundtrip_with_real_qpdf() -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn encrypt_aes256_and_decrypt_roundtrip_with_real_qpdf()
+    -> Result<(), Box<dyn std::error::Error>> {
         let sidecars = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../sidecars");
         let sec = QpdfSecurity::new(&sidecars);
         let control = ExportControl::default();
@@ -467,7 +475,10 @@ mod tests {
 
     #[test]
     fn password_validation_rejects_empty_oversized_and_control_chars() {
-        assert_eq!(validate_password("", false), Err(SecurityError::EmptyPassword));
+        assert_eq!(
+            validate_password("", false),
+            Err(SecurityError::EmptyPassword)
+        );
         assert_eq!(validate_password("", true), Ok(()));
         assert_eq!(
             validate_password("bad\npass", false),

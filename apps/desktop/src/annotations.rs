@@ -203,7 +203,8 @@ impl DocumentSession {
                             s.annotation.draft = None;
                             s.annotation.selected = None;
                             if matches!(tool, Tool::Underline | Tool::StrikeOut) {
-                                s.status = format!("Seret teks pada halaman untuk memberi {label}.");
+                                s.status =
+                                    format!("Seret teks pada halaman untuk memberi {label}.");
                             }
                             s.focus.focus(window, cx);
                             cx.notify();
@@ -278,12 +279,9 @@ impl DocumentSession {
                 .child(self.signature_button(cx))
                 .child(self.text_annotation_button(cx));
             let selected_annot = self.annotation.selected.and_then(|(page, id)| {
-                self.workspace.as_ref().and_then(|w| {
-                    w.annotations(page)
-                        .iter()
-                        .find(|a| a.id == id)
-                        .cloned()
-                })
+                self.workspace
+                    .as_ref()
+                    .and_then(|w| w.annotations(page).iter().find(|a| a.id == id).cloned())
             });
             if let Some(selected) = selected_annot {
                 if selected.signature.is_some() {
