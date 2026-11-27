@@ -1,5 +1,35 @@
 # Pengujian Origo
 
+## Rilis Origo Preview 0.1.7
+
+Paket rilis `Origo.Preview 0.1.7` dibangun (`--release --locked --offline`) dan dipaketkan ke
+feed lokal `dist/origo-preview` (mencakup aksi PDF menu klik kanan Windows 11 Explorer +
+pembersihan uninstall, enkripsi AES-256 / dekripsi / prompt sandi viewer, penomoran halaman &
+watermark, kompresi PDF cerdas, anotasi kaya & Fill & Sign, redaksi PDF permanen, pangkas margin
+lossless & standarisasi ukuran kertas, ratakan PDF & editor metadata, ekspor cepat JPEG/TXT/ekstrak
+gambar tertanam, serta widget mengambang **Capture Soal Cepat** dengan WGC + drag Win32):
+
+- Verifikasi pra-rilis: `cargo fmt --all -- --check`,
+  `cargo clippy --workspace --all-targets --locked --offline -- -D warnings` (0 warning), dan
+  `cargo test --workspace --locked --offline` lulus seluruh **145 unit test** (`5 origo-shell-ext`,
+  `39 pdf-application`, `14 pdf-domain`, `2 pdf-engine`, `5 pdf-ocr`, `11 pdf-platform`,
+  `41 pdf-studio`, `28 qpdf-adapter`).
+- Audit distribusi (`scripts/audit-distribution.ps1` + PE import verification termasuk
+  `coremessaging.dll` sebagai komponen sistem Windows untuk Windows Graphics Capture) lulus
+  (`501 notice-collected`, `3 missing-license-evidence`, `1 copyleft-source-review`,
+  `7 project-license-unset`).
+- Paket penuh `Origo.Preview-0.1.7-preview-full.nupkg`: **47,05 MiB**
+  (`SHA-256: DAE98276F07ACC03263BFFBB2997AE9EF1F77F622C8A916801286A8A58F922A3`).
+- Paket delta `0.1.6 → 0.1.7` (`Origo.Preview-0.1.7-preview-delta.nupkg`): **7,15 MiB**
+  (turun **84,8%**; 6 berkas ditambal, 1.193 tidak berubah;
+  `SHA-256: BC8B2C9410DEC078422746A4982429843CA0E5F040398B78BBD35A5431C72EC8`).
+- Installer `Origo.Preview-preview-Setup.exe`: **54,26 MiB**
+  (`SHA-256: 3F9D1D23C75B0B4212A421F5FFD90F26F4BFB1FCBC8914C71414F6144056376C`).
+- Ekstensi shell release `origo_shell_ext.dll`: **271,0 KiB**
+  (`SHA-256: 5629173820BB403A903DE7C52C52D92D9F973493FB95E0FAFFD2FC7630B7C2F9`), dipaketkan
+  menjadi Sparse MSIX bertanda tangan dan didaftarkan ulang menunjuk ke
+  `%LocalAppData%\Origo.Preview\current\pdf-studio.exe`.
+
 ## Rilis Origo Preview 0.1.6
 
 Paket rilis `Origo.Preview 0.1.6` dibangun (`--release --locked --offline`) dan dipaketkan ke
