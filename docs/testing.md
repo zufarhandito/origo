@@ -1,5 +1,26 @@
 # Pengujian Origo
 
+## Rilis Origo Preview 0.1.8
+
+Paket rilis `Origo.Preview 0.1.8` dibangun (`--release --locked --offline`) dan dipaketkan ke
+feed lokal `dist/origo-preview` dengan pembaruan logo aplikasi, installer, tray OCR, dan menu klik
+kanan Windows 11 File Explorer (`origo-source.png` 1582×1582 RGBA berlatar transparan →
+`origo.ico` 9 ukuran + `origo-32.png`):
+
+- `scripts/branding-ui-smoke.ps1 -Profile release` lulus (ikon resource ID 1 sembilan ukuran
+  `16..256`, kesesuaian piksel-per-piksel ikon jendela native dengan `origo-32.png`, metadata
+  `Origo`, tampilan terang/gelap, dan dialog Tentang Origo; bukti lokal di
+  `.research/branding-ui-5b93373d809b4ce2952974aa2fde91db`).
+- Paket penuh `Origo.Preview-0.1.8-preview-full.nupkg`: **47,09 MiB**
+  (`SHA-256: 91E545BA78DCE574EC217E37F7ADE404F6DBA4278C2F2DA4268F501599D7A7DA`).
+- Paket delta `0.1.7 → 0.1.8` (`Origo.Preview-0.1.8-preview-delta.nupkg`): **806,4 KiB**
+  (turun **98,3%**; 6 berkas ditambal, 1.193 tidak berubah;
+  `SHA-256: DA26F3C083912D46B82C98198FE0D6229EAF65C6D5A40B98D5BA98B297DBA87D`).
+- Installer `Origo.Preview-preview-Setup.exe`: **54,30 MiB**
+  (`SHA-256: 1F5E3C888A6A0EDA7612051F6D4ED8E44FD798FBB589AED1AFFE64E4946E19E0`).
+- Ekstensi shell Windows 11 (`OrigoShellExt.msix` + `origo.ico` baru) dipaketkan ulang, ditandatangani,
+  dan didaftarkan menunjuk ke `%LocalAppData%\Origo.Preview\current\pdf-studio.exe`.
+
 ## Rilis Origo Preview 0.1.7
 
 Paket rilis `Origo.Preview 0.1.7` dibangun (`--release --locked --offline`) dan dipaketkan ke
